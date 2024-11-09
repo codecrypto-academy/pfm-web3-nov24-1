@@ -25,7 +25,7 @@ body {
 main {
   display: flex;
   flex-direction: column;
-  gap: 15vh;
+
   width: 100%;
 }
 
@@ -53,6 +53,11 @@ main {
   color: var(--earth-dark) !important;
   font-family: var(--font-geist-sans) !important;
   text-align: center !important;
+}
+
+.qr-button {
+  height: 512px !important;
+  width: 512px !important;
 }
 
 :root {
