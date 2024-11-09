@@ -13,19 +13,18 @@
 }
 
 body {
-  min-height: 100vh;
+  height: 100vh;
   margin: 0;
   padding: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 10vh;
+  overflow: hidden;
 }
 
 main {
   display: flex;
   flex-direction: column;
-
   width: 100%;
 }
 
@@ -55,9 +54,65 @@ main {
   text-align: center !important;
 }
 
-.qr-button {
-  height: 512px !important;
-  width: 512px !important;
+.company-access-btn {
+  font-family: var(--font-geist-sans) !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+  background-color: var(--olive-dark) !important;
+  width: 200px !important;
+  height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 48px auto 0 !important;
+  border-radius: 12px !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.company-access-btn span {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  line-height: 1 !important;
+}
+
+.company-access-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+  stroke: #ffffff !important;
+  margin-top: 1px !important;
+}
+
+.company-access-btn:hover {
+  background-color: var(--oil-dark) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.company-access-btn:active {
+  transform: translateY(1px) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.qr-button-container {
+  position: relative !important;
+  width: 450px !important;
+  height: 450px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+}
+
+.qr-button-container::before {
+  content: '' !important;
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 4px solid var(--olive-dark) !important;
+  border-radius: 8px !important;
+  pointer-events: none !important;
 }
 
 :root {
@@ -72,15 +127,27 @@ main {
 
 @keyframes float {
   0% {
-    transform: translate(0, 0) rotate(0deg);
+    transform: translate(0, 0) rotate(0deg) scale(1);
   }
 
-  50% {
-    transform: translate(10px, -20px) rotate(180deg);
+  20% {
+    transform: translate(25px, -35px) rotate(120deg) scale(1.1);
+  }
+
+  40% {
+    transform: translate(-20px, -45px) rotate(240deg) scale(0.9);
+  }
+
+  60% {
+    transform: translate(-30px, -25px) rotate(360deg) scale(1.05);
+  }
+
+  80% {
+    transform: translate(15px, -15px) rotate(480deg) scale(0.95);
   }
 
   100% {
-    transform: translate(0, 0) rotate(360deg);
+    transform: translate(0, 0) rotate(720deg) scale(1);
   }
 }
 
@@ -93,10 +160,13 @@ main {
     inset 5px 5px 10px rgba(255, 255, 255, 0.8),
     0 0 20px rgba(255, 215, 0, 0.3);
   opacity: 0.3;
-  animation: float 15s infinite ease-in-out;
+  animation: float 25s infinite ease-in-out;
   pointer-events: none;
   backdrop-filter: blur(2px);
+  will-change: transform;
 }
+
+
 
 .bubble-xs {
   width: 25px;

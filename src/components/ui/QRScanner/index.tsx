@@ -9,12 +9,12 @@ const QRScanner = () => {
             "reader",
             {
                 qrbox: {
-                    width: 250,
-                    height: 250,
+                    width: 400,
+                    height: 400,
                 },
                 fps: 5,
             },
-            true  // verbose flag added here
+            true
         );
 
         function success(result: string) {
@@ -34,11 +34,14 @@ const QRScanner = () => {
     }, []);
 
     return (
-        <div>
+        <div className="relative w-[512px] h-[512px] flex items-center justify-center">
             {scanResult ? (
                 <div>Success: {scanResult}</div>
             ) : (
-                <div id="reader"></div>
+                <>
+                    <div className="absolute border-4 border-olive-dark rounded-lg w-[400px] h-[400px] pointer-events-none z-10" />
+                    <div id="reader" className="w-full h-full"></div>
+                </>
             )}
         </div>
     );
