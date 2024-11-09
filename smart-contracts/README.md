@@ -64,3 +64,15 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+Network Name: Sepolia
+RPC URL: https://sepolia.infura.io/v3/
+Chain ID: 11155111
+Currency Symbol: ETH
+Block Explorer URL: https://sepolia.etherscan.io
+
+
+
+Network Name: Anvil Local
+RPC URL: http://127.0.0.1:8545
+Chain ID: 31337
+Currency Symbol: ETH

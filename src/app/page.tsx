@@ -63,7 +63,9 @@ export default function Home() {
                 className="qr-button-container custom-button rounded-drop transition-colors flex items-center justify-center bg-oil hover:bg-oil-dark gap-2 shadow-oil cursor-pointer"
                 onClick={() => setShowScanner(true)}
               >
-                <QrCodeIcon className="qr-button" />
+                <QrCodeIcon className="qr-button w-12 h-12 text-blue-900" />
+
+
               </div>
             )}
           </div>
