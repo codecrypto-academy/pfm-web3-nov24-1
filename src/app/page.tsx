@@ -7,20 +7,33 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ethers } from 'ethers'
 
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 export default function Home() {
   const [showScanner, setShowScanner] = useState(false)
   const [account, setAccount] = useState('')
-  const router = useRouter()
 
   const connectWallet = async () => {
-    if (typeof window !== 'undefined' && typeof (window as any).ethereum !== 'undefined') {
+    if (typeof window !== 'undefined' && window.ethereum) {
       try {
-        const accounts = await (window as any).ethereum.request({
+        const accounts = await window.ethereum.request({
           method: 'eth_requestAccounts'
         })
+
         setAccount(accounts[0])
-        // Here you can add logic to verify if the wallet address 
-        // matches any registered company and redirect accordingly
+
+        window.ethereum.on('accountsChanged', function (newAccounts: string[]) {
+          setAccount(newAccounts[0])
+        })
+
+        window.ethereum.on('chainChanged', () => {
+          window.location.reload()
+        })
+
       } catch (error) {
         console.log('Error connecting to MetaMask:', error)
       }
@@ -28,7 +41,6 @@ export default function Home() {
       window.open('https://metamask.io/download/', '_blank')
     }
   }
-
   return (
     <div className="relative min-h-screen flex items-center justify-center">
       <BubbleBackground />
