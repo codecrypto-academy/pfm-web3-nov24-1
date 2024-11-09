@@ -1,9 +1,7 @@
-<<<<<<< HEAD
 ## Extension para drawio
 
 code --install-extension hediet.vscode-drawio
 
-=======
 ## Mnemonic
 
 **Frase mnemonic**
@@ -55,4 +53,3 @@ Private key: 0x33aed039717cecdcf4111a797d6d662a64a6a74d305a46861d301655e115aa6c
 - Account 9:
 Address:     0xa34dC89a6042bc02aB77b5a39bB081C361A91198
 Private key: 0xdd52268b6c2620a68eb425b0caf375988e0e059e344772fea293512b78a9e888
->>>>>>> origin/feature/init-foundry
