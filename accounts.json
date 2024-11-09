@@ -1,42 +1,55 @@
-[
-    {
-        "privateKey": "8daf83c362d3908d27231f7e6f43a79c959903f137d9f39b1ddf4352533dab1a",
-        "name": "Admin"
-    },
-    {
-        "privateKey": "60a5c588f8c4061242b5888f3d6ea74f2332f20467f6dec05c3e3bf78542d717",
-        "name": "Productor 1"
-    },
-    {
-        "privateKey": "bf0ab140a1e2e7b7f7f997c13fd22254997101168b7d491035581ce3875d8aee",
-        "name": "Productor 2"
-    },
-    {
-        "privateKey": "f0a58255d73c9e085b19a13f7f1ff5dfec63a42279adfefbab5bd550d963eb8c",
-        "name": "Productor 3"
-    },
-    {
-        "privateKey": "53d947d87251115f90ce6aee77377c9b3e5528fdf8ecf3e7050ab93de11a2603",
-        "name": "Fabrica 1"
-    },
-    {
-        "privateKey": "cc480c8d493ba4331fee051134bbe3f845122e94590b7d51853f7cf02e617c60",
-        "name": "Fabrica 2"
-    },
-    {
-        "privateKey": "40fd79837d4353fa971fa0e042315c9a24ffe57671a673b9b9f34393fefdbfc9",
-        "name": "Minorista 1"
-    },
-    {
-        "privateKey": "47ec3c74761514f1ca657dfec0fd33462f9ed822fa89144d857132b6632d88cf",
-        "name": "Minorista 2"
-    },
-    {
-        "privateKey": "33aed039717cecdcf4111a797d6d662a64a6a74d305a46861d301655e115aa6c",
-        "name": "Consumidor 1"
-    },
-    {
-        "privateKey": "dd52268b6c2620a68eb425b0caf375988e0e059e344772fea293512b78a9e888",
-        "name": "Consumidor 2"
-    }
-]
+{
+    "version": 3,
+    "wallets": [
+        {
+            "address": "9f35aD88884808d40F5321Ea48A29F974F0EF249",
+            "name": "Admin",
+            "private": "8daf83c362d3908d27231f7e6f43a79c959903f137d9f39b1ddf4352533dab1a"
+        },
+        {
+            "address": "D3b341D0faDe31D58c7106c0a3C3D901E21F58f4",
+            "name": "Productor 1",
+            "private": "60a5c588f8c4061242b5888f3d6ea74f2332f20467f6dec05c3e3bf78542d717"
+        },
+        {
+            "address": "0033cF9F585Bfe822359fa1F11f65fbc0e1E8182",
+            "name": "Productor 2",
+            "private": "bf0ab140a1e2e7b7f7f997c13fd22254997101168b7d491035581ce3875d8aee"
+        },
+        {
+            "address": "925C9694853a7aF711E6512dA0A87Ba529dF4986",
+            "name": "Productor 3",
+            "private": "f0a58255d73c9e085b19a13f7f1ff5dfec63a42279adfefbab5bd550d963eb8c"
+        },
+        {
+            "address": "3BfbC9dc781DC464166590f9855B78eC483ddC5E",
+            "name": "Fabrica 1",
+            "private": "53d947d87251115f90ce6aee77377c9b3e5528fdf8ecf3e7050ab93de11a2603"
+        },
+        {
+            "address": "1Ff3B17D050909fF1a9Af95A1950CE11cEc9148A",
+            "name": "Fabrica 2",
+            "private": "cc480c8d493ba4331fee051134bbe3f845122e94590b7d51853f7cf02e617c60"
+        },
+        {
+            "address": "b03C8cdd9aD635242700453D2e75Ce6d8E52ffD4",
+            "name": "Minorista 1",
+            "private": "40fd79837d4353fa971fa0e042315c9a24ffe57671a673b9b9f34393fefdbfc9"
+        },
+        {
+            "address": "A6C4eC6a8D42aE2c5DE9cEA1E9700C2937a4929d",
+            "name": "Minorista 2",
+            "private": "47ec3c74761514f1ca657dfec0fd33462f9ed822fa89144d857132b6632d88cf"
+        },
+        {
+            "address": "9aa9E44E3D72e78B0De60F4BFDb20231207ad3ca",
+            "name": "Consumidor 1",
+            "private": "33aed039717cecdcf4111a797d6d662a64a6a74d305a46861d301655e115aa6c"
+        },
+        {
+            "address": "a34dC89a6042bc02aB77b5a39bB081C361A91198",
+            "name": "Consumidor 2",
+            "private": "dd52268b6c2620a68eb425b0caf375988e0e059e344772fea293512b78a9e888"
+        }
+    ]
+}

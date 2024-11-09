@@ -3,8 +3,19 @@ import { useEffect, useState } from 'react';
 
 const QRScanner = () => {
     const [scanResult, setScanResult] = useState<string | null>(null);
+    const [hasPermission, setHasPermission] = useState(false);
 
     useEffect(() => {
+        // Request camera permission first
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(() => {
+                setHasPermission(true);
+                initializeScanner();
+            })
+            .catch((err) => console.warn("Camera permission denied:", err));
+    }, []);
+
+    const initializeScanner = () => {
         const scanner = new Html5QrcodeScanner(
             "reader",
             {
@@ -17,6 +28,8 @@ const QRScanner = () => {
             true
         );
 
+        scanner.render(success, error);
+
         function success(result: string) {
             scanner.clear();
             setScanResult(result);
@@ -25,17 +38,13 @@ const QRScanner = () => {
         function error(err: string) {
             console.warn(err);
         }
-
-        scanner.render(success, error);
-
-        return () => {
-            scanner.clear();
-        };
-    }, []);
+    };
 
     return (
         <div className="relative w-[512px] h-[512px] flex items-center justify-center">
-            {scanResult ? (
+            {!hasPermission ? (
+                <div>Please allow camera access to scan QR codes</div>
+            ) : scanResult ? (
                 <div>Success: {scanResult}</div>
             ) : (
                 <>
