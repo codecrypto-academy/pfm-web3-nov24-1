@@ -1,10 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "esnext",
+      "ES2017",
+      "ES2018.Promise",
+      "ES2019.Array",
+      "ES2020.String"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -26,7 +29,8 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "jsxImportSource": "react"
   },
   "include": [
     "next-env.d.ts",

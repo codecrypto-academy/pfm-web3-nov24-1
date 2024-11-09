@@ -8,6 +8,15 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontSize: {
+        'title': ['2.5rem !important', { lineHeight: '3rem', fontWeight: '700' }],
+        'subtitle': ['2rem !important', { lineHeight: '2.5rem', fontWeight: '600' }],
+        'body': ['1rem !important', { lineHeight: '1.5rem' }]
+      },
+      fontFamily: {
+        'title': ['var(--font-geist-sans)'],
+        'body': ['var(--font-geist-mono)']
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

@@ -2,10 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  h1 {
+    @apply text-title font-title text-olive-dark !important;
+  }
+
+  p {
+    @apply text-subtitle font-body text-earth-dark;
+  }
+}
+.custom-heading {
+  font-size: 2.5rem !important;
+  line-height: 3rem !important;
+  font-weight: 700 !important;
+  color: var(--olive-dark) !important;
+  font-family: var(--font-geist-sans) !important;
+}
+
+.custom-subtitle {
+  font-size: 2rem !important;
+  line-height: 2.5rem !important;
+  font-weight: 600 !important;
+  color: var(--earth-dark) !important;
+  font-family: var(--font-geist-mono) !important;
+}
+
+.custom-button {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+  color: var(--earth-dark) !important;
+  font-family: var(--font-geist-sans) !important;
+}
 :root {
   --background: #ffffff;
-  /* Cambiamos a fondo blanco puro */
   --foreground: #000000;
+  --olive-dark: #4A5D23;
+  --earth-dark: #654321;
+  --oil-dark: #B8860B;
 }
 
 body {
