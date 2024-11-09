@@ -11,12 +11,31 @@
     @apply text-subtitle font-body text-earth-dark;
   }
 }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 15vh;
+  width: 100%;
+}
+
 .custom-heading {
   font-size: 2.5rem !important;
   line-height: 3rem !important;
   font-weight: 700 !important;
   color: var(--olive-dark) !important;
   font-family: var(--font-geist-sans) !important;
+  text-align: center !important;
 }
 
 .custom-subtitle {
@@ -25,6 +44,7 @@
   font-weight: 600 !important;
   color: var(--earth-dark) !important;
   font-family: var(--font-geist-mono) !important;
+  text-align: center !important;
 }
 
 .custom-button {
@@ -32,7 +52,9 @@
   line-height: 1.5rem !important;
   color: var(--earth-dark) !important;
   font-family: var(--font-geist-sans) !important;
+  text-align: center !important;
 }
+
 :root {
   --background: #ffffff;
   --foreground: #000000;
@@ -41,11 +63,7 @@
   --oil-dark: #B8860B;
 }
 
-body {
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-}
+
 
 @keyframes float {
   0% {
