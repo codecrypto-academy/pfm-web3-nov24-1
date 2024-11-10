@@ -78,4 +78,4 @@ Chain ID: 31337
 Currency Symbol: ETH
 
 ### Desplegar Participantes
-forge script script/Participantes.s.sol:ParticipantesDeploy --rpc-url http://127.0.0.1:8545 --broadcast
+forge script script/Participantes.s.sol:ParticipantesDeploy --rpc-url http://127.0.0.1:8545 --broadcast --private-key 0xCLAVE_PRIVADA
