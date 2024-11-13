@@ -75,30 +75,7 @@ export default function Home() {
     }
   }, [account])
 
-  //THIS WORKS FINE
-  /*
-    const connectWallet = async () => {
-      if (window.ethereum) {
-        try {
-          console.log("Solicitando conexión a MetaMask...")
-          const accounts = await window.ethereum.request({
-            method: 'wallet_requestPermissions',
-            params: [{ eth_accounts: {} }],
-          })
-  
-          if (accounts.length > 0) {
-            console.log("Cuentas conectadas:", accounts)
-            handleAccountsChanged(accounts) // Asegurarnos de actualizar con la nueva cuenta
-          } else {
-            console.log("No se encontraron cuentas.")
-          }
-        } catch (error) {
-          console.error("Error al conectar MetaMask:", error)
-        }
-      } else {
-        console.log("MetaMask no está disponible.")
-      }
-    }*/
+
   const connectWallet = async () => {
     if (window.ethereum) {
       try {

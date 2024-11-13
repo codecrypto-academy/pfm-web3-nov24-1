@@ -31,24 +31,20 @@ export default function DashboardLayout({ children }: LayoutProps) {
                 return (
                     <nav className="p-6">
                         <div className="mb-6">
-                            <h2 className="text-xl font-semibold text-olive-800">Panel de Control</h2>
+                            <h2 className="text-xl font-semibold text-olive-800">
+                                Panel de Control
+                            </h2>
                             <p className="text-sm text-olive-600">Administración</p>
                         </div>
                         <ul className="space-y-2">
                             <li>
-                                <Link
-                                    href="/dashboard/admin"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                >
+                                <Link href="/dashboard/admin" className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2">
                                     <span className="font-medium">Panel Principal</span>
                                 </Link>
                             </li>
-                            <div className="border-t border-olive-200 my-4" />
+                            <div className="border-t border-olive-200 my-4 opacity-50" />
                             <li>
-                                <Link
-                                    href="/dashboard/admin/adduser"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                >
+                                <Link href="/dashboard/admin/adduser" className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2">
                                     <span className="font-medium">Añadir Usuario</span>
                                 </Link>
                             </li>
@@ -81,14 +77,14 @@ export default function DashboardLayout({ children }: LayoutProps) {
     return (
         <div className="min-h-screen bg-olive-50">
             <Header role={role} account={account} />
+            <BubbleBackground />
             <div className="pt-[73px]">
                 <div className="relative">
-                    <BubbleBackground />
                     <div className="flex">
                         <aside className="fixed left-0 top-[73px] h-[calc(100vh-73px)] w-64 backdrop-blur-sm bg-white/80 border-r border-olive-200 shadow-lg">
                             {renderNavigation()}
                         </aside>
-                        <main className="flex-1 ml-64 p-6">
+                        <main className="flex-1 ml-64 p-6 shadow-sm bg-white/50 backdrop-blur-sm rounded-lg">
                             {children}
                         </main>
                     </div>
