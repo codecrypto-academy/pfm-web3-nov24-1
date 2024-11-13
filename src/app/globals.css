@@ -160,6 +160,11 @@ main {
 
 .qr-button {
   color: var(--slate-grey) !important;
+  width: 400px;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .qr-button-container {
@@ -170,6 +175,7 @@ main {
   align-items: center !important;
   justify-content: center !important;
   margin: 0 auto !important;
+
 }
 
 .qr-button-container::before {

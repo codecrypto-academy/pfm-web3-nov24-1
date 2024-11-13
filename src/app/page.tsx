@@ -152,7 +152,7 @@ export default function Home() {
                 className="qr-button-container cursor-pointer"
                 onClick={() => setShowScanner(true)}
               >
-                <QrCodeIcon className="qr-button w-12 h-12 text-blue-900" />
+                <QrCodeIcon className="qr-button  text-blue-900" />
               </div>
             )}
           </div>
