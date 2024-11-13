@@ -131,9 +131,9 @@ export default function Home() {
     }
   }
   return (
-    <div className="relative min-h-screen flex items-center justify-center">
+    <div className="relative min-h-screen w-full flex items-center justify-center">
       <BubbleBackground />
-      <main className="z-10">
+      <main className="relative z-20 w-full max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
           <h1 className="custom-heading mb-4">
             Trazabilidad de Aceite
@@ -143,21 +143,21 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-8 max-w-4xl">
-          <div className="bg-oil-light/30 backdrop-blur-sm rounded-2xl p-8 flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-8 max-w-4xl mx-auto">
+          <div className="flex items-center justify-center bg-oil-light/30 backdrop-blur-sm rounded-2xl p-8">
             {showScanner ? (
               <QRScanner />
             ) : (
               <div
-                className="qr-button-container custom-button rounded-drop transition-colors flex items-center justify-center bg-oil hover:bg-oil-dark gap-2 shadow-oil cursor-pointer"
+                className="qr-button-container cursor-pointer"
                 onClick={() => setShowScanner(true)}
               >
                 <QrCodeIcon className="qr-button w-12 h-12 text-blue-900" />
               </div>
             )}
           </div>
+          <div className="flex items-center justify-center backdrop-blur-sm rounded-2xl p-8">
 
-          <div className="bg-olive-light/30 backdrop-blur-sm rounded-2xl p-8 flex flex-col items-center gap-4">
             <div
               onClick={connectWallet}
               className="company-access-btn"
