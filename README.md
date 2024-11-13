@@ -97,3 +97,36 @@ Derivation path:   m/44'/60'/0'/0/
 
 ## IMPORTANT FOR PRESENTATION
 We can´t have camera on zoom and on the platform at the same time.
+
+## INSTRUCCIONES PARA INSTALAR EL PROYECTO
+
+## Prerequisites
+- Foundry (Forge, Cast, Anvil)
+- Node.js (v16 or higher)
+- Git
+- VS Code with Draw.io extension
+```bash
+code --install-extension hediet.vscode-drawio
+```
+Este último, opcional para vel el esquema en diagrams
+--------------------------------------------------------------------------------------------------------------
+
+npm install
+CD smart_contracts
+forge install
+anvil
+
+Nos dara 10 cuentas, con sus llaves privadas y direcciones.
+Cojemos la primera que será la Admin
+
+forge script script/Participantes.s.sol:ParticipantesDeploy --rpc-url http://127.0.0.1:8545 --broadcast --private-key [LLAVE PRIVADA]
+
+RPC para metamask:
+
+Network Name: Anvil Local
+RPC URL: http://127.0.0.1:8545
+Chain ID: 31337
+Currency Symbol: ETH
+
+
+Una vez deployado el contrato, ponemos los datos del ABI y la dirección del contrato en -> /src/constants/contracts.ts
