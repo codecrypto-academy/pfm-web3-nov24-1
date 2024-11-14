@@ -16,8 +16,8 @@ export default function DashboardLayout({ children }: LayoutProps) {
 
     useEffect(() => {
         const getAccount = async () => {
-            if (window.ethereum) {
-                const provider = new ethers.BrowserProvider(window.ethereum)
+            if ((window as any).ethereum) {
+                const provider = new ethers.BrowserProvider((window as any).ethereum)
                 const accounts = await provider.send("eth_requestAccounts", [])
                 setAccount(accounts[0])
             }

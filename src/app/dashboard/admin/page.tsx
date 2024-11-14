@@ -1,9 +1,10 @@
 'use client'
 
-import React from 'react';
+import React from 'react'
 import { CONTRACTS } from '@/constants/contracts'
 import { ethers } from 'ethers'
 import { useState, useEffect } from 'react'
+import { withAuth } from '@/components/hoc/withAuth'
 
 interface Participante {
     direccion: string
@@ -11,14 +12,14 @@ interface Participante {
     rol: string
 }
 
-export default function AdminDashboard() {
+function AdminDashboard() {
     const [participants, setParticipants] = useState([])
     const CONTRACT_ADDRESS = CONTRACTS.PARTICIPANTES.ADDRESS
 
     useEffect(() => {
         const fetchParticipants = async () => {
-            if (window.ethereum) {
-                const provider = new ethers.BrowserProvider(window.ethereum)
+            if ((window as any).ethereum) {
+                const provider = new ethers.BrowserProvider((window as any).ethereum)
                 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.PARTICIPANTES.ABI, provider)
                 const participantsList = await contract.getParticipantes()
                 setParticipants(participantsList)
@@ -51,3 +52,5 @@ export default function AdminDashboard() {
         </div>
     )
 }
+
+export default withAuth(AdminDashboard, 'admin')
