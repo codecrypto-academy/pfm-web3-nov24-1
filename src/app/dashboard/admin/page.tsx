@@ -28,7 +28,6 @@ function AdminDashboard() {
     const CONTRACT_ADDRESS = CONTRACTS.PARTICIPANTES.ADDRESS
     const [isApproving, setIsApproving] = useState<number | null>(null)
 
-
     const fetchParticipants = async () => {
         if ((window as any).ethereum) {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
