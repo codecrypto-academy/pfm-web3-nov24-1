@@ -33,7 +33,7 @@ export default function AddUsser() {
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(CONTRACTS.PARTICIPANTES.ADDRESS, CONTRACTS.PARTICIPANTES.ABI, signer)
 
-            const tx = await contract.nuevoParticipante(
+            const tx = await contract.nuevoUsuario(
                 formData.address,
                 formData.name,
                 formData.role
