@@ -76,7 +76,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
 
     return (
         <div className="min-h-screen bg-olive-50">
-            <Header role={role} account={account} />
+            <Header />
             <BubbleBackground />
             <div className="pt-[73px]">
                 <div className="relative">
