@@ -5,6 +5,7 @@ import { ethers } from 'ethers'
 import BubbleBackground from '@/components/ui/BubbleBackground'
 import Header from '@/components/ui/Header'
 import Link from 'next/link'
+import { useWeb3 } from '@/context/Web3Context'
 
 interface LayoutProps {
     children: ReactNode
@@ -12,22 +13,12 @@ interface LayoutProps {
 
 export default function DashboardLayout({ children }: LayoutProps) {
     const [account, setAccount] = useState('')
-    const [role, setRole] = useState('Admin')
+    const { role } = useWeb3()
 
-    useEffect(() => {
-        const getAccount = async () => {
-            if ((window as any).ethereum) {
-                const provider = new ethers.BrowserProvider((window as any).ethereum)
-                const accounts = await provider.send("eth_requestAccounts", [])
-                setAccount(accounts[0])
-            }
-        }
-        getAccount()
-    }, [])
 
     const renderNavigation = () => {
-        switch (role) {
-            case 'Admin':
+        switch (role.toLowerCase()) {
+            case 'admin':
                 return (
                     <nav className="p-6">
                         <div className="mb-6">
@@ -51,7 +42,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                         </ul>
                     </nav>
                 )
-            case 'Productor':
+            case 'productor':
                 return (
                     <nav className="p-6">
                         <div className="mb-6">
@@ -64,7 +55,17 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                     href="/dashboard/productor"
                                     className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
                                 >
-                                    Mi Panel
+                                    <span className="font-medium">Panel Principal</span>
+                                </Link>
+                            </li>
+                            <div className="border-t border-olive-200 my-4 opacity-50" />
+                            <li>
+                                <Link
+                                    href="/dashboard/productor/crear-producto"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <span className="font-medium">Crear Producto</span>
+
                                 </Link>
                             </li>
                         </ul>
