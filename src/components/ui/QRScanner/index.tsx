@@ -1,12 +1,15 @@
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useEffect, useState } from 'react';
 
-const QRScanner = () => {
+interface QRScannerProps {
+    onResult: (result: string) => Promise<void>
+}
+
+const QRScanner = ({ onResult }: QRScannerProps) => {
     const [scanResult, setScanResult] = useState<string | null>(null);
     const [hasPermission, setHasPermission] = useState(false);
 
     useEffect(() => {
-        // Request camera permission first
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(() => {
                 setHasPermission(true);
@@ -30,9 +33,12 @@ const QRScanner = () => {
 
         scanner.render(success, error);
 
-        function success(result: string) {
+        async function success(result: string) {
             scanner.clear();
             setScanResult(result);
+            if (onResult) {
+                await onResult(result);
+            }
         }
 
         function error(err: string) {
@@ -55,5 +61,6 @@ const QRScanner = () => {
         </div>
     );
 };
+
 
 export default QRScanner;
