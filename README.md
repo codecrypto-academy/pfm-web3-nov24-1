@@ -119,7 +119,7 @@ anvil
 Nos dara 10 cuentas, con sus llaves privadas y direcciones.
 Cojemos la primera que será la Admin
 
-forge script script/Participantes.s.sol:ParticipantesDeploy --rpc-url http://127.0.0.1:8545 --broadcast --private-key [LLAVE PRIVADA]
+forge script script/Usuarios.s.sol:UsuariosDeploy --rpc-url http://127.0.0.1:8545 --broadcast --private-key [LLAVE PRIVADA]
 
 RPC para metamask:
 

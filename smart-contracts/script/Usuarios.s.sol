@@ -2,16 +2,16 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Participantes} from "../src/Participantes.sol";
+import {Usuarios} from "../src/Usuarios.sol";
 
-contract ParticipantesDeploy is Script {
-    Participantes public participantes;
+contract UsuariosDeploy is Script {
+    Usuarios public usuarios;
 
      function setUp() public {}
 
      function run() public {
         vm.startBroadcast();
-        participantes = new Participantes();
+        usuarios = new Usuarios();
         vm.stopBroadcast();
      }
 }
