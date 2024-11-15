@@ -119,7 +119,7 @@ anvil
 Nos dara 10 cuentas, con sus llaves privadas y direcciones.
 Cojemos la primera que será la Admin
 
-forge script script/Usuarios.s.sol:UsuariosDeploy --rpc-url http://127.0.0.1:8545 --broadcast --private-key [LLAVE PRIVADA]
+forge script script/Usuarios.s.sol:UsuariosDeploy --rpc-url http://127.0.0.1:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 RPC para metamask:
 
@@ -130,3 +130,13 @@ Currency Symbol: ETH
 
 
 Una vez deployado el contrato, ponemos los datos del ABI y la dirección del contrato en -> /src/constants/contracts.ts
+
+
+ATENCIÓN:
+
+Si habésis deployado un contrato viejo, haced:
+
+forge clean
+forge build
+
+y ya finalmente forge script

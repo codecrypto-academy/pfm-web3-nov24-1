@@ -21,7 +21,7 @@ function AdminDashboard() {
             if ((window as any).ethereum) {
                 const provider = new ethers.BrowserProvider((window as any).ethereum)
                 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.PARTICIPANTES.ABI, provider)
-                const participantsList = await contract.getParticipantes()
+                const participantsList = await contract.getUsuarios()
                 setParticipants(participantsList)
             }
         }
