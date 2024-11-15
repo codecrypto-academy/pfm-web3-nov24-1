@@ -83,7 +83,7 @@ contract Tokens {
 
         uint256 transferId = siguienteTransferId++;
 
-        // Crear un nuevo token
+        // Crear una nueva transferencia
         transfers[transferId] = Transferencia(
             transferId,
             _idToken, 
@@ -93,8 +93,14 @@ contract Tokens {
             block.timestamp
         );
 
+        tokens[_idToken].balances[_from] -= _cantidad;
+        tokens[_idToken].balances[_to] += _cantidad;
+
         // Emitir el evento de tranferencia
         emit TokenTransferido(_idToken, _from, _to, _cantidad);
     }
 
+    function getBalance(uint256 _idToken, address _owner) public view returns (uint256) {
+        return tokens[_idToken].balances[_owner];
+    }
 }
