@@ -6,10 +6,11 @@ import { QrCodeIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect } from 'react'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
+import RegisterForm from '@/components/RegisterForm'
 
 export default function Home() {
   const [showScanner, setShowScanner] = useState(false)
-  const { address, isAuthenticated, connect, role } = useWeb3()
+  const { address, isAuthenticated, isUnregistered, connect, role } = useWeb3()
   const router = useRouter()
 
   useEffect(() => {
@@ -32,33 +33,39 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col items-center gap-8 max-w-4xl mx-auto">
-          <div className="flex items-center justify-center bg-oil-light/30 backdrop-blur-sm rounded-2xl p-8">
-            {showScanner ? (
-              <QRScanner />
-            ) : (
-              <div
-                className="qr-button-container cursor-pointer"
-                onClick={() => setShowScanner(true)}
-              >
-                <QrCodeIcon className="qr-button text-blue-900" />
-              </div>
-            )}
-          </div>
-          <div className="flex items-center justify-center backdrop-blur-sm rounded-2xl p-8">
-            <div
-              onClick={connect}
-              className="company-access-btn"
-            >
-              <span className="flex items-center justify-center gap-2">
-                {isAuthenticated ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Acceso Empresas'}
-                {!isAuthenticated && (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                  </svg>
+          {isUnregistered ? (
+            <RegisterForm />
+          ) : (
+            <>
+              <div className="flex items-center justify-center bg-oil-light/30 backdrop-blur-sm rounded-2xl p-8">
+                {showScanner ? (
+                  <QRScanner />
+                ) : (
+                  <div
+                    className="qr-button-container cursor-pointer"
+                    onClick={() => setShowScanner(true)}
+                  >
+                    <QrCodeIcon className="qr-button text-blue-900" />
+                  </div>
                 )}
-              </span>
-            </div>
-          </div>
+              </div>
+              <div className="flex items-center justify-center backdrop-blur-sm rounded-2xl p-8">
+                <div
+                  onClick={connect}
+                  className="company-access-btn"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    {isAuthenticated ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Acceso Empresas'}
+                    {!isAuthenticated && (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </main>
     </div>

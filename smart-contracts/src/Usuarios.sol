@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 contract Usuarios {
-    struct Usuario{
+    struct Usuario {
         address direccion;
         string nombre;
         string rol;
@@ -15,40 +15,57 @@ contract Usuarios {
     mapping(address => bool) public esUsuario;
 
     event NuevoUsuario(address indexed direccion, string nombre, string rol);
-    event UsuarioDesactivado(address indexed direccion, string nombre, string rol);
+    event UsuarioDesactivado(
+        address indexed direccion,
+        string nombre,
+        string rol
+    );
 
     constructor() {
         admin = msg.sender;
-        usuarios.push(Usuario({
-            direccion: admin,
-            nombre: "Propietario",
-            rol: "Admin",
-            activo: true
-        }));
+        usuarios.push(
+            Usuario({
+                direccion: admin,
+                nombre: "Propietario",
+                rol: "Admin",
+                activo: true
+            })
+        );
     }
 
     modifier soloAdmin() {
-        require(msg.sender == admin, "Solo el Admin puede llamar a esta funcion");
+        require(
+            msg.sender == admin,
+            "Solo el Admin puede llamar a esta funcion"
+        );
         _;
     }
 
-    function nuevoUsuario(address _direccion, string memory _nombre, string memory _rol) public soloAdmin {
+    function nuevoUsuario(
+        address _direccion,
+        string memory _nombre,
+        string memory _rol
+    ) public soloAdmin {
         require(_direccion != address(0), "Direccion no valida");
         require(!esUsuario[_direccion], "La direccion ya existe");
 
-        usuarios.push(Usuario({
-            direccion: _direccion,
-            nombre: _nombre,
-            rol: _rol,
-            activo: true
-        }));
+        usuarios.push(
+            Usuario({
+                direccion: _direccion,
+                nombre: _nombre,
+                rol: _rol,
+                activo: true
+            })
+        );
 
         esUsuario[_direccion] = true;
 
         emit NuevoUsuario(_direccion, _nombre, _rol);
     }
 
-    function getIndiceUsuario(address _direccion) public view returns (uint256 i) {
+    function getIndiceUsuario(
+        address _direccion
+    ) public view returns (uint256 i) {
         require(_direccion != address(0), "Direccion no valida");
         require(esUsuario[_direccion], "La direccion no existe");
 
@@ -78,9 +95,30 @@ contract Usuarios {
         require(_direccionUsuario != address(0), "Direccion no valida");
         require(esUsuario[_direccionUsuario], "La direccion no existe");
 
-        Usuario storage usuarioDesactivado = usuarios[getIndiceUsuario(_direccionUsuario)];
+        Usuario storage usuarioDesactivado = usuarios[
+            getIndiceUsuario(_direccionUsuario)
+        ];
         usuarioDesactivado.activo = false;
 
-        emit UsuarioDesactivado(_direccionUsuario, usuarioDesactivado.nombre, usuarioDesactivado.rol);
+        emit UsuarioDesactivado(
+            _direccionUsuario,
+            usuarioDesactivado.nombre,
+            usuarioDesactivado.rol
+        );
+    }
+    function activarUsuario(address _direccionUsuario) public soloAdmin {
+        require(_direccionUsuario != address(0), "Direccion no valida");
+        require(esUsuario[_direccionUsuario], "La direccion no existe");
+
+        Usuario storage usuarioActivado = usuarios[
+            getIndiceUsuario(_direccionUsuario)
+        ];
+        usuarioActivado.activo = true;
+
+        emit UsuarioDesactivado(
+            _direccionUsuario,
+            usuarioActivado.nombre,
+            usuarioActivado.rol
+        );
     }
 }

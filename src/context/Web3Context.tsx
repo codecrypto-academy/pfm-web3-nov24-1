@@ -10,6 +10,7 @@ export type Web3ContextType = {
     role: string
     name: string
     isAuthenticated: boolean
+    isUnregistered: boolean
     connect: () => Promise<void>
     disconnect: () => void
 }
@@ -22,6 +23,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     const [name, setName] = useState('')
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const router = useRouter()
+    const [isUnregistered, setIsUnregistered] = useState(false)
 
     const disconnect = useCallback(() => {
         setAddress('')
@@ -36,9 +38,6 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
         if (accounts.length === 0) {
             disconnect()
         } else if (accounts[0] !== address) {
-            // First disconnect the current session
-            disconnect()
-
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
@@ -53,6 +52,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             )
 
             if (userFound && userFound.activo) {
+                setIsUnregistered(false)
                 const newRole = userFound.rol
                 const newName = userFound.nombre
 
@@ -69,8 +69,9 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 
                 router.push(`/dashboard/${newRole.toLowerCase()}`)
             } else {
-                // If no valid user is found, stay disconnected
-                router.push('/')
+                disconnect()
+                setIsUnregistered(true)
+                setAddress(accounts[0])
             }
         }
     }, [address, router, disconnect])
@@ -133,6 +134,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             role,
             name,
             isAuthenticated,
+            isUnregistered, // Add to context value
             connect,
             disconnect
         }}>
