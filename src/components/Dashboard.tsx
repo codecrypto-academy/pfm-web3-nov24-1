@@ -19,6 +19,8 @@ interface Token {
     descripcion: string
     cantidad: number
     timestamp: number
+    relatedTokens: Token[]
+    transactionHash: string
 }
 
 const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
@@ -61,7 +63,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     creador: tokenData[3],
                     descripcion: tokenData[4],
                     cantidad: Number(tokenData[5]),
-                    timestamp: Number(tokenData[6])
+                    timestamp: Number(tokenData[6]),
+                    transactionHash: eventLog.transactionHash
                 } as Token
             })
 
@@ -70,7 +73,21 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 token.creador.toLowerCase() === address.toLowerCase()
             )
 
-            setTokens(userTokens)
+            // Group tokens by product name
+            const groupedTokens = userTokens.reduce((acc, token) => {
+                const existingProduct = acc.find(p => p.nombre === token.nombre)
+                if (existingProduct) {
+                    existingProduct.relatedTokens.push(token)
+                } else {
+                    acc.push({
+                        ...token,
+                        relatedTokens: [token]
+                    })
+                }
+                return acc
+            }, [] as (Token & { relatedTokens: Token[] })[])
+
+            setTokens(groupedTokens)
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar los tokens')
             console.error("Error fetching tokens:", err)
@@ -78,6 +95,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             setLoading(false)
         }
     }
+
 
     useEffect(() => {
         if (address && address !== '') {
@@ -184,7 +202,12 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                         <td className="px-6 py-4 whitespace-nowrap">{token.nombre}</td>
                                         <td className="px-6 py-4">{token.descripcion}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {(token.cantidad / 1000).toString()} kg
+                                            <div className="flex flex-col">
+                                                <span>{token.relatedTokens.reduce((sum, t) => sum + t.cantidad / 1000, 0)} kg</span>
+                                                <span className="text-gray-500 text-xs">
+                                                    {token.relatedTokens.reduce((sum, t) => sum + t.cantidad, 0)} tokens
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {new Date(Number(token.timestamp) * 1000).toLocaleDateString()}
@@ -205,33 +228,65 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                         </td>
                                     </tr>
                                     {expandedRows.includes(token.id) && (
-                                        <tr className="bg-gray-50">
+                                        <tr className="bg-gray-50 transition-all duration-200 ease-in-out">
                                             <td colSpan={6}>
-                                                <table className="min-w-full divide-y divide-gray-200">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td className="px-6 py-2 w-1/4 font-semibold">ID:</td>
-                                                            <td className="px-6 py-2">{token.id.toString()}</td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td className="px-6 py-2 w-1/4 font-semibold">Creador:</td>
-                                                            <td className="px-6 py-2">{token.creador}</td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td className="px-6 py-2 w-1/4 font-semibold">Cantidad Tokens:</td>
-                                                            <td className="px-6 py-2">{token.cantidad.toString()}</td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td className="px-6 py-2 w-1/4 font-semibold">Token Padre ID:</td>
-                                                            <td className="px-6 py-2">{token.idPadre.toString()}</td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td className="px-6 py-2 w-1/4 font-semibold">Timestamp:</td>
-                                                            <td className="px-6 py-2">{new Date(Number(token.timestamp) * 1000).toLocaleString()}</td>
-                                                        </tr>
-
-                                                    </tbody>
-                                                </table>
+                                                <div className="p-4">
+                                                    <div className="border-b border-gray-200 pb-4 mb-4">
+                                                        <h4 className="text-lg font-semibold text-olive-600">
+                                                            Historial de Lotes: {token.nombre}
+                                                        </h4>
+                                                        <p className="text-sm text-gray-500">
+                                                            Mostrando todos los lotes relacionados con este producto
+                                                        </p>
+                                                    </div>
+                                                    <div className="overflow-x-auto">
+                                                        <table className="min-w-full divide-y divide-gray-200">
+                                                            <thead className="bg-gray-50">
+                                                                <tr>
+                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Token</th>
+                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Padre</th>
+                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hash</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                                {token.relatedTokens.map(relatedToken => (
+                                                                    <tr key={relatedToken.id} className="hover:bg-gray-50">
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                            {relatedToken.id}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                            <div className="flex flex-col">
+                                                                                <span>{(relatedToken.cantidad / 1000)} kg</span>
+                                                                                <span className="text-gray-500 text-xs">{relatedToken.cantidad} tokens</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                            {new Date(relatedToken.timestamp * 1000).toLocaleDateString()}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                            {relatedToken.idPadre}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                            <a
+                                                                                href={`https://sepolia.etherscan.io/tx/${relatedToken.transactionHash}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="text-olive-600 hover:text-olive-800 flex items-center gap-1"
+                                                                            >
+                                                                                {relatedToken.transactionHash}
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                                                                </svg>
+                                                                            </a>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     )}
