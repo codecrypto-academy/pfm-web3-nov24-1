@@ -11,7 +11,7 @@ contract TokensTest is Test {
 
     function setUp() public {
         contratoUsuarios = new Usuarios();
-        contratoUsuarios.nuevoUsuario(usuarioTransfer, "UsuarioTransfer", "Productor");
+        contratoUsuarios.nuevoUsuario(usuarioTransfer, "UsuarioTransfer", "UsuarioCalle", "Productor");
 
         // Desplegar el contrato de tokens, pasándole el contrato Usuarios
         contratoTokens = new Tokens(address(contratoUsuarios));
