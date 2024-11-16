@@ -19,6 +19,12 @@ export default function Home() {
     }
   }, [isAuthenticated, role])
 
+  const handleQRResult = async (result: string) => {
+    // Handle the QR code result here
+    console.log(result)
+    setShowScanner(false)
+  }
+
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center">
       <BubbleBackground />
@@ -39,7 +45,7 @@ export default function Home() {
             <>
               <div className="flex items-center justify-center bg-oil-light/30 backdrop-blur-sm rounded-2xl p-8">
                 {showScanner ? (
-                  <QRScanner />
+                  <QRScanner onResult={handleQRResult} />
                 ) : (
                   <div
                     className="qr-button-container cursor-pointer"

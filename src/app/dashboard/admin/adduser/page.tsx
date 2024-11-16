@@ -107,7 +107,6 @@ export default function AddUsser() {
                             <option value="Productor">Productor</option>
                             <option value="Fabrica">Fabrica</option>
                             <option value="Minorista">Minorista</option>
-                            <option value="Consumidor">Consumidor</option>
                         </select>
                     </div>
 

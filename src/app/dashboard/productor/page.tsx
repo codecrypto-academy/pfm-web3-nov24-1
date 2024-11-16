@@ -3,10 +3,13 @@ import { useWeb3 } from '@/context/Web3Context'
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
+import React from 'react'
 
 interface Token {
     id: number
+    idPadre: number
     nombre: string
+    creador: string
     descripcion: string
     cantidad: number
     timestamp: number
@@ -15,45 +18,58 @@ interface Token {
 export default function ProductorDashboard() {
     const { address } = useWeb3()
     const [tokens, setTokens] = useState<Token[]>([])
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(false) // Changed initial state to false
+    const [error, setError] = useState<string | null>(null)
     const [expandedRows, setExpandedRows] = useState<number[]>([])
 
-    const fetchTokens = async () => {
-        setLoading(true)
-        console.log("Fetching tokens for:", address)
+    useEffect(() => {
+        if (!address) return
 
-        try {
-            const provider = new ethers.BrowserProvider((window as any).ethereum)
-            const signer = await provider.getSigner()
-            const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
-                signer
-            )
+        const fetchTokens = async () => {
+            setLoading(true)
+            setError(null)
 
-            // Get token created events
-            const filter = contract.filters.TokenCreado()
-            const events = await contract.queryFilter(filter)
-            console.log("Events found:", events)
 
-            const tokenPromises = events.map(async (event) => {
-                const token = await contract.tokens(event.args.id)
-                return token
-            })
 
-            const allTokens = await Promise.all(tokenPromises)
-            const userTokens = allTokens.filter(token =>
-                token.creador.toLowerCase() === address.toLowerCase()
-            )
+            try {
+                const provider = new ethers.BrowserProvider((window as any).ethereum)
+                const signer = await provider.getSigner()
+                const contract = new ethers.Contract(
+                    CONTRACTS.TOKENS.ADDRESS,
+                    CONTRACTS.TOKENS.ABI,
+                    signer
+                )
 
-            console.log("User tokens:", userTokens)
-            setTokens(userTokens)
-        } catch (error) {
-            console.error("Error fetching tokens:", error)
-        } finally {
-            setLoading(false)
+                const filter = contract.filters.TokenCreado()
+                const events = await contract.queryFilter(filter)
+
+                const tokenPromises = events.map(async (event) => {
+                    const eventLog = event as ethers.EventLog
+                    const token = await contract.tokens(eventLog.args.id)
+                    return token
+                })
+
+                const allTokens = await Promise.all(tokenPromises)
+                const userTokens = allTokens.filter(token =>
+                    token.creador.toLowerCase() === address.toLowerCase()
+                )
+
+                setTokens(userTokens)
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Error al cargar los tokens')
+                console.error("Error fetching tokens:", err)
+            } finally {
+                setLoading(false)
+            }
         }
+
+        fetchTokens()
+    }, [address])
+
+    if (error) {
+        return <div className="text-red-500">Error: {error}</div>
     }
+
     const toggleRow = (tokenId: number) => {
         setExpandedRows(prev =>
             prev.includes(tokenId)
@@ -61,12 +77,6 @@ export default function ProductorDashboard() {
                 : [...prev, tokenId]
         )
     }
-
-    useEffect(() => {
-        if (address) {
-            fetchTokens()
-        }
-    }, [address])
 
     return (
         <div className="container mx-auto px-4">
@@ -85,43 +95,46 @@ export default function ProductorDashboard() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Física</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad Tokens</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {tokens.map((token) => (
-                                <>
-                                    <tr key={token.id}>
-                                        <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => toggleRow(token.id)}
-                                                className="text-olive-600 hover:text-olive-800"
-                                            >
-                                                {expandedRows.includes(token.id) ? '-' : '+'}
-                                            </button>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">{token.id.toString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">{token.nombre}</td>
-                                        <td className="px-6 py-4">{token.descripcion}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">{token.cantidad.toString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {new Date(Number(token.timestamp) * 1000).toLocaleDateString()}
+                            {tokens.map((token) => (<React.Fragment key={token.id}>
+                                <tr key={token.id}>
+                                    <td className="px-6 py-4">
+                                        <button
+                                            onClick={() => toggleRow(token.id)}
+                                            className="text-olive-600 hover:text-olive-800"
+                                        >
+                                            {expandedRows.includes(token.id) ? '-' : '+'}
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{token.id?.toString() || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{token.nombre || '-'}</td>
+                                    <td className="px-6 py-4">{token.descripcion || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{(Number(token.cantidad) / 1000).toString()} kg</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{(Number(token.cantidad))?.toString() || '0'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {token.timestamp ? new Date(Number(token.timestamp) * 10).toLocaleDateString() : '-'}
+                                    </td>
+                                </tr>
+                                {expandedRows.includes(token.id) && (
+                                    <tr className="bg-gray-50">
+                                        <td colSpan={6} className="px-6 py-4">
+                                            <div className="space-y-2 text-sm">
+                                                <p><span className="font-semibold">Creador:</span> {token.creador}</p>
+                                                <p><span className="font-semibold">Token Padre ID:</span> {token.idPadre.toString()}</p>
+                                                <p><span className="font-semibold">Timestamp:</span> {new Date(Number(token.timestamp) * 1000).toLocaleString()}</p>
+                                            </div>
+
                                         </td>
                                     </tr>
-                                    {expandedRows.includes(token.id) && (
-                                        <tr className="bg-gray-50">
-                                            <td colSpan={6} className="px-6 py-4">
-                                                <div className="space-y-2 text-sm">
-                                                    <p><span className="font-semibold">Creador:</span> {token.creator}</p>
-                                                    <p><span className="font-semibold">Token Padre ID:</span> {token.idPadre.toString()}</p>
-                                                    <p><span className="font-semibold">Timestamp:</span> {new Date(Number(token.timestamp) * 1000).toLocaleString()}</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </>
+                                )}
+                            </React.Fragment>
                             ))}
+
                         </tbody>
                     </table>
                 </div>

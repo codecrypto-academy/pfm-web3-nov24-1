@@ -3,14 +3,17 @@ import { useWeb3 } from '@/context/Web3Context'
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
+import { useRouter } from 'next/navigation'
 
 export default function CreateProduct() {
+    const router = useRouter()
     const { address } = useWeb3()
     const [isLoading, setIsLoading] = useState(false)
     const [formData, setFormData] = useState({
         nombre: '',
-        cantidad: '',
         descripcion: '',
+        cantidad: '',
+        tokenRatio: 1000,
         idTokenPadre: '0'
     })
 
@@ -27,15 +30,17 @@ export default function CreateProduct() {
                 signer
             )
 
+            const totalTokens = Number(formData.cantidad) * formData.tokenRatio
+
             const tx = await contract.crearToken(
                 formData.nombre,
-                formData.cantidad,
+                totalTokens,
                 formData.descripcion,
                 formData.idTokenPadre
             )
 
             await tx.wait()
-            // Handle success
+            router.push('/dashboard/productor')
         } catch (error) {
             console.error('Error:', error)
         } finally {
@@ -44,7 +49,7 @@ export default function CreateProduct() {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center justify-center min-h-screen bubbles-background">
             <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-lg shadow-lg">
                 <h1 className="custom-subtitle">Crear Nuevo Producto</h1>
 
@@ -56,7 +61,7 @@ export default function CreateProduct() {
                         <input
                             type="text"
                             className="w-full p-2 border rounded-md bg-input text-primary"
-                            placeholder="Nombre del producto"
+                            placeholder="Ej: Aceituna negra"
                             value={formData.nombre}
                             onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                         />
@@ -68,7 +73,7 @@ export default function CreateProduct() {
                         </label>
                         <textarea
                             className="w-full p-2 border rounded-md bg-input text-primary"
-                            placeholder="Descripción del producto"
+                            placeholder="Descripción detallada del producto"
                             value={formData.descripcion}
                             onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                         />
@@ -76,15 +81,19 @@ export default function CreateProduct() {
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-primary">
-                            Cantidad
+                            Cantidad (kg)
                         </label>
                         <input
                             type="number"
                             className="w-full p-2 border rounded-md bg-input text-primary"
-                            placeholder="Cantidad"
+                            placeholder="Ej: 100"
                             value={formData.cantidad}
                             onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
                         />
+                        <p className="text-sm text-gray-500">
+                            Se generarán {Number(formData.cantidad || 0) * formData.tokenRatio} tokens
+                            (1kg = 1000 tokens)
+                        </p>
                     </div>
 
                     <button

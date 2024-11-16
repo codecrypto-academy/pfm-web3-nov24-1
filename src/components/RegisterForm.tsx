@@ -73,7 +73,6 @@ export default function RegisterForm() {
                         <option value="Productor">Productor</option>
                         <option value="Fabrica">Fábrica</option>
                         <option value="Minorista">Minorista</option>
-                        <option value="Consumidor">Consumidor</option>
                     </select>
                 </div>
                 <button

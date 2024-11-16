@@ -7,8 +7,6 @@ import { useWeb3 } from '@/context/Web3Context'
 export default function Header() {
     const router = useRouter()
     const { role, address, name, disconnect } = useWeb3()
-    console.log("Header values:", { role, address, name })
-
     const handleLogout = () => {
         disconnect()
         router.push('/')
