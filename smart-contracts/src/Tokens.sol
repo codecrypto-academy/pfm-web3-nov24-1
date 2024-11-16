@@ -10,6 +10,7 @@ contract Tokens {
     struct Token {
         uint256 id;
         uint256 idPadre;
+        uint256 idHijo;
         string nombre;
         address creador;
         string descripcion;
@@ -50,7 +51,8 @@ contract Tokens {
         string memory _nombre, 
         uint256 _cantidad, 
         string memory _descripcion, 
-        uint256 _idTokenPadre
+        uint256 _idTokenPadre, 
+        uint256 _idTokenHijo
     ) public {
         uint256 tokenId = siguienteTokenId++;
 
@@ -59,6 +61,7 @@ contract Tokens {
 
         nuevoToken.id = tokenId;
         nuevoToken.idPadre = _idTokenPadre;
+        nuevoToken.idHijo = _idTokenHijo;
         nuevoToken.nombre = _nombre;
         nuevoToken.creador = msg.sender;
         nuevoToken.descripcion = _descripcion;

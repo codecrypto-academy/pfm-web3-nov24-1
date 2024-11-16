@@ -17,7 +17,7 @@ contract UsuariosTest is Test {
 
         emit Usuarios.NuevoUsuario(nuevaDireccion, "Nombre", "Rol");
 
-        usuarios.nuevoUsuario(nuevaDireccion, "Nombre", "Rol");
+        usuarios.nuevoUsuario(nuevaDireccion, "Nombre", "Calle", "Rol");
         assertTrue(usuarios.estaActivo(nuevaDireccion));
         assertEq(usuarios.esUsuario(nuevaDireccion), true, "El usuario deberia existir");
     }
@@ -25,7 +25,7 @@ contract UsuariosTest is Test {
     function testDesactivarUsuario() public {
         address nuevaDireccion = address(uint160(uint(keccak256(abi.encodePacked(block.timestamp)))));
 
-        usuarios.nuevoUsuario(nuevaDireccion, "Nombre", "Rol");
+        usuarios.nuevoUsuario(nuevaDireccion, "Nombre", "Calle", "Rol");
         assertTrue(usuarios.estaActivo(nuevaDireccion));
 
         usuarios.desactivarUsuario(nuevaDireccion);

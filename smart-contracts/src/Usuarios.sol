@@ -5,6 +5,7 @@ contract Usuarios {
     struct Usuario {
         address direccion;
         string nombre;
+        string gps;
         string rol;
         bool activo;
     }
@@ -27,6 +28,7 @@ contract Usuarios {
             Usuario({
                 direccion: admin,
                 nombre: "Propietario",
+                gps: "Calle",
                 rol: "Admin",
                 activo: true
             })
@@ -44,6 +46,7 @@ contract Usuarios {
     function nuevoUsuario(
         address _direccion,
         string memory _nombre,
+        string memory _gps,
         string memory _rol
     ) public soloAdmin {
         require(_direccion != address(0), "Direccion no valida");
@@ -53,6 +56,7 @@ contract Usuarios {
             Usuario({
                 direccion: _direccion,
                 nombre: _nombre,
+                gps: _gps,
                 rol: _rol,
                 activo: true
             })

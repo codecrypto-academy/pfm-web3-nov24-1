@@ -11,7 +11,7 @@ contract TokensTest is Test {
 
     function setUp() public {
         contratoUsuarios = new Usuarios();
-        contratoUsuarios.nuevoUsuario(usuarioTransfer, "UsuarioTransfer", "Productor");
+        contratoUsuarios.nuevoUsuario(usuarioTransfer, "UsuarioTransfer", "UsuarioCalle", "Productor");
 
         // Desplegar el contrato de tokens, pasándole el contrato Usuarios
         contratoTokens = new Tokens(address(contratoUsuarios));
@@ -23,19 +23,21 @@ contract TokensTest is Test {
         uint256 cantidad = 1000;
         string memory descripcion = "Este es un token de prueba";
         uint256 idPadre = 0;
+        uint256 idHijo = 0;
 
         // Esperar el evento `TokenCreado`
         vm.expectEmit(true, true, true, true);
         emit Tokens.TokenCreado(0, nombre, address(this), cantidad);
 
         // Llamar a la función crearToken
-        contratoTokens.crearToken(nombre, cantidad, descripcion, idPadre);
+        contratoTokens.crearToken(nombre, cantidad, descripcion, idPadre, idHijo);
 
         // Verificar que los valores se almacenaron correctamente
-        (uint256 id, uint256 idPadreObtenido, string memory nombreObtenido, address creador, string memory descripcionObtenida, uint256 cantidadObtenida, ) = contratoTokens.tokens(0);
+        (uint256 id, uint256 idPadreObtenido, uint256 idHijoObtenido, string memory nombreObtenido, address creador, string memory descripcionObtenida, uint256 cantidadObtenida, ) = contratoTokens.tokens(0);
 
         assertEq(id, 0, "El ID del token deberia ser 0");
         assertEq(idPadreObtenido, idPadre, "El ID del padre no coincide");
+        assertEq(idHijoObtenido, idHijo, "El ID del hijo no coincide");
         assertEq(nombreObtenido, nombre, "El nombre del token no coincide");
         assertEq(creador, address(this), "El creador deberia ser la direccion del contrato de prueba");
         assertEq(descripcionObtenida, descripcion, "La descripcion no coincide");
@@ -47,7 +49,7 @@ contract TokensTest is Test {
         uint256 cantidad = 100;
 
         // Crear un token y asignarlo al sender
-        contratoTokens.crearToken("TokenTest", 1000, "Token de prueba", 0);
+        contratoTokens.crearToken("TokenTest", 1000, "Token de prueba", 0, 0);
 
         // Validar evento esperado
         vm.expectEmit(true, true, true, true);
