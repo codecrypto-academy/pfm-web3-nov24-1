@@ -87,7 +87,7 @@ contract OliveOilCertification {
         require(!batch.verified, "Batch already evaluated");
 
         if (
-            batch.acidity <= 0.3 &&
+            (batch.acidity * 10) <= (0.3 * 10) &&
             batch.peroxides <= 10 &&
             batch.polyphenols >= 300 &&
             batch.tocopherols >= 250 &&
@@ -97,7 +97,7 @@ contract OliveOilCertification {
         ) {
             batch.quality = QualityLevel.Excellence;
         } else if (
-            batch.acidity <= 0.4 &&
+            (batch.acidity * 10) <= (0.4 * 10) &&
             batch.peroxides <= 12 &&
             batch.polyphenols >= 250 &&
             batch.tocopherols >= 200 &&
@@ -106,7 +106,7 @@ contract OliveOilCertification {
         ) {
             batch.quality = QualityLevel.High;
         } else if (
-            batch.acidity <= 0.5 &&
+            (batch.acidity * 10) <= (0.5 * 10) &&
             batch.peroxides <= 15 &&
             batch.polyphenols >= 200 &&
             batch.tocopherols >= 150 &&
@@ -115,7 +115,7 @@ contract OliveOilCertification {
         ) {
             batch.quality = QualityLevel.Good;
         } else if (
-            batch.acidity <= 0.6 &&
+            (batch.acidity * 10) <= (0.6 * 10) &&
             batch.peroxides <= 18 &&
             batch.polyphenols >= 150 &&
             batch.extractionTemp <= 27 &&
@@ -123,7 +123,7 @@ contract OliveOilCertification {
         ) {
             batch.quality = QualityLevel.Medium;
         } else if (
-            batch.acidity <= 0.8 &&
+            (batch.acidity * 10) <= (0.8 * 10) &&
             batch.peroxides <= 20
         ) {
             batch.quality = QualityLevel.Basic;
@@ -139,5 +139,5 @@ contract OliveOilCertification {
     function getBatch(uint256 batchId) external view returns (Batch memory) {
         require(batches[batchId].producer != address(0), "Batch does not exist");
         return batches[batchId];
-    }
+    }
 }
