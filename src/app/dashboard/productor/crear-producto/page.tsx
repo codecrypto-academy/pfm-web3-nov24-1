@@ -1,8 +1,9 @@
-import CreateProduct from '@/components/Addproduct'
+'use client'
+import Addproduct from '@/components/Addproduct'
 import { NextPage } from 'next'
 
-const CreateProductPage: NextPage = () => {
-    return <CreateProduct role="productor" />
+const AddProductPage: NextPage = () => {
+    return <Addproduct role="productor" />
 }
 
-export default CreateProductPage
+export default AddProductPage

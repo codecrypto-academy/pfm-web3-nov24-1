@@ -14,6 +14,8 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
     const router = useRouter()
     const { address } = useWeb3()
     const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState('')
+    const [txStatus, setTxStatus] = useState('')
     const [formData, setFormData] = useState({
         nombre: '',
         descripcion: '',
@@ -24,9 +26,18 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        setError('')
+        setTxStatus('')
+
+        if (!formData.nombre || !formData.descripcion || !formData.cantidad) {
+            setError('Por favor complete todos los campos')
+            return
+        }
+
         setIsLoading(true)
 
         try {
+            setTxStatus('Conectando con la wallet...')
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
@@ -37,17 +48,30 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
 
             const totalTokens = Number(formData.cantidad) * formData.tokenRatio
 
+            setTxStatus('Enviando transacción...')
             const tx = await contract.crearToken(
                 formData.nombre,
                 totalTokens,
                 formData.descripcion,
-                formData.idTokenPadre
+                formData.idTokenPadre,
+                0
             )
 
-            await tx.wait()
-            router.push(`/dashboard/${role}`)
-        } catch (error) {
+            setTxStatus('Esperando confirmación...')
+            const receipt = await tx.wait()
+            
+            if (receipt.status === 1) {
+                setTxStatus('¡Producto creado con éxito!')
+                setTimeout(() => {
+                    router.push(`/dashboard/${role}`)
+                }, 2000)
+            } else {
+                throw new Error('La transacción falló')
+            }
+        } catch (error: any) {
             console.error('Error:', error)
+            setError(error.message || 'Error al crear el producto')
+            setTxStatus('')
         } finally {
             setIsLoading(false)
         }
@@ -109,6 +133,18 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                         {isLoading ? 'Procesando...' : 'Crear Producto'}
                     </button>
                 </form>
+
+                {error && (
+                    <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+                        {error}
+                    </div>
+                )}
+
+                {txStatus && (
+                    <div className="mt-4 p-3 bg-blue-100 text-blue-700 rounded-md">
+                        {txStatus}
+                    </div>
+                )}
             </div>
         </div>
     )

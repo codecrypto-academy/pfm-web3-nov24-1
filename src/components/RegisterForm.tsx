@@ -7,6 +7,7 @@ import { CONTRACTS } from '@/constants/contracts'
 export default function RegisterForm() {
     const [nombre, setNombre] = useState('')
     const [rol, setRol] = useState('')
+    const [gps, setGps] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [message, setMessage] = useState('')
 
@@ -28,7 +29,8 @@ export default function RegisterForm() {
                 body: JSON.stringify({
                     address: userAddress,
                     nombre,
-                    rol
+                    rol,
+                    gps
                 }),
             })
 
@@ -36,6 +38,7 @@ export default function RegisterForm() {
                 setMessage('Solicitud enviada con éxito. El administrador revisará su petición.')
                 setNombre('')
                 setRol('')
+                setGps('')
             } else {
                 throw new Error('Error al enviar la solicitud')
             }
@@ -58,6 +61,17 @@ export default function RegisterForm() {
                         value={nombre}
                         onChange={(e) => setNombre(e.target.value)}
                         className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                        required
+                    />
+                </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">GPS:</label>
+                    <input
+                        type="text"
+                        value={gps}
+                        onChange={(e) => setGps(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                        placeholder="Ingrese las coordenadas GPS"
                         required
                     />
                 </div>

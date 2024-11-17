@@ -14,13 +14,14 @@ interface DashboardProps {
 interface Token {
     id: number
     idPadre: number
+    idHijo: number
     nombre: string
     creador: string
     descripcion: string
     cantidad: number
     timestamp: number
-    relatedTokens: Token[]
     transactionHash: string
+    relatedTokens: Token[]
 }
 
 const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
@@ -41,36 +42,42 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
-            const signer = await provider.getSigner()
             const contract = new ethers.Contract(
                 CONTRACTS.TOKENS.ADDRESS,
                 CONTRACTS.TOKENS.ABI,
-                signer
+                provider
             )
 
+            // Get the latest block number
+            const latestBlock = await provider.getBlockNumber()
+            // Get events from the last 1000 blocks or from block 0 if chain is shorter
+            const fromBlock = Math.max(0, latestBlock - 1000)
+            
+            // Get TokenCreado events
             const filter = contract.filters.TokenCreado()
-            const events = await contract.queryFilter(filter)
+            const events = await contract.queryFilter(filter, fromBlock, latestBlock)
 
-            const tokenPromises = events.map(async (event) => {
-                const eventLog = event as ethers.EventLog
-                const tokenId = eventLog.args.id
+            const tokenPromises = events.map(async (event: any) => {
+                const tokenId = event.args[0] // id is the first argument
                 const tokenData = await contract.tokens(tokenId)
-
+                
                 return {
                     id: Number(tokenId),
                     idPadre: Number(tokenData[1]),
-                    nombre: tokenData[2],
-                    creador: tokenData[3],
-                    descripcion: tokenData[4],
-                    cantidad: Number(tokenData[5]),
-                    timestamp: Number(tokenData[6]),
-                    transactionHash: eventLog.transactionHash
+                    idHijo: Number(tokenData[2]),
+                    nombre: tokenData[3],
+                    creador: tokenData[4],
+                    descripcion: tokenData[5],
+                    cantidad: Number(tokenData[6]),
+                    timestamp: Number(tokenData[7]),
+                    transactionHash: event.transactionHash,
+                    relatedTokens: []
                 } as Token
             })
 
             const allTokens = await Promise.all(tokenPromises)
-            const userTokens = allTokens.filter(token =>
-                token.creador.toLowerCase() === address.toLowerCase()
+            const userTokens = allTokens.filter(token => 
+                token.creador.toLowerCase() === address?.toLowerCase()
             )
 
             // Group tokens by product name
@@ -85,17 +92,16 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     })
                 }
                 return acc
-            }, [] as (Token & { relatedTokens: Token[] })[])
+            }, [] as Token[])
 
             setTokens(groupedTokens)
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error al cargar los tokens')
             console.error("Error fetching tokens:", err)
+            setError(err instanceof Error ? err.message : 'Error al cargar los tokens')
         } finally {
             setLoading(false)
         }
     }
-
 
     useEffect(() => {
         if (address && address !== '') {
@@ -122,7 +128,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 token.nombre,
                 totalTokens,
                 token.descripcion,
-                token.id // Este será el token padre
+                token.id, // token padre
+                0  // token hijo (0 para nuevos lotes)
             )
 
             await tx.wait()
@@ -131,6 +138,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             setNewQuantity('')
         } catch (error) {
             console.error('Error:', error)
+            alert('Error al crear el lote: ' + (error instanceof Error ? error.message : 'Error desconocido'))
         }
     }
 
@@ -297,6 +305,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
                 </div>
             )}
+            {/* Modal para crear nuevo lote */}
             {isModalOpen && selectedToken && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
@@ -326,6 +335,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                 <button
                                     onClick={() => createNewLot(selectedToken, newQuantity)}
                                     className="px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors"
+                                    disabled={!newQuantity || Number(newQuantity) <= 0}
                                 >
                                     Crear Lote
                                 </button>
@@ -339,4 +349,3 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 }
 
 export default Dashboard
-
