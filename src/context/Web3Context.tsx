@@ -11,8 +11,16 @@ export type Web3ContextType = {
     name: string
     isAuthenticated: boolean
     isUnregistered: boolean
+    isLoading: boolean
+    error: string | null
+    networkName: string
     connect: () => Promise<void>
     disconnect: () => void
+}
+
+const SUPPORTED_NETWORKS = {
+    sepolia: 11155111,
+    // Add other networks as needed
 }
 
 const Web3Context = createContext<Web3ContextType | null>(null)
@@ -22,22 +30,86 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     const [role, setRole] = useState('')
     const [name, setName] = useState('')
     const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const router = useRouter()
     const [isUnregistered, setIsUnregistered] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [networkName, setNetworkName] = useState('')
+    const router = useRouter()
 
     const disconnect = useCallback(() => {
         setAddress('')
         setRole('')
         setName('')
         setIsAuthenticated(false)
+        setError(null)
+        setNetworkName('')
         localStorage.removeItem('web3Auth')
         router.push('/')
     }, [router])
 
+    const checkNetwork = useCallback(async (): Promise<boolean> => {
+        if (!(window as any).ethereum) {
+            setError('Please install MetaMask')
+            return false
+        }
+
+        try {
+            const chainId = await (window as any).ethereum.request({ 
+                method: 'eth_chainId' 
+            })
+            const networkId = parseInt(chainId, 16)
+
+            // Check if we're on a supported network
+            const isSupported = Object.values(SUPPORTED_NETWORKS).includes(networkId)
+            if (!isSupported) {
+                setError('Please connect to Sepolia testnet')
+                try {
+                    await (window as any).ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x' + SUPPORTED_NETWORKS.sepolia.toString(16) }],
+                    })
+                    return true
+                } catch (switchError: any) {
+                    if (switchError.code === 4902) {
+                        setError('Please add Sepolia network to MetaMask')
+                    }
+                    return false
+                }
+            }
+
+            // Set network name
+            setNetworkName(
+                Object.entries(SUPPORTED_NETWORKS).find(
+                    ([, id]) => id === networkId
+                )?.[0] || 'unknown'
+            )
+            return true
+        } catch (error) {
+            console.error('Error checking network:', error)
+            setError('Failed to check network')
+            return false
+        }
+    }, [])
+
     const handleAccountsChanged = useCallback(async (accounts: string[]) => {
-        if (accounts.length === 0) {
+        setError(null)
+        
+        if (!await checkNetwork()) {
+            return
+        }
+
+        if (!accounts.length) {
             disconnect()
-        } else if (accounts[0] !== address) {
+            return
+        }
+
+        const newAddress = accounts[0]
+        if (newAddress === address && isAuthenticated) {
+            return
+        }
+
+        setIsLoading(true)
+        try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
@@ -48,7 +120,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 
             const usuarios = await contract.getUsuarios()
             const userFound = usuarios.find(
-                (u: any) => u.direccion.toLowerCase() === accounts[0].toLowerCase()
+                (u: any) => u.direccion.toLowerCase() === newAddress.toLowerCase()
             )
 
             if (userFound && userFound.activo) {
@@ -56,13 +128,13 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 const newRole = userFound.rol
                 const newName = userFound.nombre
 
-                setAddress(accounts[0])
+                setAddress(newAddress)
                 setRole(newRole)
                 setName(newName)
                 setIsAuthenticated(true)
 
                 localStorage.setItem('web3Auth', JSON.stringify({
-                    address: accounts[0],
+                    address: newAddress,
                     role: newRole,
                     name: newName
                 }))
@@ -71,79 +143,102 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             } else {
                 disconnect()
                 setIsUnregistered(true)
-                setAddress(accounts[0])
+                setAddress(newAddress)
             }
+        } catch (error) {
+            console.error('Error in handleAccountsChanged:', error)
+            setError('Failed to authenticate user')
+            disconnect()
+        } finally {
+            setIsLoading(false)
         }
-    }, [address, router, disconnect])
-
+    }, [address, router, disconnect, isAuthenticated, checkNetwork])
 
     const connect = useCallback(async () => {
         if (!(window as any).ethereum) {
+            setError('Please install MetaMask')
             return
         }
 
+        setIsLoading(true)
+        setError(null)
+        
         try {
-            const permissions = await (window as any).ethereum.request({
-                method: 'wallet_requestPermissions',
-                params: [{ eth_accounts: {} }],
-            })
+            if (!await checkNetwork()) {
+                return
+            }
 
             const accounts = await (window as any).ethereum.request({
-                method: 'eth_accounts'
+                method: 'eth_requestAccounts'
             })
 
-            if (accounts.length > 0) {
-                await handleAccountsChanged(accounts)
+            await handleAccountsChanged(accounts)
+        } catch (error: any) {
+            console.error('Connection error:', error)
+            if (error.code === 4001) {
+                setError('Please connect your wallet')
+            } else {
+                setError('Failed to connect wallet')
             }
-        } catch (error) {
-            console.error("Connection error:", error)
+            disconnect()
+        } finally {
+            setIsLoading(false)
         }
-    }, [handleAccountsChanged])
+    }, [handleAccountsChanged, checkNetwork, disconnect])
 
     useEffect(() => {
-        const storedAuth = localStorage.getItem('web3Auth')
-        if (storedAuth) {
-            try {
-                const { address, role, name } = JSON.parse(storedAuth)
-                setAddress(address)
-                setRole(role)
-                setName(name)
-                setIsAuthenticated(true)
-                router.push(`/dashboard/${role.toLowerCase()}`)
-            } catch (error) {
-                localStorage.removeItem('web3Auth')
-            }
-        }
-    }, [router])
-
-    useEffect(() => {
-        if (!(window as any).ethereum) {
-            return
+        // Restore session from localStorage
+        const savedAuth = localStorage.getItem('web3Auth')
+        if (savedAuth) {
+            const { address: savedAddress, role: savedRole, name: savedName } = JSON.parse(savedAuth)
+            setAddress(savedAddress)
+            setRole(savedRole)
+            setName(savedName)
+            setIsAuthenticated(true)
         }
 
-        (window as any).ethereum.on('accountsChanged', handleAccountsChanged)
+        // Setup event listeners
+        if ((window as any).ethereum) {
+            (window as any).ethereum.on('accountsChanged', handleAccountsChanged)
+            (window as any).ethereum.on('chainChanged', () => {
+                window.location.reload()
+            })
+            (window as any).ethereum.on('disconnect', disconnect)
+        }
 
         return () => {
-            (window as any).ethereum.removeListener('accountsChanged', handleAccountsChanged)
+            if ((window as any).ethereum) {
+                (window as any).ethereum.removeListener('accountsChanged', handleAccountsChanged)
+                (window as any).ethereum.removeListener('chainChanged', () => {})
+                (window as any).ethereum.removeListener('disconnect', disconnect)
+            }
         }
-    }, [handleAccountsChanged])
+    }, [handleAccountsChanged, disconnect])
 
     return (
-        <Web3Context.Provider value={{
-            address,
-            role,
-            name,
-            isAuthenticated,
-            isUnregistered, // Add to context value
-            connect,
-            disconnect
-        }}>
+        <Web3Context.Provider
+            value={{
+                address,
+                role,
+                name,
+                isAuthenticated,
+                isUnregistered,
+                isLoading,
+                error,
+                networkName,
+                connect,
+                disconnect,
+            }}
+        >
             {children}
         </Web3Context.Provider>
     )
 }
-export const useWeb3 = () => {
+
+export function useWeb3() {
     const context = useContext(Web3Context)
-    if (!context) throw new Error('useWeb3 must be used within a Web3Provider')
+    if (!context) {
+        throw new Error('useWeb3 must be used within a Web3Provider')
+    }
     return context
 }
