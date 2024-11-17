@@ -1,7 +1,7 @@
 'use client'
 import { useWeb3 } from '@/context/Web3Context'
 import { useState, useEffect } from 'react'
-import { ethers } from 'ethers'
+import { ethers, EventLog, Log } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import React from 'react'
 import { FC } from 'react'
@@ -24,6 +24,18 @@ interface Token {
     relatedTokens: Token[]
 }
 
+// Definir la interfaz para los argumentos del evento
+interface TransferEventArgs {
+    tokenId: bigint;
+    from: string;
+    to: string;
+    cantidad: bigint;
+}
+
+interface TokenTransferidoEvent extends Omit<EventLog, 'args'> {
+    args: TransferEventArgs;
+}
+
 const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
     const { address } = useWeb3()
@@ -38,6 +50,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
     const [transferQuantity, setTransferQuantity] = useState('')
     const [selectedFactory, setSelectedFactory] = useState('')
     const [factories, setFactories] = useState<{ direccion: string; nombre: string }[]>([])
+    const [factoryBalance, setFactoryBalance] = useState<string>('')
 
     // Fetch tokens logic
     const fetchTokens = async () => {
@@ -57,45 +70,49 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             // Get events from the last 1000 blocks or from block 0 if chain is shorter
             const fromBlock = Math.max(0, latestBlock - 1000)
             
-            // Get TokenCreado events
-            const filter = contract.filters.TokenCreado()
-            const events = await contract.queryFilter(filter, fromBlock, latestBlock)
+            // Get all transfer events
+            const transferFilter = contract.filters.TokenTransferido()
+            const events = await contract.queryFilter(transferFilter, fromBlock, latestBlock)
+            const transferEvents = events.filter((e): e is TokenTransferidoEvent => e instanceof EventLog)
+            
+            // Filter transfers where this address is the recipient
+            const relevantTransferEvents = transferEvents.filter(event => 
+                event.args.to.toLowerCase() === address?.toLowerCase()
+            )
 
-            const tokenPromises = events.map(async (event: any) => {
-                const tokenId = event.args[0] // id is the first argument
-                const tokenData = await contract.tokens(tokenId)
-                
-                console.log('Loading token:', {
-                    id: Number(tokenId),
-                    nombre: tokenData[3],
-                    creador: tokenData[4],
-                    cantidad: Number(tokenData[6])
-                });
-                
-                return {
-                    id: Number(tokenId),
-                    idPadre: Number(tokenData[1]),
-                    idHijo: Number(tokenData[2]),
-                    nombre: tokenData[3],
-                    creador: tokenData[4],
-                    descripcion: tokenData[5],
-                    cantidad: Number(tokenData[6]),
-                    timestamp: Number(tokenData[7]),
-                    transactionHash: event.transactionHash,
-                    relatedTokens: []
-                } as Token
+            // Get unique token IDs from transfers using Array.from
+            const transferredTokenIds = Array.from(new Set(
+                relevantTransferEvents.map(event => Number(event.args.tokenId))
+            ))
+
+            // Get all tokens
+            const tokenPromises = transferredTokenIds.map(async (tokenId) => {
+                try {
+                    const tokenData = await contract.tokens(tokenId)
+                    const balance = await contract.getBalance(tokenId, address)
+                    
+                    return {
+                        id: tokenId,
+                        idPadre: Number(tokenData[1]),
+                        idHijo: Number(tokenData[2]),
+                        nombre: tokenData[3],
+                        creador: tokenData[4],
+                        descripcion: tokenData[5],
+                        cantidad: Number(balance), // Use balance instead of total amount
+                        timestamp: Number(tokenData[7]),
+                        transactionHash: relevantTransferEvents.find(e => Number(e.args.tokenId) === tokenId)?.transactionHash || '',
+                        relatedTokens: []
+                    } as Token
+                } catch (error) {
+                    console.error(`Error fetching token ${tokenId}:`, error)
+                    return null
+                }
             })
 
-            const allTokens = await Promise.all(tokenPromises)
-            console.log('All tokens loaded:', allTokens);
+            const allTokens = (await Promise.all(tokenPromises)).filter((token): token is Token => token !== null && token.cantidad > 0)
             
-            const userTokens = allTokens.filter(token => 
-                token.creador.toLowerCase() === address?.toLowerCase()
-            )
-            console.log('User tokens:', userTokens);
-
             // Group tokens by product name
-            const groupedTokens = userTokens.reduce((acc, token) => {
+            const groupedTokens = allTokens.reduce((acc, token) => {
                 const existingProduct = acc.find(p => p.nombre === token.nombre)
                 if (existingProduct) {
                     existingProduct.relatedTokens.push(token)
@@ -108,8 +125,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 return acc
             }, [] as Token[])
 
-            console.log('Grouped tokens:', groupedTokens);
-
+            console.log('Grouped tokens for role', role, ':', groupedTokens)
             setTokens(groupedTokens)
         } catch (err) {
             console.error("Error fetching tokens:", err)
@@ -204,6 +220,17 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         }
     }
 
+    // Función para obtener el balance de la fábrica
+    const checkFactoryBalance = async (tokenId: number, factoryAddress: string) => {
+        try {
+            const balance = await getTokenBalance(tokenId, factoryAddress);
+            setFactoryBalance(`Balance de la fábrica: ${Number(balance)/1000} kg`);
+        } catch (error) {
+            console.error('Error al obtener balance de la fábrica:', error);
+            setFactoryBalance('Error al obtener balance');
+        }
+    };
+
     // Función para transferir tokens
     const handleTransfer = async () => {
         if (!selectedToken || !selectedFactory || !transferQuantity || !address) {
@@ -279,6 +306,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             )
 
             await tx.wait()
+            await checkFactoryBalance(selectedToken.id, selectedFactory);
             fetchTokens()
             setIsTransferModalOpen(false)
             setTransferQuantity('')
@@ -323,16 +351,68 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         }
     }
 
+    // Función para renderizar el título según el rol
+    const getRoleTitle = () => {
+        switch (role) {
+            case 'productor':
+                return 'Mis Productos'
+            case 'fabrica':
+                return 'Mis Materias Primas'
+            case 'distribuidor':
+                return 'Mis Productos Procesados'
+            case 'mayorista':
+                return 'Productos para Distribución'
+            case 'minorista':
+                return 'Productos para Venta'
+            default:
+                return 'Mis Tokens'
+        }
+    }
+
+    // Función para obtener el texto del botón según el rol
+    const getActionButtonText = () => {
+        switch (role) {
+            case 'productor':
+                return 'Crear Nuevo Lote'
+            case 'fabrica':
+                return 'Procesar Materias Primas'
+            case 'distribuidor':
+                return 'Distribuir Productos'
+            case 'mayorista':
+                return 'Preparar para Venta'
+            case 'minorista':
+                return 'Vender Productos'
+            default:
+                return 'Crear Token'
+        }
+    }
+
     if (!address) return <div>Please connect your wallet</div>
 
     return (
         <div className="container mx-auto px-4">
-            <h1 className="text-2xl font-bold mb-6">Mis Productos</h1>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">{getRoleTitle()}</h2>
+                {role === 'productor' && (
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-[#6D8B74] text-white px-4 py-2 rounded-md hover:bg-[#5F7A65] transition-colors"
+                    >
+                        {getActionButtonText()}
+                    </button>
+                )}
+            </div>
 
             {loading ? (
-                <div>Cargando productos...</div>
+                <div className="text-center py-4">Cargando...</div>
+            ) : error ? (
+                <div className="text-red-500 text-center py-4">{error}</div>
             ) : tokens.length === 0 ? (
-                <div>No hay productos disponibles</div>
+                <div className="text-center py-4 text-gray-500">
+                    {role === 'fabrica' 
+                        ? 'No tienes materias primas disponibles. Espera a que un productor te transfiera tokens.'
+                        : 'No hay tokens disponibles.'}
+                </div>
             ) : (
                 <div className="bg-white shadow-md rounded-lg overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -513,57 +593,56 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             )}
             {/* Modal de Transferencia */}
             {isTransferModalOpen && selectedToken && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                        <div className="flex flex-col space-y-4">
-                            <h3 className="text-xl font-bold text-gray-900">
-                                Transferir: {selectedToken.nombre}
-                            </h3>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+                        <h2 className="text-xl font-bold mb-4">Transferir Token</h2>
+                        <div className="text-sm text-gray-600 mb-4">
+                            Balance disponible: {selectedToken.cantidad / 1000} kg
+                        </div>
 
-                            <div className="text-sm text-gray-600 mb-4">
-                                Balance disponible: {selectedToken.cantidad / 1000} kg
-                            </div>
+                        <select
+                            value={selectedFactory}
+                            onChange={(e) => setSelectedFactory(e.target.value)}
+                            className="w-full p-3 border rounded-md"
+                        >
+                            <option value="">Seleccionar Fábrica</option>
+                            {factories.map((factory) => (
+                                <option key={factory.direccion} value={factory.direccion}>
+                                    {factory.nombre}
+                                </option>
+                            ))}
+                        </select>
 
-                            <select
-                                value={selectedFactory}
-                                onChange={(e) => setSelectedFactory(e.target.value)}
-                                className="w-full p-3 border rounded-md"
+                        <input
+                            type="number"
+                            value={transferQuantity}
+                            onChange={(e) => setTransferQuantity(e.target.value)}
+                            className="w-full p-3 border rounded-md"
+                            placeholder="Cantidad en kg"
+                        />
+
+                        {factoryBalance && (
+                            <p className="mt-2 text-sm text-gray-600">{factoryBalance}</p>
+                        )}
+
+                        <div className="flex justify-end gap-2 mt-4">
+                            <button
+                                onClick={() => {
+                                    setIsTransferModalOpen(false)
+                                    setTransferQuantity('')
+                                    setSelectedFactory('')
+                                }}
+                                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
                             >
-                                <option value="">Seleccionar Fábrica</option>
-                                {factories.map((factory) => (
-                                    <option key={factory.direccion} value={factory.direccion}>
-                                        {factory.nombre}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <input
-                                type="number"
-                                value={transferQuantity}
-                                onChange={(e) => setTransferQuantity(e.target.value)}
-                                className="w-full p-3 border rounded-md"
-                                placeholder="Cantidad en kg"
-                            />
-
-                            <div className="flex justify-center gap-3 pt-4">
-                                <button
-                                    onClick={() => {
-                                        setIsTransferModalOpen(false)
-                                        setTransferQuantity('')
-                                        setSelectedFactory('')
-                                    }}
-                                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleTransfer}
-                                    className="px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors"
-                                    disabled={!transferQuantity || !selectedFactory || Number(transferQuantity) <= 0}
-                                >
-                                    Transferir
-                                </button>
-                            </div>
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleTransfer}
+                                className="px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors"
+                                disabled={!transferQuantity || !selectedFactory || Number(transferQuantity) <= 0}
+                            >
+                                Transferir
+                            </button>
                         </div>
                     </div>
                 </div>
