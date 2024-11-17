@@ -32,8 +32,12 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
     const [error, setError] = useState<string | null>(null)
     const [expandedRows, setExpandedRows] = useState<number[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
     const [selectedToken, setSelectedToken] = useState<Token | null>(null)
     const [newQuantity, setNewQuantity] = useState('')
+    const [transferQuantity, setTransferQuantity] = useState('')
+    const [selectedFactory, setSelectedFactory] = useState('')
+    const [factories, setFactories] = useState<{ direccion: string; nombre: string }[]>([])
 
     // Fetch tokens logic
     const fetchTokens = async () => {
@@ -61,6 +65,13 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 const tokenId = event.args[0] // id is the first argument
                 const tokenData = await contract.tokens(tokenId)
                 
+                console.log('Loading token:', {
+                    id: Number(tokenId),
+                    nombre: tokenData[3],
+                    creador: tokenData[4],
+                    cantidad: Number(tokenData[6])
+                });
+                
                 return {
                     id: Number(tokenId),
                     idPadre: Number(tokenData[1]),
@@ -76,9 +87,12 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             })
 
             const allTokens = await Promise.all(tokenPromises)
+            console.log('All tokens loaded:', allTokens);
+            
             const userTokens = allTokens.filter(token => 
                 token.creador.toLowerCase() === address?.toLowerCase()
             )
+            console.log('User tokens:', userTokens);
 
             // Group tokens by product name
             const groupedTokens = userTokens.reduce((acc, token) => {
@@ -93,6 +107,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 }
                 return acc
             }, [] as Token[])
+
+            console.log('Grouped tokens:', groupedTokens);
 
             setTokens(groupedTokens)
         } catch (err) {
@@ -109,7 +125,35 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         }
     }, [address])
 
-    if (!address) return <div>Please connect your wallet</div>
+    // Función para obtener las fábricas
+    const fetchFactories = async () => {
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const contract = new ethers.Contract(
+                CONTRACTS.PARTICIPANTES.ADDRESS,
+                CONTRACTS.PARTICIPANTES.ABI,
+                provider
+            )
+
+            const users = await contract.getUsuarios()
+            const factoryUsers = users.filter((user: any) => 
+                user.rol.toLowerCase() === 'fabrica' && user.activo
+            )
+
+            setFactories(factoryUsers.map((user: any) => ({
+                direccion: user.direccion,
+                nombre: user.nombre
+            })))
+        } catch (error) {
+            console.error('Error al cargar fábricas:', error)
+        }
+    }
+
+    useEffect(() => {
+        if (role === 'productor') {
+            fetchFactories()
+        }
+    }, [role])
 
     // Función para crear nuevo lote
     const createNewLot = async (token: Token, quantity: string) => {
@@ -139,6 +183,109 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         } catch (error) {
             console.error('Error:', error)
             alert('Error al crear el lote: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+        }
+    }
+
+    // Función para obtener el balance de un token
+    const getTokenBalance = async (tokenId: number, address: string) => {
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const contract = new ethers.Contract(
+                CONTRACTS.TOKENS.ADDRESS,
+                CONTRACTS.TOKENS.ABI,
+                provider
+            )
+
+            const token = await contract.tokens(tokenId)
+            return Number(token.balances[address])
+        } catch (error) {
+            console.error('Error al obtener balance:', error)
+            return 0
+        }
+    }
+
+    // Función para transferir tokens
+    const handleTransfer = async () => {
+        if (!selectedToken || !selectedFactory || !transferQuantity || !address) {
+            console.error('Faltan datos para la transferencia');
+            return;
+        }
+
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const signer = await provider.getSigner()
+            const signerAddress = await signer.getAddress()
+            
+            // Verificar que el signer es el mismo que el address
+            console.log('Verificación de direcciones:', {
+                signer: signerAddress,
+                from: address,
+                to: selectedFactory
+            });
+            
+            if (signerAddress.toLowerCase() !== address.toLowerCase()) {
+                alert('Error: La dirección del signer no coincide con la dirección del remitente');
+                return;
+            }
+
+            const contract = new ethers.Contract(
+                CONTRACTS.TOKENS.ADDRESS,
+                CONTRACTS.TOKENS.ABI,
+                signer
+            )
+
+            const totalTokens = Number(transferQuantity) * 1000
+
+            // Verificar que el destinatario no sea el mismo que el remitente
+            if (address.toLowerCase() === selectedFactory.toLowerCase()) {
+                alert('No puedes transferir tokens a tu propia dirección');
+                return;
+            }
+
+            // Verificar que el destinatario es un usuario activo
+            const usuariosContract = new ethers.Contract(
+                CONTRACTS.PARTICIPANTES.ADDRESS,
+                CONTRACTS.PARTICIPANTES.ABI,
+                provider
+            )
+            const isActive = await usuariosContract.estaActivo(selectedFactory);
+            if (!isActive) {
+                alert('El destinatario no es un usuario activo');
+                return;
+            }
+
+            // Verificar el balance antes de transferir
+            const balance = await contract.getBalance(selectedToken.id, address);
+            console.log('Current balance:', Number(balance));
+            console.log('Attempting to transfer:', totalTokens);
+
+            if (Number(balance) < totalTokens) {
+                alert(`No tienes suficientes tokens. Balance actual: ${Number(balance)/1000} kg`);
+                return;
+            }
+
+            console.log('Transferring token:', {
+                tokenId: selectedToken.id,
+                from: address,
+                to: selectedFactory,
+                amount: totalTokens
+            });
+
+            const tx = await contract.transferirToken(
+                selectedToken.id,
+                address,
+                selectedFactory,
+                totalTokens
+            )
+
+            await tx.wait()
+            fetchTokens()
+            setIsTransferModalOpen(false)
+            setTransferQuantity('')
+            setSelectedFactory('')
+        } catch (error) {
+            console.error('Error en la transferencia:', error)
+            alert('Error al transferir tokens: ' + (error instanceof Error ? error.message : 'Error desconocido'))
         }
     }
 
@@ -175,6 +322,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             console.error('Error en la transferencia:', error)
         }
     }
+
+    if (!address) return <div>Please connect your wallet</div>
 
     return (
         <div className="container mx-auto px-4">
@@ -221,18 +370,36 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                             {new Date(Number(token.timestamp) * 1000).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedToken(token)
-                                                    setIsModalOpen(true)
-                                                }}
-                                                className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
-                                                title="Crear Nuevo Lote"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </button>
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedToken(token)
+                                                        setIsModalOpen(true)
+                                                    }}
+                                                    className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
+                                                    title="Crear Nuevo Lote"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                </button>
+                                                {role === 'productor' && token.relatedTokens.length > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const tokenToTransfer = token.relatedTokens[0];
+                                                            console.log('Token to transfer:', tokenToTransfer);
+                                                            setSelectedToken(tokenToTransfer);
+                                                            setIsTransferModalOpen(true);
+                                                        }}
+                                                        className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
+                                                        title="Transferir a Fábrica"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                     {expandedRows.includes(token.id) && (
@@ -338,6 +505,63 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                     disabled={!newQuantity || Number(newQuantity) <= 0}
                                 >
                                     Crear Lote
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal de Transferencia */}
+            {isTransferModalOpen && selectedToken && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                        <div className="flex flex-col space-y-4">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                Transferir: {selectedToken.nombre}
+                            </h3>
+
+                            <div className="text-sm text-gray-600 mb-4">
+                                Balance disponible: {selectedToken.cantidad / 1000} kg
+                            </div>
+
+                            <select
+                                value={selectedFactory}
+                                onChange={(e) => setSelectedFactory(e.target.value)}
+                                className="w-full p-3 border rounded-md"
+                            >
+                                <option value="">Seleccionar Fábrica</option>
+                                {factories.map((factory) => (
+                                    <option key={factory.direccion} value={factory.direccion}>
+                                        {factory.nombre}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <input
+                                type="number"
+                                value={transferQuantity}
+                                onChange={(e) => setTransferQuantity(e.target.value)}
+                                className="w-full p-3 border rounded-md"
+                                placeholder="Cantidad en kg"
+                            />
+
+                            <div className="flex justify-center gap-3 pt-4">
+                                <button
+                                    onClick={() => {
+                                        setIsTransferModalOpen(false)
+                                        setTransferQuantity('')
+                                        setSelectedFactory('')
+                                    }}
+                                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleTransfer}
+                                    className="px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors"
+                                    disabled={!transferQuantity || !selectedFactory || Number(transferQuantity) <= 0}
+                                >
+                                    Transferir
                                 </button>
                             </div>
                         </div>

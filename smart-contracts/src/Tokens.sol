@@ -80,8 +80,9 @@ contract Tokens {
         address _to,
         uint256 _cantidad
     ) public {
+        require(msg.sender == _from, "Solo el propietario puede transferir sus tokens");
         require(tokens[_idToken].balances[_from] >= _cantidad, "El remitente no tiene tokens suficientes.");
-        require(_to != msg.sender, "No se puede transferir un token al propietario");
+        require(_from != _to, "No se puede transferir un token a la misma direccion");
         require(usuarios.estaActivo(_to), "El destinatario no es un usuario activo.");
 
         uint256 transferId = siguienteTransferId++;
