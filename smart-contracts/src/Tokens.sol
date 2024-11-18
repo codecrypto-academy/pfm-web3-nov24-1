@@ -107,4 +107,51 @@ contract Tokens {
     function getBalance(uint256 _idToken, address _owner) public view returns (uint256) {
         return tokens[_idToken].balances[_owner];
     }
+
+    // Función para procesar materias primas y crear un nuevo producto
+    function procesarMateriasPrimas(
+        uint256[] memory _idTokens,
+        uint256[] memory _cantidades,
+        string memory _nombreProducto,
+        uint256 _cantidadProducto,
+        string memory _descripcionProducto
+    ) public {
+        require(_idTokens.length == _cantidades.length, "La cantidad de tokens y cantidades debe ser igual");
+        require(_idTokens.length > 0, "Debe haber al menos una materia prima");
+        
+        // Verificar y quemar los tokens de materias primas
+        for (uint256 i = 0; i < _idTokens.length; i++) {
+            uint256 tokenId = _idTokens[i];
+            uint256 cantidad = _cantidades[i];
+            
+            require(tokens[tokenId].balances[msg.sender] >= cantidad, 
+                "No hay suficiente cantidad de materia prima");
+            
+            // Quemar (consumir) los tokens de materia prima
+            tokens[tokenId].balances[msg.sender] -= cantidad;
+            tokens[tokenId].cantidad -= cantidad;
+            
+            emit TokenDestruido(tokenId, tokens[tokenId].nombre, msg.sender, cantidad);
+        }
+        
+        // Crear el nuevo token del producto procesado
+        uint256 tokenId = siguienteTokenId++;
+        
+        Token storage nuevoToken = tokens[tokenId];
+        nuevoToken.id = tokenId;
+        nuevoToken.nombre = _nombreProducto;
+        nuevoToken.creador = msg.sender;
+        nuevoToken.descripcion = _descripcionProducto;
+        nuevoToken.cantidad = _cantidadProducto;
+        nuevoToken.timestamp = block.timestamp;
+        nuevoToken.balances[msg.sender] = _cantidadProducto;
+        
+        // Si hay solo una materia prima, establecer la relación padre-hijo
+        if (_idTokens.length == 1) {
+            nuevoToken.idPadre = _idTokens[0];
+            tokens[_idTokens[0]].idHijo = tokenId;
+        }
+        
+        emit TokenCreado(tokenId, _nombreProducto, msg.sender, _cantidadProducto);
+    }
 }

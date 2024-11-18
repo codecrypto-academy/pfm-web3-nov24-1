@@ -36,6 +36,17 @@ interface TokenTransferidoEvent extends Omit<EventLog, 'args'> {
     args: TransferEventArgs;
 }
 
+interface CreatedEventArgs {
+    id: bigint;
+    nombre: string;
+    creador: string;
+    cantidad: bigint;
+}
+
+interface TokenCreadoEvent extends Omit<EventLog, 'args'> {
+    args: CreatedEventArgs;
+}
+
 const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
     const { address } = useWeb3()
@@ -72,21 +83,31 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             
             // Get all transfer events
             const transferFilter = contract.filters.TokenTransferido()
-            const events = await contract.queryFilter(transferFilter, fromBlock, latestBlock)
-            const transferEvents = events.filter((e): e is TokenTransferidoEvent => e instanceof EventLog)
+            const transferEvents = await contract.queryFilter(transferFilter, fromBlock, latestBlock)
+            const typedTransferEvents = transferEvents.filter((e): e is TokenTransferidoEvent => e instanceof EventLog)
             
-            // Filter transfers where this address is the recipient
-            const relevantTransferEvents = transferEvents.filter(event => 
+            // Get all creation events
+            const creationFilter = contract.filters.TokenCreado()
+            const creationEvents = await contract.queryFilter(creationFilter, fromBlock, latestBlock)
+            const typedCreationEvents = creationEvents.filter((e): e is TokenCreadoEvent => e instanceof EventLog)
+            
+            // Filter relevant events
+            const relevantTransferEvents = typedTransferEvents.filter(event => 
                 event.args.to.toLowerCase() === address?.toLowerCase()
             )
 
-            // Get unique token IDs from transfers using Array.from
-            const transferredTokenIds = Array.from(new Set(
-                relevantTransferEvents.map(event => Number(event.args.tokenId))
-            ))
+            const relevantCreationEvents = typedCreationEvents.filter(event =>
+                event.args.creador.toLowerCase() === address?.toLowerCase()
+            )
+
+            // Get unique token IDs from both transfers and creations
+            const tokenIds = Array.from(new Set([
+                ...relevantTransferEvents.map(event => Number(event.args.tokenId)),
+                ...relevantCreationEvents.map(event => Number(event.args.id))
+            ]))
 
             // Get all tokens
-            const tokenPromises = transferredTokenIds.map(async (tokenId) => {
+            const tokenPromises = tokenIds.map(async (tokenId) => {
                 try {
                     const tokenData = await contract.tokens(tokenId)
                     const balance = await contract.getBalance(tokenId, address)
@@ -390,28 +411,22 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
     if (!address) return <div>Please connect your wallet</div>
 
     return (
-        <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">{getRoleTitle()}</h2>
-                {role === 'productor' && (
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-[#6D8B74] text-white px-4 py-2 rounded-md hover:bg-[#5F7A65] transition-colors"
-                    >
-                        {getActionButtonText()}
-                    </button>
-                )}
+        <div className="container mx-auto px-4 py-8">
+            <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">{getRoleTitle()}</h2>
             </div>
 
             {loading ? (
-                <div className="text-center py-4">Cargando...</div>
+                <div className="text-center">
+                    <p>Cargando tokens...</p>
+                </div>
             ) : error ? (
-                <div className="text-red-500 text-center py-4">{error}</div>
+                <div className="text-red-500">
+                    <p>{error}</p>
+                </div>
             ) : tokens.length === 0 ? (
-                <div className="text-center py-4 text-gray-500">
-                    {role === 'fabrica' 
-                        ? 'No tienes materias primas disponibles. Espera a que un productor te transfiera tokens.'
-                        : 'No hay tokens disponibles.'}
+                <div className="text-center text-gray-500">
+                    <p>No hay tokens disponibles</p>
                 </div>
             ) : (
                 <div className="bg-white shadow-md rounded-lg overflow-hidden">
@@ -463,22 +478,6 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                 </button>
-                                                {role === 'productor' && token.relatedTokens.length > 0 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const tokenToTransfer = token.relatedTokens[0];
-                                                            console.log('Token to transfer:', tokenToTransfer);
-                                                            setSelectedToken(tokenToTransfer);
-                                                            setIsTransferModalOpen(true);
-                                                        }}
-                                                        className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
-                                                        title="Transferir a Fábrica"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                                                        </svg>
-                                                    </button>
-                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -503,6 +502,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Padre</th>
                                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hash</th>
+                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="bg-white divide-y divide-gray-200">
@@ -528,13 +528,26 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                                                 href={`https://sepolia.etherscan.io/tx/${relatedToken.transactionHash}`}
                                                                                 target="_blank"
                                                                                 rel="noopener noreferrer"
-                                                                                className="text-olive-600 hover:text-olive-800 flex items-center gap-1"
+                                                                                className="text-olive-600 hover:text-olive-800"
                                                                             >
-                                                                                {relatedToken.transactionHash}
-                                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                                                                                </svg>
+                                                                                Ver en Etherscan
                                                                             </a>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                            <div className="flex space-x-2">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setSelectedToken(relatedToken)
+                                                                                        setIsTransferModalOpen(true)
+                                                                                    }}
+                                                                                    className="text-olive-600 hover:text-olive-800 ml-2"
+                                                                                    title="Transferir Lote"
+                                                                                >
+                                                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                                                                    </svg>
+                                                                                </button>
+                                                                            </div>
                                                                         </td>
                                                                     </tr>
                                                                 ))}

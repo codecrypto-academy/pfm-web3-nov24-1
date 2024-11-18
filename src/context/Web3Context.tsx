@@ -192,6 +192,9 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
 
+                    // Redirigir al usuario a su dashboard correspondiente
+                    router.push(`/dashboard/${currentUser.rol.toLowerCase()}`)
+
                     try {
                         localStorage.setItem('web3Auth', JSON.stringify({
                             address: accounts[0],
@@ -216,7 +219,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             setWeb3Error('Failed to initialize Web3 provider', 'wallet')
             setIsAuthenticated(false)
         }
-    }, [provider, initializeProvider, disconnect])
+    }, [provider, initializeProvider, disconnect, router])
 
     const connect = useCallback(async () => {
         if (!(window as any).ethereum) {

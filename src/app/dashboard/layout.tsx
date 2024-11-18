@@ -65,7 +65,91 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                     className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
                                 >
                                     <span className="font-medium">Crear Producto</span>
-
+                                </Link>
+                            </li>
+                        </ul>
+                    </nav>
+                )
+            case 'fabrica':
+                return (
+                    <nav className="p-6">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-olive-800">Panel de Fábrica</h2>
+                            <p className="text-sm text-olive-600">Procesamiento de Aceite</p>
+                        </div>
+                        <ul className="space-y-2">
+                            <li>
+                                <Link
+                                    href="/dashboard/fabrica"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <span className="font-medium">Panel Principal</span>
+                                </Link>
+                            </li>
+                            <div className="border-t border-olive-200 my-4 opacity-50" />
+                            <li>
+                                <Link
+                                    href="/dashboard/fabrica/procesar"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <span className="font-medium">Procesar Aceite</span>
+                                </Link>
+                            </li>
+                        </ul>
+                    </nav>
+                )
+            case 'distribuidor':
+                return (
+                    <nav className="p-6">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-olive-800">Panel de Distribuidor</h2>
+                            <p className="text-sm text-olive-600">Distribución de Aceite</p>
+                        </div>
+                        <ul className="space-y-2">
+                            <li>
+                                <Link
+                                    href="/dashboard/distribuidor"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <span className="font-medium">Panel Principal</span>
+                                </Link>
+                            </li>
+                        </ul>
+                    </nav>
+                )
+            case 'mayorista':
+                return (
+                    <nav className="p-6">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-olive-800">Panel de Mayorista</h2>
+                            <p className="text-sm text-olive-600">Gestión de Ventas al Mayor</p>
+                        </div>
+                        <ul className="space-y-2">
+                            <li>
+                                <Link
+                                    href="/dashboard/mayorista"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <span className="font-medium">Panel Principal</span>
+                                </Link>
+                            </li>
+                        </ul>
+                    </nav>
+                )
+            case 'minorista':
+                return (
+                    <nav className="p-6">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-olive-800">Panel de Minorista</h2>
+                            <p className="text-sm text-olive-600">Venta al Público</p>
+                        </div>
+                        <ul className="space-y-2">
+                            <li>
+                                <Link
+                                    href="/dashboard/minorista"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <span className="font-medium">Panel Principal</span>
                                 </Link>
                             </li>
                         </ul>
