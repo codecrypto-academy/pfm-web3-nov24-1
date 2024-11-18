@@ -1,26 +1,46 @@
 'use client'
 import { useWeb3 } from '@/context/Web3Context'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ethers, EventLog, Log } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import React from 'react'
 import { FC } from 'react'
 import router from 'next/router'
 
+// Declaración de tipos para window.ethereum
+declare global {
+    interface Window {
+        ethereum?: any;
+    }
+}
+
 interface DashboardProps {
     role: 'productor' | 'fabrica' | 'distribuidor' | 'mayorista' | 'minorista'
 }
 
+interface TokenAttribute {
+    nombre: string;
+    valor: string;
+    timestamp: number;
+}
+
+interface RelatedToken {
+    id: number;
+    cantidad: number;
+    timestamp: number;
+}
+
 interface Token {
-    id: number
-    nombre: string
-    creador: string
-    descripcion: string
-    cantidad: number
-    timestamp: number
-    transactionHash: string
-    relatedTokens: Token[]
-    atributos?: { nombre: string; valor: string; timestamp: number }[]
+    id: number;
+    nombre: string;
+    descripcion?: string;
+    creador: string;
+    cantidad: number;
+    timestamp: number;
+    isProcesado?: boolean;
+    tokenPadre?: string;
+    atributos?: TokenAttribute[];
+    relatedTokens: RelatedToken[];
 }
 
 // Definir la interfaz para los argumentos del evento
@@ -61,6 +81,24 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
     const [selectedFactory, setSelectedFactory] = useState('')
     const [factories, setFactories] = useState<{ direccion: string; nombre: string }[]>([])
     const [factoryBalance, setFactoryBalance] = useState<string>('')
+    const [lastUpdate, setLastUpdate] = useState(Date.now());
+
+    // Función para recargar tokens que retorna Promise<void>
+    const reloadTokens = useCallback(async () => {
+        await fetchTokens()
+    }, [address])
+
+    // Función para manejar el clic en crear lote
+    const handleCreateBatchClick = (token: Token) => {
+        setSelectedToken(token)
+        setIsModalOpen(true)
+    }
+
+    // Función para manejar el clic en transferir
+    const handleTransferClick = (token: Token) => {
+        setSelectedToken(token)
+        setIsTransferModalOpen(true)
+    }
 
     // Fetch tokens logic
     const fetchTokens = async () => {
@@ -68,7 +106,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         setError(null)
 
         try {
-            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const provider = new ethers.BrowserProvider(window.ethereum)
             const contract = new ethers.Contract(
                 CONTRACTS.TOKENS.ADDRESS,
                 CONTRACTS.TOKENS.ABI,
@@ -116,25 +154,43 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     const atributos = await Promise.all(
                         nombresAtributos.map(async (nombre: string) => {
                             const attr = await contract.getAtributo(tokenId, nombre)
-                            return {
+                            const attribute: TokenAttribute = {
                                 nombre: attr[0],
                                 valor: attr[1],
                                 timestamp: Number(attr[2])
                             }
+                            return attribute
                         })
                     )
 
-                    return {
+                    // Verificar si es un producto procesado
+                    const isProcesado = atributos.some(attr => 
+                        attr.nombre === "Procesado" && attr.valor.toLowerCase() === "true"
+                    )
+
+                    // Obtener token padre si existe
+                    const tokenPadre = atributos.find(attr => attr.nombre === "TokenPadre")?.valor
+
+                    const relatedToken: RelatedToken = {
+                        id: tokenId,
+                        cantidad: Number(balance),
+                        timestamp: Number(tokenData[5])
+                    }
+
+                    const token: Token = {
                         id: tokenId,
                         nombre: tokenData[1],
                         creador: tokenData[2],
                         descripcion: tokenData[3],
                         cantidad: Number(balance),
                         timestamp: Number(tokenData[5]),
-                        transactionHash: relevantTransferEvents.find(e => Number(e.args.tokenId) === tokenId)?.transactionHash || '',
-                        relatedTokens: [],
-                        atributos
-                    } as Token
+                        isProcesado,
+                        tokenPadre,
+                        atributos,
+                        relatedTokens: [relatedToken]
+                    }
+
+                    return token
                 } catch (error) {
                     console.error(`Error fetching token ${tokenId}:`, error)
                     return null
@@ -147,17 +203,18 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             const groupedTokens = allTokens.reduce((acc, token) => {
                 const existingProduct = acc.find(p => p.nombre === token.nombre)
                 if (existingProduct) {
-                    existingProduct.relatedTokens.push(token)
+                    const relatedToken: RelatedToken = {
+                        id: token.id,
+                        cantidad: token.cantidad,
+                        timestamp: token.timestamp
+                    }
+                    existingProduct.relatedTokens.push(relatedToken)
                 } else {
-                    acc.push({
-                        ...token,
-                        relatedTokens: [token]
-                    })
+                    acc.push(token)
                 }
                 return acc
             }, [] as Token[])
 
-            console.log('Grouped tokens for role', role, ':', groupedTokens)
             setTokens(groupedTokens)
         } catch (err) {
             console.error("Error fetching tokens:", err)
@@ -168,10 +225,40 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
     }
 
     useEffect(() => {
-        if (address && address !== '') {
-            fetchTokens()
+        if (!address) return;
+
+        // Cargar tokens inicialmente
+        reloadTokens();
+        
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(
+            CONTRACTS.TOKENS.ADDRESS,
+            CONTRACTS.TOKENS.ABI,
+            provider
+        );
+
+        const handleNewToken = async () => {
+            await reloadTokens();
+        };
+
+        // Los nombres de los eventos deben coincidir exactamente con los del contrato
+        contract.on("TokenCreado", handleNewToken);
+        contract.on("TokenTransferido", handleNewToken);
+        contract.on("TokenProcesado", handleNewToken);
+
+        // Cleanup function
+        return () => {
+            contract.removeListener("TokenCreado", handleNewToken);
+            contract.removeListener("TokenTransferido", handleNewToken);
+            contract.removeListener("TokenProcesado", handleNewToken);
+        };
+    }, [address]);
+
+    useEffect(() => {
+        if (role === 'productor') {
+            fetchFactories()
         }
-    }, [address])
+    }, [role])
 
     // Función para obtener las fábricas
     const fetchFactories = async () => {
@@ -197,12 +284,6 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         }
     }
 
-    useEffect(() => {
-        if (role === 'productor') {
-            fetchFactories()
-        }
-    }, [role])
-
     // Función para crear nuevo lote
     const createNewLot = async (token: Token, quantity: string) => {
         try {
@@ -225,7 +306,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             )
 
             await tx.wait()
-            fetchTokens() // Refrescar la lista
+            reloadTokens() // Refrescar la lista
             setIsModalOpen(false)
             setNewQuantity('')
         } catch (error) {
@@ -339,7 +420,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
             await tx.wait()
             await checkFactoryBalance(selectedToken.id, selectedFactory);
-            fetchTokens()
+            reloadTokens()
             setIsTransferModalOpen(false)
             setTransferQuantity('')
             setSelectedFactory('')
@@ -377,7 +458,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
             await tx.wait()
             // Refresh tokens after transfer
-            fetchTokens()
+            reloadTokens()
         } catch (error) {
             console.error('Error en la transferencia:', error)
         }
@@ -440,174 +521,242 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     <p>No hay tokens disponibles</p>
                 </div>
             ) : (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="w-10 px-6 py-3"></th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                            </tr>
-                        </thead>
-
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {tokens.map((token) => (
-                                <React.Fragment key={token.id}>
+                <div className="space-y-8">
+                    {/* Materias Primas */}
+                    <div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">Materias Primas</h3>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
                                     <tr>
-                                        <td className="px-6 py-4">
-                                            <button onClick={() => toggleRow(token.id)} className="text-olive-600 hover:text-olive-800">
-                                                {expandedRows.includes(token.id) ? '-' : '+'}
-                                            </button>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">{token.nombre}</td>
-                                        <td className="px-6 py-4">{token.descripcion}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex flex-col">
-                                                <span>{token.relatedTokens.reduce((sum, t) => sum + t.cantidad / 1000, 0)} kg</span>
-                                                <span className="text-gray-500 text-xs">
-                                                    {token.relatedTokens.reduce((sum, t) => sum + t.cantidad, 0)} tokens
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {new Date(Number(token.timestamp) * 1000).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                token.creador.toLowerCase() === address?.toLowerCase()
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-blue-100 text-blue-800'
-                                            }`}>
-                                                {token.creador.toLowerCase() === address?.toLowerCase() ? 'Creado' : 'Recibido'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex space-x-2">
-                                                {token.creador.toLowerCase() === address?.toLowerCase() && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedToken(token)
-                                                            setIsModalOpen(true)
-                                                        }}
-                                                        className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
-                                                        title="Crear Nuevo Lote"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Token ID
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Nombre
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Balance Total
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Remesas
+                                        </th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Acciones
+                                        </th>
                                     </tr>
-                                    {expandedRows.includes(token.id) && (
-                                        <tr className="bg-gray-50 transition-all duration-200 ease-in-out">
-                                            <td colSpan={7}>
-                                                <div className="p-4">
-                                                    <div className="border-b border-gray-200 pb-4 mb-4">
-                                                        <h4 className="text-lg font-semibold text-olive-600">
-                                                            Historial de Lotes: {token.nombre}
-                                                        </h4>
-                                                        <p className="text-sm text-gray-500">
-                                                            Mostrando todos los lotes relacionados con este producto
-                                                        </p>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {tokens
+                                        .filter(token => !token.isProcesado)
+                                        .map((token, index) => (
+                                            <tr key={token.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    #{token.id}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <div>
+                                                        <span className="font-medium">{token.nombre}</span>
+                                                        {token.descripcion && (
+                                                            <span className="block text-xs text-gray-500">
+                                                                {token.descripcion}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    <div className="overflow-x-auto">
-                                                        <table className="min-w-full divide-y divide-gray-200">
-                                                            <thead className="bg-gray-50">
-                                                                <tr>
-                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Token</th>
-                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token Padre</th>
-                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hash</th>
-                                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                                {token.relatedTokens.map(relatedToken => (
-                                                                    <React.Fragment key={relatedToken.id}>
-                                                                        <tr className="hover:bg-gray-50">
-                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                                {relatedToken.id}
-                                                                            </td>
-                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                                <div className="flex flex-col">
-                                                                                    <span>{(relatedToken.cantidad / 1000)} kg</span>
-                                                                                    <span className="text-gray-500 text-xs">{relatedToken.cantidad} tokens</span>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                                {new Date(relatedToken.timestamp * 1000).toLocaleDateString()}
-                                                                            </td>
-                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                                {relatedToken.id}
-                                                                            </td>
-                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                                                <a
-                                                                                    href={`https://sepolia.etherscan.io/tx/${relatedToken.transactionHash}`}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    className="text-blue-600 hover:text-blue-900"
-                                                                                >
-                                                                                    Ver transacción
-                                                                                </a>
-                                                                            </td>
-                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                                                <div className="flex space-x-2">
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            setSelectedToken(relatedToken)
-                                                                                            setIsTransferModalOpen(true)
-                                                                                        }}
-                                                                                        className="text-olive-600 hover:text-olive-800 ml-2"
-                                                                                        title="Transferir Lote"
-                                                                                    >
-                                                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                                                                        </svg>
-                                                                                    </button>
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                        {relatedToken.atributos && relatedToken.atributos.length > 0 && (
-                                                                            <tr className="bg-gray-50">
-                                                                                <td colSpan={6} className="px-6 py-4">
-                                                                                    <div className="mt-2">
-                                                                                        <h5 className="text-sm font-medium text-gray-900 mb-2">Atributos del Lote:</h5>
-                                                                                        <div className="grid grid-cols-3 gap-4">
-                                                                                            {relatedToken.atributos.map((atributo, index) => (
-                                                                                                <div key={index} className="bg-white p-3 rounded-lg shadow-sm">
-                                                                                                    <div className="text-sm font-medium text-olive-600">{atributo.nombre}</div>
-                                                                                                    <div className="text-sm text-gray-500">{atributo.valor}</div>
-                                                                                                    <div className="text-xs text-gray-400">
-                                                                                                        {new Date(atributo.timestamp * 1000).toLocaleDateString()}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            ))}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                            </tr>
-                                                                        )}
-                                                                    </React.Fragment>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {token.cantidad / 1000} kg
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    <div className="space-y-2">
+                                                        {token.relatedTokens.map((remesa, idx) => (
+                                                            <div key={idx} className="flex items-center space-x-2">
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                                    Remesa #{remesa.id}
+                                                                </span>
+                                                                <span className="text-sm text-gray-600">
+                                                                    {remesa.cantidad / 1000} kg
+                                                                </span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    {new Date(remesa.timestamp * 1000).toLocaleDateString()}
+                                                                </span>
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </React.Fragment>
-                            ))}
-                        </tbody>
-                    </table>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    {role === 'productor' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleTransferClick(token)}
+                                                                className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                                            >
+                                                                Transferir
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCreateBatchClick(token)}
+                                                                className="text-green-600 hover:text-green-900"
+                                                            >
+                                                                Crear Lote
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
+                    {/* Productos Procesados */}
+                    <div>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">Productos Procesados</h3>
+                        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="w-10 px-6 py-3"></th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {tokens
+                                        .filter(token => token.isProcesado)
+                                        .map((token) => {
+                                            const parentTokenIds = token.atributos?.find(attr => 
+                                                attr.nombre === "TokenPadre")?.valor?.split(',') || [];
+                                            return (
+                                                <React.Fragment key={token.id}>
+                                                    <tr className="hover:bg-gray-50">
+                                                        <td className="px-6 py-4">
+                                                            <button onClick={() => toggleRow(token.id)} className="text-olive-600 hover:text-olive-800">
+                                                                {expandedRows.includes(token.id) ? '-' : '+'}
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">{token.nombre}</td>
+                                                        <td className="px-6 py-4">{token.descripcion}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div className="flex flex-col">
+                                                                <span>{token.relatedTokens[0]?.cantidad / 1000} kg</span>
+                                                                <span className="text-gray-500 text-xs">
+                                                                    {token.relatedTokens[0]?.cantidad} tokens
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            {new Date(Number(token.timestamp) * 1000).toLocaleDateString()}
+                                                        </td>
+                                                    </tr>
+                                                    {expandedRows.includes(token.id) && (
+                                                        <tr>
+                                                            <td colSpan={5}>
+                                                                <div className="p-4 bg-gray-50">
+                                                                    {/* Atributos */}
+                                                                    <div className="mb-6">
+                                                                        <h4 className="text-sm font-medium text-gray-700 mb-2">Atributos del Producto:</h4>
+                                                                        <div className="grid grid-cols-3 gap-4">
+                                                                            {token.atributos
+                                                                                ?.filter(attr => !['Procesado', 'TokenPadre'].includes(attr.nombre))
+                                                                                .map((attr, index) => (
+                                                                                    <div key={index} className="bg-white p-3 rounded shadow-sm">
+                                                                                        <div className="font-medium text-gray-700">{attr.nombre}</div>
+                                                                                        <div className="text-gray-600">{attr.valor}</div>
+                                                                                    </div>
+                                                                                ))}
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    {/* Materias Primas Utilizadas */}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-medium text-gray-700 mb-2">Materias Primas Utilizadas:</h4>
+                                                                        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                                                                            <table className="min-w-full divide-y divide-gray-200">
+                                                                                <thead className="bg-gray-50">
+                                                                                    <tr>
+                                                                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Token ID</th>
+                                                                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Nombre</th>
+                                                                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
+                                                                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody className="divide-y divide-gray-200">
+                                                                                    {parentTokenIds.map((id, index) => {
+                                                                                        const numericId = parseInt(id);
+                                                                                        
+                                                                                        // Primero buscar el token que tenga este ID en sus remesas
+                                                                                        let parentToken = tokens.find(t => 
+                                                                                            t.relatedTokens?.some(rt => rt.id === numericId)
+                                                                                        );
+
+                                                                                        // Si no lo encontramos, buscar por ID de token
+                                                                                        if (!parentToken) {
+                                                                                            parentToken = tokens.find(t => t.id === numericId);
+                                                                                        }
+
+                                                                                        // Buscar la remesa específica
+                                                                                        let parentRemesa = parentToken?.relatedTokens?.find(rt => rt.id === numericId);
+                                                                                        
+                                                                                        // Si no encontramos la remesa específica pero tenemos el token,
+                                                                                        // usar la primera remesa disponible
+                                                                                        if (!parentRemesa && parentToken?.relatedTokens && parentToken.relatedTokens.length > 0) {
+                                                                                            parentRemesa = parentToken.relatedTokens[0];
+                                                                                        }
+                                                                                        
+                                                                                        return (
+                                                                                            <tr key={index} className="hover:bg-gray-50">
+                                                                                                <td className="px-4 py-2 text-sm text-gray-900">
+                                                                                                    <span className="font-medium">Token #{id}</span>
+                                                                                                </td>
+                                                                                                <td className="px-4 py-2 text-sm text-gray-900">
+                                                                                                    {parentToken?.nombre || 'N/A'}
+                                                                                                    {parentToken?.descripcion && (
+                                                                                                        <span className="block text-xs text-gray-500">
+                                                                                                            {parentToken.descripcion}
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </td>
+                                                                                                <td className="px-4 py-2 text-sm text-gray-900">
+                                                                                                    {parentRemesa ? (
+                                                                                                        <div>
+                                                                                                            <span className="font-medium">{parentRemesa.cantidad / 1000} kg</span>
+                                                                                                            <span className="block text-xs text-gray-500">
+                                                                                                                Remesa #{parentRemesa.id}
+                                                                                                            </span>
+                                                                                                        </div>
+                                                                                                    ) : 'N/A'}
+                                                                                                </td>
+                                                                                                <td className="px-4 py-2 text-sm text-gray-900">
+                                                                                                    {parentRemesa ? (
+                                                                                                        <div>
+                                                                                                            <span>{new Date(Number(parentRemesa.timestamp) * 1000).toLocaleDateString()}</span>
+                                                                                                            <span className="block text-xs text-gray-500">
+                                                                                                                {new Date(Number(parentRemesa.timestamp) * 1000).toLocaleTimeString()}
+                                                                                                            </span>
+                                                                                                        </div>
+                                                                                                    ) : 'N/A'}
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        );
+                                                                                    })}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             )}
             {/* Modal para crear nuevo lote */}
