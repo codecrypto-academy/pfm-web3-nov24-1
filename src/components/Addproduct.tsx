@@ -5,9 +5,15 @@ import { useState } from 'react'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import { useRouter } from 'next/navigation'
+import { PlusCircle, XCircle } from 'lucide-react'
 
 interface CreateProductProps {
     role: 'productor' | 'fabrica' | 'distribuidor' | 'mayorista'
+}
+
+interface Atributo {
+    nombre: string;
+    valor: string;
 }
 
 const CreateProduct: FC<CreateProductProps> = ({ role }) => {
@@ -21,8 +27,22 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
         descripcion: '',
         cantidad: '',
         tokenRatio: 1000,
-        idTokenPadre: '0'
     })
+    const [atributos, setAtributos] = useState<Atributo[]>([])
+
+    const handleAddAtributo = () => {
+        setAtributos([...atributos, { nombre: '', valor: '' }])
+    }
+
+    const handleRemoveAtributo = (index: number) => {
+        setAtributos(atributos.filter((_, i) => i !== index))
+    }
+
+    const handleAtributoChange = (index: number, field: 'nombre' | 'valor', value: string) => {
+        const nuevosAtributos = [...atributos]
+        nuevosAtributos[index][field] = value
+        setAtributos(nuevosAtributos)
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -31,6 +51,13 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
 
         if (!formData.nombre || !formData.descripcion || !formData.cantidad) {
             setError('Por favor complete todos los campos')
+            return
+        }
+
+        // Validar que los atributos no estén vacíos
+        const atributosInvalidos = atributos.some(attr => !attr.nombre || !attr.valor)
+        if (atributosInvalidos) {
+            setError('Por favor complete todos los campos de los atributos')
             return
         }
 
@@ -48,13 +75,17 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
 
             const totalTokens = Number(formData.cantidad) * formData.tokenRatio
 
+            // Preparar arrays de atributos
+            const nombresAtributos = atributos.map(attr => attr.nombre)
+            const valoresAtributos = atributos.map(attr => attr.valor)
+
             setTxStatus('Enviando transacción...')
             const tx = await contract.crearToken(
                 formData.nombre,
                 totalTokens,
                 formData.descripcion,
-                formData.idTokenPadre,
-                0
+                nombresAtributos,
+                valoresAtributos
             )
 
             setTxStatus('Esperando confirmación...')
@@ -123,6 +154,51 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                             Se generarán {Number(formData.cantidad || 0) * formData.tokenRatio} tokens
                             (1kg = 1000 tokens)
                         </p>
+                    </div>
+
+                    {/* Sección de Atributos */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-primary">
+                                Atributos Personalizados
+                            </label>
+                            <button
+                                type="button"
+                                onClick={handleAddAtributo}
+                                className="text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                Añadir Atributo
+                            </button>
+                        </div>
+
+                        {atributos.map((atributo, index) => (
+                            <div key={index} className="flex gap-2 items-start">
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre (ej: Método de recolección)"
+                                        className="w-full p-2 border rounded-md bg-input text-primary mb-2"
+                                        value={atributo.nombre}
+                                        onChange={(e) => handleAtributoChange(index, 'nombre', e.target.value)}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Valor (ej: Manual)"
+                                        className="w-full p-2 border rounded-md bg-input text-primary"
+                                        value={atributo.valor}
+                                        onChange={(e) => handleAtributoChange(index, 'valor', e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveAtributo(index)}
+                                    className="text-red-500 hover:text-red-700"
+                                >
+                                    <XCircle className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ))}
                     </div>
 
                     <button

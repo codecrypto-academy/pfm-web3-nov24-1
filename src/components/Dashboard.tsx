@@ -13,8 +13,6 @@ interface DashboardProps {
 
 interface Token {
     id: number
-    idPadre: number
-    idHijo: number
     nombre: string
     creador: string
     descripcion: string
@@ -22,6 +20,7 @@ interface Token {
     timestamp: number
     transactionHash: string
     relatedTokens: Token[]
+    atributos?: { nombre: string; valor: string; timestamp: number }[]
 }
 
 // Definir la interfaz para los argumentos del evento
@@ -112,17 +111,29 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     const tokenData = await contract.tokens(tokenId)
                     const balance = await contract.getBalance(tokenId, address)
                     
+                    // Obtener atributos del token
+                    const nombresAtributos = await contract.getNombresAtributos(tokenId)
+                    const atributos = await Promise.all(
+                        nombresAtributos.map(async (nombre: string) => {
+                            const attr = await contract.getAtributo(tokenId, nombre)
+                            return {
+                                nombre: attr[0],
+                                valor: attr[1],
+                                timestamp: Number(attr[2])
+                            }
+                        })
+                    )
+
                     return {
                         id: tokenId,
-                        idPadre: Number(tokenData[1]),
-                        idHijo: Number(tokenData[2]),
-                        nombre: tokenData[3],
-                        creador: tokenData[4],
-                        descripcion: tokenData[5],
-                        cantidad: Number(balance), // Use balance instead of total amount
-                        timestamp: Number(tokenData[7]),
+                        nombre: tokenData[1],
+                        creador: tokenData[2],
+                        descripcion: tokenData[3],
+                        cantidad: Number(balance),
+                        timestamp: Number(tokenData[5]),
                         transactionHash: relevantTransferEvents.find(e => Number(e.args.tokenId) === tokenId)?.transactionHash || '',
-                        relatedTokens: []
+                        relatedTokens: [],
+                        atributos
                     } as Token
                 } catch (error) {
                     console.error(`Error fetching token ${tokenId}:`, error)
@@ -209,8 +220,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 token.nombre,
                 totalTokens,
                 token.descripcion,
-                token.id, // token padre
-                0  // token hijo (0 para nuevos lotes)
+                [], // array vacío para nombres de atributos
+                []  // array vacío para valores de atributos
             )
 
             await tx.wait()
@@ -438,6 +449,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
@@ -464,26 +476,37 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {new Date(Number(token.timestamp) * 1000).toLocaleDateString()}
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                token.creador.toLowerCase() === address?.toLowerCase()
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : 'bg-blue-100 text-blue-800'
+                                            }`}>
+                                                {token.creador.toLowerCase() === address?.toLowerCase() ? 'Creado' : 'Recibido'}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex space-x-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedToken(token)
-                                                        setIsModalOpen(true)
-                                                    }}
-                                                    className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
-                                                    title="Crear Nuevo Lote"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                </button>
+                                                {token.creador.toLowerCase() === address?.toLowerCase() && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedToken(token)
+                                                            setIsModalOpen(true)
+                                                        }}
+                                                        className="text-olive-600 hover:text-olive-800 p-2 rounded-full hover:bg-olive-100 transition-colors"
+                                                        title="Crear Nuevo Lote"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
                                     {expandedRows.includes(token.id) && (
                                         <tr className="bg-gray-50 transition-all duration-200 ease-in-out">
-                                            <td colSpan={6}>
+                                            <td colSpan={7}>
                                                 <div className="p-4">
                                                     <div className="border-b border-gray-200 pb-4 mb-4">
                                                         <h4 className="text-lg font-semibold text-olive-600">
@@ -507,49 +530,71 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                             </thead>
                                                             <tbody className="bg-white divide-y divide-gray-200">
                                                                 {token.relatedTokens.map(relatedToken => (
-                                                                    <tr key={relatedToken.id} className="hover:bg-gray-50">
-                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                            {relatedToken.id}
-                                                                        </td>
-                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                            <div className="flex flex-col">
-                                                                                <span>{(relatedToken.cantidad / 1000)} kg</span>
-                                                                                <span className="text-gray-500 text-xs">{relatedToken.cantidad} tokens</span>
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                            {new Date(relatedToken.timestamp * 1000).toLocaleDateString()}
-                                                                        </td>
-                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                                            {relatedToken.idPadre}
-                                                                        </td>
-                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                                            <a
-                                                                                href={`https://sepolia.etherscan.io/tx/${relatedToken.transactionHash}`}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                                className="text-olive-600 hover:text-olive-800"
-                                                                            >
-                                                                                Ver en Etherscan
-                                                                            </a>
-                                                                        </td>
-                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                                            <div className="flex space-x-2">
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        setSelectedToken(relatedToken)
-                                                                                        setIsTransferModalOpen(true)
-                                                                                    }}
-                                                                                    className="text-olive-600 hover:text-olive-800 ml-2"
-                                                                                    title="Transferir Lote"
+                                                                    <React.Fragment key={relatedToken.id}>
+                                                                        <tr className="hover:bg-gray-50">
+                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                                {relatedToken.id}
+                                                                            </td>
+                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                                <div className="flex flex-col">
+                                                                                    <span>{(relatedToken.cantidad / 1000)} kg</span>
+                                                                                    <span className="text-gray-500 text-xs">{relatedToken.cantidad} tokens</span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                                {new Date(relatedToken.timestamp * 1000).toLocaleDateString()}
+                                                                            </td>
+                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                                                {relatedToken.id}
+                                                                            </td>
+                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                                <a
+                                                                                    href={`https://sepolia.etherscan.io/tx/${relatedToken.transactionHash}`}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="text-blue-600 hover:text-blue-900"
                                                                                 >
-                                                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                                                                    </svg>
-                                                                                </button>
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
+                                                                                    Ver transacción
+                                                                                </a>
+                                                                            </td>
+                                                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                                <div className="flex space-x-2">
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setSelectedToken(relatedToken)
+                                                                                            setIsTransferModalOpen(true)
+                                                                                        }}
+                                                                                        className="text-olive-600 hover:text-olive-800 ml-2"
+                                                                                        title="Transferir Lote"
+                                                                                    >
+                                                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                                                                        </svg>
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                        {relatedToken.atributos && relatedToken.atributos.length > 0 && (
+                                                                            <tr className="bg-gray-50">
+                                                                                <td colSpan={6} className="px-6 py-4">
+                                                                                    <div className="mt-2">
+                                                                                        <h5 className="text-sm font-medium text-gray-900 mb-2">Atributos del Lote:</h5>
+                                                                                        <div className="grid grid-cols-3 gap-4">
+                                                                                            {relatedToken.atributos.map((atributo, index) => (
+                                                                                                <div key={index} className="bg-white p-3 rounded-lg shadow-sm">
+                                                                                                    <div className="text-sm font-medium text-olive-600">{atributo.nombre}</div>
+                                                                                                    <div className="text-sm text-gray-500">{atributo.valor}</div>
+                                                                                                    <div className="text-xs text-gray-400">
+                                                                                                        {new Date(atributo.timestamp * 1000).toLocaleDateString()}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </React.Fragment>
                                                                 ))}
                                                             </tbody>
                                                         </table>
