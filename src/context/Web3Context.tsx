@@ -249,39 +249,80 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     }, [checkNetwork, disconnect, initializeProvider, provider, router])
 
     useEffect(() => {
-        try {
-            const savedAuth = localStorage.getItem('web3Auth')
-            if (savedAuth) {
-                const { address: savedAddress, role: savedRole, name: savedName } = JSON.parse(savedAuth)
-                // Verificar si la cuenta actual coincide con la guardada
-                if (window?.ethereum?.selectedAddress?.toLowerCase() === savedAddress.toLowerCase()) {
-                    setAddress(savedAddress)
-                    setRole(savedRole)
-                    setName(savedName)
-                    setIsAuthenticated(true)
-                } else {
-                    // Si la cuenta no coincide, limpiar el localStorage
-                    localStorage.removeItem('web3Auth')
+        const initializeAuth = async () => {
+            try {
+                const savedAuth = localStorage.getItem('web3Auth')
+                if (savedAuth) {
+                    const { address: savedAddress, role: savedRole, name: savedName } = JSON.parse(savedAuth)
+                    
+                    // Verificar si MetaMask está disponible
+                    if (!window.ethereum) {
+                        throw new Error('MetaMask not available')
+                    }
+
+                    // Obtener la cuenta actual de MetaMask
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' })
+                    const currentAddress = accounts[0]?.toLowerCase()
+
+                    if (currentAddress === savedAddress.toLowerCase()) {
+                        // Verificar que la red es correcta
+                        const networkValid = await checkNetwork()
+                        if (!networkValid) {
+                            throw new Error('Invalid network')
+                        }
+
+                        setAddress(savedAddress)
+                        setRole(savedRole)
+                        setName(savedName)
+                        setIsAuthenticated(true)
+                        setIsUnregistered(false)
+                    } else {
+                        throw new Error('Account mismatch')
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to restore auth state:', error)
+                localStorage.removeItem('web3Auth')
+                setIsAuthenticated(false)
+                setAddress('')
+                setRole('')
+                setName('')
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        // Establecer isLoading inmediatamente
+        setIsLoading(true)
+
+        // Inicializar autenticación solo si window.ethereum está disponible
+        if (window?.ethereum) {
+            // Configurar event listeners
+            const handleChainChanged = () => {
+                window.location.reload()
+            }
+            
+            window.ethereum.setMaxListeners(20)
+            window.ethereum.on('accountsChanged', handleAccountsChanged)
+            window.ethereum.on('chainChanged', handleChainChanged)
+            window.ethereum.on('disconnect', disconnect)
+
+            // Inicializar autenticación
+            initializeAuth()
+
+            // Cleanup function
+            return () => {
+                if (window.ethereum?.removeListener) {
+                    window.ethereum.removeListener('accountsChanged', handleAccountsChanged)
+                    window.ethereum.removeListener('chainChanged', handleChainChanged)
+                    window.ethereum.removeListener('disconnect', disconnect)
                 }
             }
-        } catch (error) {
-            console.error('Failed to restore auth state:', error)
-            localStorage.removeItem('web3Auth')
+        } else {
+            // Si no hay window.ethereum, terminar la carga
+            setIsLoading(false)
         }
-
-        const provider = (window as any).ethereum
-        if (provider) {
-            provider.on('accountsChanged', handleAccountsChanged)
-            provider.on('chainChanged', () => window.location.reload())
-            provider.on('disconnect', disconnect)
-
-            return () => {
-                provider.removeListener('accountsChanged', handleAccountsChanged)
-                provider.removeListener('chainChanged', () => window.location.reload())
-                provider.removeListener('disconnect', disconnect)
-            }
-        }
-    }, [disconnect, handleAccountsChanged])
+    }, [disconnect, handleAccountsChanged, checkNetwork])
 
     return (
         <Web3Context.Provider

@@ -6,6 +6,7 @@ import BubbleBackground from '@/components/ui/BubbleBackground'
 import Header from '@/components/ui/Header'
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
+import { useRouter } from 'next/navigation'
 import { HomeIcon, ClockIcon } from '@heroicons/react/24/outline'
 
 interface LayoutProps {
@@ -14,7 +15,28 @@ interface LayoutProps {
 
 export default function DashboardLayout({ children }: LayoutProps) {
     const [account, setAccount] = useState('')
-    const { role } = useWeb3()
+    const { role, isAuthenticated, isLoading } = useWeb3()
+    const router = useRouter()
+
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            router.push('/')
+        }
+    }, [isLoading, isAuthenticated, router])
+
+    // Mostrar un estado de carga mientras se verifica la autenticación
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-olive-600"></div>
+            </div>
+        )
+    }
+
+    // No mostrar nada si no está autenticado (evita el flash de contenido)
+    if (!isAuthenticated) {
+        return null
+    }
 
     const renderNavigation = () => {
         if (!role) return null;
