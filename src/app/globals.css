@@ -2,192 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  h1 {
-    @apply text-title font-title text-olive-dark !important;
-  }
-
-  p {
-    @apply text-subtitle font-body text-earth-dark;
-  }
-}
-
-body {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-}
-
-main {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  width: 100%;
-}
-
-/* Header Styles */
-.header-container {
-  display: flex;
-  justify-content: center;
-  background: linear-gradient(to right, rgba(74, 93, 35, 0.05), rgba(184, 134, 11, 0.05));
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(74, 93, 35, 0.1);
-}
-
-.header-content {
-  width: 100%;
-  max-width: 1200px;
-  padding: 0 2rem;
-  height: 73px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header-info-container {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: fit-content;
-}
-
-.header-text-container {
-  text-align: right;
-  white-space: nowrap;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.header-role {
-  font-size: 1.5rem !important;
-  line-height: 2rem !important;
-  font-weight: 700 !important;
-  margin-bottom: 1.5rem !important;
-}
-
-.header-account {
-  font-size: 1.25rem !important;
-  line-height: 1.75rem !important;
-}
-
-.header-icon {
-  width: 24px !important;
-  height: 24px !important;
-  stroke: var(--olive-dark) !important;
-  background: transparent !important;
-  fill: transparent !important;
-}
-
-.header-icon-btn {
-  background: transparent !important;
-}
-
-
-.header-account {
-  font-size: 1.25rem !important;
-  line-height: 1.75rem !important;
-}
-
-.custom-heading {
-  font-size: 2.5rem !important;
-  line-height: 3rem !important;
-  font-weight: 700 !important;
-  color: var(--olive-dark) !important;
-  font-family: var(--font-geist-sans) !important;
-  text-align: center !important;
-}
-
-.custom-subtitle {
-  font-size: 2rem !important;
-  line-height: 2.5rem !important;
-  font-weight: 600 !important;
-  color: var(--slate-grey) !important;
-  font-family: var(--font-geist-mono) !important;
-  text-align: center !important;
-}
-
-.custom-button {
-  font-size: 1rem !important;
-  line-height: 1.5rem !important;
-  color: var(--earth-dark) !important;
-  font-family: var(--font-geist-sans) !important;
-  text-align: center !important;
-}
-
-.company-access-btn {
-  font-family: var(--font-geist-sans) !important;
-  color: #ffffff !important;
-  font-weight: 500 !important;
-  background-color: var(--olive-dark) !important;
-  width: 200px !important;
-  height: 48px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  margin: 48px auto 0 !important;
-  border-radius: 12px !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
-}
-
-.company-access-btn span {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  line-height: 1 !important;
-}
-
-.company-access-btn svg {
-  width: 16px !important;
-  height: 16px !important;
-  stroke: #ffffff !important;
-  margin-top: 1px !important;
-}
-
-.company-access-btn:hover {
-  background-color: var(--oil-dark) !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
-}
-
-.company-access-btn:active {
-  transform: translateY(1px) !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-}
-
-.qr-button {
-  color: var(--slate-grey) !important;
-  width: 400px;
-  height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.qr-button-container {
-  position: relative !important;
-  width: 450px !important;
-  height: 450px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  margin: 0 auto !important;
-
-}
-
-.qr-button-container::before {
-  content: '' !important;
-  position: absolute !important;
-  width: 100% !important;
-  height: 100% !important;
-  border: 4px solid var(--slate-grey) !important;
-  border-radius: 8px !important;
-  pointer-events: none !important;
-}
-
 :root {
   --background: #ffffff;
   --foreground: #000000;
@@ -196,10 +10,161 @@ main {
   --oil-dark: #B8860B;
   --navy-blue: #00005C;
   --slate-grey: #2F4F4F;
-
 }
 
+@layer base {
+  body {
+    @apply flex flex-col min-h-screen m-0 p-0 overflow-x-hidden bg-background text-foreground;
+  }
 
+  main {
+    @apply flex flex-col flex-1 w-full;
+  }
+
+  h1 {
+    @apply text-title font-title text-olive-600;
+  }
+
+  h2 {
+    @apply text-subtitle font-body text-earth-500;
+  }
+
+  p {
+    @apply text-body font-body text-earth-400;
+  }
+}
+
+@layer components {
+  .header-container {
+    @apply flex justify-center bg-gradient-to-r from-olive-50/5 to-oil-400/5 backdrop-blur-md border-b border-olive-600/10;
+  }
+
+  .header-content {
+    @apply w-full max-w-7xl px-8 h-[73px] flex items-center justify-between;
+  }
+
+  .header-info-container {
+    @apply flex items-center gap-1 min-w-fit;
+  }
+
+  .header-text-container {
+    @apply text-right whitespace-nowrap flex-col gap-6;
+  }
+
+  .header-role {
+    @apply text-2xl font-bold mb-6;
+  }
+
+  .header-account {
+    @apply text-xl;
+  }
+
+  .header-icon {
+    @apply w-6 h-6 stroke-olive-600 bg-transparent fill-transparent;
+  }
+
+  .header-icon-btn {
+    @apply bg-transparent;
+  }
+
+  .custom-heading {
+    @apply text-title font-title text-olive-600 text-center;
+  }
+
+  .custom-subtitle {
+    @apply text-subtitle font-body text-slate-500 text-center;
+  }
+
+  .custom-button {
+    @apply text-body font-title text-earth-500 text-center;
+  }
+
+  .company-access-btn {
+    @apply font-title text-white font-medium bg-olive-600 
+           w-[200px] h-12 flex items-center justify-center 
+           mx-auto mt-12 rounded-xl transition-all duration-300 
+           shadow-md hover:bg-oil-500 hover:-translate-y-0.5 
+           hover:shadow-lg active:translate-y-0.5 active:shadow-sm;
+  }
+
+  .company-access-btn span {
+    @apply flex items-center gap-2 leading-none;
+  }
+
+  .company-access-btn svg {
+    @apply w-4 h-4 stroke-white mt-px;
+  }
+
+  .qr-button {
+    @apply text-slate-500 w-[400px] h-[400px] flex items-center justify-center;
+  }
+
+  .qr-button-container {
+    @apply relative w-[450px] h-[450px] flex items-center justify-center mx-auto;
+  }
+
+  .qr-button-container::before {
+    @apply content-[''] absolute w-full h-full border-4 border-slate-500 rounded-lg pointer-events-none;
+  }
+
+  /* Estilos para Leaflet */
+  .leaflet-container {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+
+  .custom-marker-icon {
+    background: none;
+    border: none;
+  }
+
+  /* Personalización de los controles de ruta */
+  .leaflet-routing-container {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.875rem;
+  }
+
+  .leaflet-routing-alt {
+    max-height: none !important;
+  }
+
+  .leaflet-routing-geocoder input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+  }
+}
+
+@layer utilities {
+  .bubble {
+    @apply absolute rounded-full bg-gradient-radial from-oil-300 via-oil-400/40 to-transparent
+           shadow-[inset_-5px_-5px_10px_rgba(0,0,0,0.1),inset_5px_5px_10px_rgba(255,255,255,0.8),0_0_20px_rgba(255,215,0,0.3)]
+           opacity-30 animate-float pointer-events-none backdrop-blur-sm will-change-transform;
+  }
+
+  .bubble-xs {
+    @apply w-6 h-6;
+  }
+
+  .bubble-sm {
+    @apply w-12 h-12;
+  }
+
+  .bubble-md {
+    @apply w-24 h-24;
+  }
+
+  .bubble-lg {
+    @apply w-36 h-36;
+  }
+}
 
 @keyframes float {
   0% {
@@ -225,42 +190,4 @@ main {
   100% {
     transform: translate(0, 0) rotate(720deg) scale(1);
   }
-}
-
-.bubble {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 215, 0, 0.8), rgba(184, 134, 11, 0.4));
-  box-shadow:
-    inset -5px -5px 10px rgba(0, 0, 0, 0.1),
-    inset 5px 5px 10px rgba(255, 255, 255, 0.8),
-    0 0 20px rgba(255, 215, 0, 0.3);
-  opacity: 0.3;
-  animation: float 25s infinite ease-in-out;
-  pointer-events: none;
-  backdrop-filter: blur(2px);
-  will-change: transform;
-}
-
-
-
-.bubble-xs {
-  width: 25px;
-  height: 25px;
-}
-
-/* Añadimos clases específicas para diferentes tamaños de burbujas */
-.bubble-lg {
-  width: 150px;
-  height: 150px;
-}
-
-.bubble-md {
-  width: 100px;
-  height: 100px;
-}
-
-.bubble-sm {
-  width: 50px;
-  height: 50px;
 }

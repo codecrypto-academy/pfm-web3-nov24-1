@@ -6,6 +6,7 @@ import BubbleBackground from '@/components/ui/BubbleBackground'
 import Header from '@/components/ui/Header'
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
+import { HomeIcon, ClockIcon } from '@heroicons/react/24/outline'
 
 interface LayoutProps {
     children: ReactNode
@@ -15,8 +16,22 @@ export default function DashboardLayout({ children }: LayoutProps) {
     const [account, setAccount] = useState('')
     const { role } = useWeb3()
 
-
     const renderNavigation = () => {
+        if (!role) return null;
+
+        const commonNavItems = [
+            {
+                name: 'Panel Principal',
+                href: `/dashboard/${role.toLowerCase()}`,
+                icon: HomeIcon,
+            },
+            {
+                name: 'Historial de Transacciones',
+                href: `/dashboard/${role.toLowerCase()}/transactions`,
+                icon: ClockIcon,
+            },
+        ]
+
         switch (role.toLowerCase()) {
             case 'admin':
                 return (
@@ -28,11 +43,17 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <p className="text-sm text-olive-600">Administración</p>
                         </div>
                         <ul className="space-y-2">
-                            <li>
-                                <Link href="/dashboard/admin" className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2">
-                                    <span className="font-medium">Panel Principal</span>
-                                </Link>
-                            </li>
+                            {commonNavItems.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        <span className="font-medium">{item.name}</span>
+                                    </Link>
+                                </li>
+                            ))}
                             <div className="border-t border-olive-200 my-4 opacity-50" />
                             <li>
                                 <Link href="/dashboard/admin/adduser" className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2">
@@ -50,19 +71,22 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <p className="text-sm text-olive-600">Gestión de Olivos</p>
                         </div>
                         <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/dashboard/productor"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
-                                >
-                                    <span className="font-medium">Panel Principal</span>
-                                </Link>
-                            </li>
+                            {commonNavItems.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        <span className="font-medium">{item.name}</span>
+                                    </Link>
+                                </li>
+                            ))}
                             <div className="border-t border-olive-200 my-4 opacity-50" />
                             <li>
                                 <Link
                                     href="/dashboard/productor/crear-producto"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
                                 >
                                     <span className="font-medium">Crear Producto</span>
                                 </Link>
@@ -78,19 +102,22 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <p className="text-sm text-olive-600">Procesamiento de Aceite</p>
                         </div>
                         <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/dashboard/fabrica"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
-                                >
-                                    <span className="font-medium">Panel Principal</span>
-                                </Link>
-                            </li>
+                            {commonNavItems.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        <span className="font-medium">{item.name}</span>
+                                    </Link>
+                                </li>
+                            ))}
                             <div className="border-t border-olive-200 my-4 opacity-50" />
                             <li>
                                 <Link
                                     href="/dashboard/fabrica/procesar"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
                                 >
                                     <span className="font-medium">Procesar Aceite</span>
                                 </Link>
@@ -106,14 +133,17 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <p className="text-sm text-olive-600">Distribución de Aceite</p>
                         </div>
                         <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/dashboard/distribuidor"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
-                                >
-                                    <span className="font-medium">Panel Principal</span>
-                                </Link>
-                            </li>
+                            {commonNavItems.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        <span className="font-medium">{item.name}</span>
+                                    </Link>
+                                </li>
+                            ))}
                         </ul>
                     </nav>
                 )
@@ -125,14 +155,17 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <p className="text-sm text-olive-600">Gestión de Ventas al Mayor</p>
                         </div>
                         <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/dashboard/mayorista"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
-                                >
-                                    <span className="font-medium">Panel Principal</span>
-                                </Link>
-                            </li>
+                            {commonNavItems.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        <span className="font-medium">{item.name}</span>
+                                    </Link>
+                                </li>
+                            ))}
                         </ul>
                     </nav>
                 )
@@ -144,14 +177,17 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <p className="text-sm text-olive-600">Venta al Público</p>
                         </div>
                         <ul className="space-y-2">
-                            <li>
-                                <Link
-                                    href="/dashboard/minorista"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
-                                >
-                                    <span className="font-medium">Panel Principal</span>
-                                </Link>
-                            </li>
+                            {commonNavItems.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
+                                    >
+                                        <item.icon className="w-5 h-5" />
+                                        <span className="font-medium">{item.name}</span>
+                                    </Link>
+                                </li>
+                            ))}
                         </ul>
                     </nav>
                 )

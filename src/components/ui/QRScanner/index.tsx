@@ -47,20 +47,29 @@ const QRScanner = ({ onResult }: QRScannerProps) => {
     };
 
     return (
-        <div className="relative w-[512px] h-[512px] flex items-center justify-center">
+        <div className="relative w-full max-w-md mx-auto">
             {!hasPermission ? (
-                <div>Please allow camera access to scan QR codes</div>
+                <div className="absolute inset-0 flex items-center justify-center bg-earth-100/80">
+                    <p className="text-red-600 text-center mb-4">Please allow camera access to scan QR codes</p>
+                </div>
             ) : scanResult ? (
-                <div>Success: {scanResult}</div>
+                <div className="absolute inset-0 flex items-center justify-center bg-earth-100/80">
+                    <p className="text-green-600 text-center mb-4">Success: {scanResult}</p>
+                </div>
             ) : (
-                <>
-                    <div className="absolute border-4 border-olive-dark rounded-lg w-[400px] h-[400px] pointer-events-none z-10" />
-                    <div id="reader" className="w-full h-full"></div>
-                </>
+                <div className="aspect-square w-full relative overflow-hidden rounded-lg shadow-lg bg-earth-50">
+                    <div id="reader" className="w-full h-full object-cover"></div>
+                    <div className="absolute inset-0 border-2 border-olive-500 opacity-50"></div>
+                    <div className="absolute inset-0">
+                        <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-olive-600"></div>
+                        <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-olive-600"></div>
+                        <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-olive-600"></div>
+                        <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-olive-600"></div>
+                    </div>
+                </div>
             )}
         </div>
     );
 };
-
 
 export default QRScanner;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../styles/MapModalStyles.css';
@@ -29,9 +29,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ onClose, originPoint, destinationPo
   const mapRef = useRef<L.Map | null>(null);
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
-  const containerRef = useRef<string>(`map-${Math.random().toString(36).substr(2, 9)}`);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  const calculateAndDrawRoute = async (start: [number, number], end: [number, number]) => {
+  const calculateAndDrawRoute = useCallback(async (start: [number, number], end: [number, number]) => {
+    if (!mapRef.current) return;
+
     try {
       const response = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`
@@ -44,74 +46,112 @@ const RouteMap: React.FC<RouteMapProps> = ({ onClose, originPoint, destinationPo
           coord[0],
         ]);
 
-        // Eliminar ruta anterior si existe
-        if (routeLayerRef.current && mapRef.current) {
-          mapRef.current.removeLayer(routeLayerRef.current);
+        if (routeLayerRef.current) {
+          routeLayerRef.current.remove();
         }
 
-        // Dibujar nueva ruta
-        if (mapRef.current) {
-          routeLayerRef.current = L.polyline(coordinates, {
-            color: 'blue',
-            weight: 3,
-            opacity: 0.7,
-          }).addTo(mapRef.current);
+        routeLayerRef.current = L.polyline(coordinates, {
+          color: 'blue',
+          weight: 3,
+          opacity: 0.7,
+        }).addTo(mapRef.current);
 
-          // Ajustar el mapa para mostrar toda la ruta
-          mapRef.current.fitBounds(routeLayerRef.current.getBounds(), {
-            padding: [50, 50],
-          });
-        }
+        const bounds = L.latLngBounds([originPoint.coordinates, destinationPoint.coordinates]);
+        mapRef.current.fitBounds(bounds, { padding: [50, 50] });
       }
     } catch (error) {
       console.error('Error calculating route:', error);
     }
-  };
+  }, [originPoint.coordinates, destinationPoint.coordinates]);
 
+  // Inicializar mapa
   useEffect(() => {
-    // Crear el mapa
-    const map = L.map(containerRef.current).setView([40.4168, -3.7038], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: ' OpenStreetMap contributors',
-    }).addTo(map);
+    let isMounted = true;
 
-    // Guardar referencia al mapa
-    mapRef.current = map;
+    const initializeMap = () => {
+      if (!mapContainerRef.current || mapRef.current) return;
 
-    // Añadir marcadores de origen y destino con popups informativos
-    const originMarker = L.marker(originPoint.coordinates)
-      .bindPopup(`<b>${originPoint.type === 'producer' ? 'Productor' : 'Fábrica'}</b><br>${originPoint.name}`)
-      .addTo(map);
-    
-    const destinationMarker = L.marker(destinationPoint.coordinates)
-      .bindPopup(`<b>${destinationPoint.type === 'producer' ? 'Productor' : 'Fábrica'}</b><br>${destinationPoint.name}`)
-      .addTo(map);
+      // Crear el mapa con una vista inicial que incluya ambos puntos
+      const bounds = L.latLngBounds([originPoint.coordinates, destinationPoint.coordinates]);
+      const map = L.map(mapContainerRef.current, {
+        center: bounds.getCenter(),
+        zoom: 6
+      });
 
-    markersRef.current = [originMarker, destinationMarker];
+      // Añadir capa de tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: ' OpenStreetMap contributors'
+      }).addTo(map);
 
-    // Calcular y dibujar la ruta
-    calculateAndDrawRoute(originPoint.coordinates, destinationPoint.coordinates);
+      // Añadir marcadores
+      const originMarker = L.marker(originPoint.coordinates, {
+        title: originPoint.name
+      }).addTo(map);
+      
+      const destinationMarker = L.marker(destinationPoint.coordinates, {
+        title: destinationPoint.name
+      }).addTo(map);
+
+      markersRef.current = [originMarker, destinationMarker];
+      mapRef.current = map;
+
+      // Ajustar vista y calcular ruta
+      map.fitBounds(bounds, { padding: [50, 50] });
+      calculateAndDrawRoute(originPoint.coordinates, destinationPoint.coordinates);
+
+      // Forzar actualización del tamaño del mapa
+      setTimeout(() => {
+        if (isMounted && mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 100);
+    };
+
+    // Inicializar con un pequeño retraso
+    const timer = setTimeout(initializeMap, 100);
 
     return () => {
-      map.remove();
+      isMounted = false;
+      clearTimeout(timer);
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
-  }, [originPoint, destinationPoint]);
+  }, [originPoint, destinationPoint, calculateAndDrawRoute]);
 
   return (
-    <div className="modal modal-open">
-      <div className="modal-content">
-        <h2>Trazar Ruta</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Ruta entre {originPoint.name} y {destinationPoint.name}
-        </p>
-        <div id={containerRef.current} style={{ width: '100%', height: '400px' }}></div>
-        <div className="flex justify-between mt-4">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Ruta del Producto</h2>
           <button 
-            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
             onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
           >
-            Cerrar
+            ×
           </button>
+        </div>
+        
+        <div style={{ height: '600px', width: '100%', position: 'relative' }}>
+          <div 
+            ref={mapContainerRef}
+            style={{ 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: '#f0f0f0'
+            }}
+          />
+        </div>
+
+        <div className="p-4 border-t">
+          <div className="text-sm text-gray-600">
+            Origen: {originPoint.name}<br/>
+            Destino: {destinationPoint.name}
+          </div>
         </div>
       </div>
     </div>

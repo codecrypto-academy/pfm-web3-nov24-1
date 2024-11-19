@@ -28,10 +28,10 @@ export default function Header() {
                         </span>
                     </div>
                     <button
-                        className="header-icon-btn p-2 rounded-lg hover:bg-olive-dark/10 transition-colors"
+                        className="header-icon-btn p-2 rounded-lg hover:bg-olive-600/10 transition-colors"
                         onClick={handleLogout}
                     >
-                        <ArrowRightOnRectangleIcon className="header-icon w-6 h-6" />
+                        <ArrowRightOnRectangleIcon className="header-icon" />
                     </button>
                 </div>
             </div>

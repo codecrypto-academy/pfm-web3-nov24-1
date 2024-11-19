@@ -140,86 +140,17 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     }, [provider, initializeProvider])
 
     const handleAccountsChanged = useCallback(async (accounts: string[]) => {
+        // Siempre desconectar cuando cambia la cuenta
+        disconnect()
+        
         if (accounts.length === 0) {
-            disconnect()
             return
         }
 
-        try {
-            let currentProvider = provider
-            if (!currentProvider) {
-                currentProvider = await initializeProvider()
-                if (!currentProvider) {
-                    setWeb3Error('Failed to initialize provider', 'wallet')
-                    return
-                }
-                setProvider(currentProvider)
-            }
-
-            const signer = await currentProvider.getSigner()
-            const usuariosContract = new ethers.Contract(
-                CONTRACTS.PARTICIPANTES.ADDRESS,
-                CONTRACTS.PARTICIPANTES.ABI,
-                currentProvider
-            )
-
-            try {
-                const adminAddress = await usuariosContract.admin()
-                const isUser = await usuariosContract.esUsuario(accounts[0])
-
-                if (accounts[0].toLowerCase() === adminAddress.toLowerCase() || isUser) {
-                    const allUsers = await usuariosContract.getUsuarios() as UserData[]
-                    const currentUser = allUsers.find(user =>
-                        user.direccion.toLowerCase() === accounts[0].toLowerCase()
-                    )
-
-                    if (!currentUser) {
-                        setWeb3Error('User data not found', 'contract')
-                        setIsAuthenticated(false)
-                        return
-                    }
-
-                    // Validate user data
-                    if (!currentUser.rol || !currentUser.nombre) {
-                        setWeb3Error('Invalid user data', 'contract')
-                        setIsAuthenticated(false)
-                        return
-                    }
-
-                    setAddress(accounts[0])
-                    setRole(currentUser.rol)
-                    setName(currentUser.nombre)
-                    setIsAuthenticated(true)
-                    setIsUnregistered(false)
-
-                    // Redirigir al usuario a su dashboard correspondiente
-                    router.push(`/dashboard/${currentUser.rol.toLowerCase()}`)
-
-                    try {
-                        localStorage.setItem('web3Auth', JSON.stringify({
-                            address: accounts[0],
-                            role: currentUser.rol,
-                            name: currentUser.nombre
-                        }))
-                    } catch (storageError) {
-                        console.error('Failed to save auth state:', storageError)
-                        setWeb3Error('Failed to save authentication state', 'storage')
-                    }
-                } else {
-                    setIsUnregistered(true)
-                    setIsAuthenticated(false)
-                }
-            } catch (contractError) {
-                console.error('Contract interaction error:', contractError)
-                setWeb3Error('Failed to interact with contract', 'contract')
-                setIsAuthenticated(false)
-            }
-        } catch (error) {
-            console.error('Provider error:', error)
-            setWeb3Error('Failed to initialize Web3 provider', 'wallet')
-            setIsAuthenticated(false)
-        }
-    }, [provider, initializeProvider, disconnect, router])
+        // No intentar reconectar automáticamente
+        // El usuario debe volver a conectarse manualmente
+        router.push('/')
+    }, [disconnect, router])
 
     const connect = useCallback(async () => {
         if (!(window as any).ethereum) {
@@ -231,8 +162,8 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
         setError(null)
 
         try {
-            if (!await checkNetwork()) {
-                setIsLoading(false)
+            const networkValid = await checkNetwork()
+            if (!networkValid) {
                 return
             }
 
@@ -240,34 +171,102 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 method: 'eth_requestAccounts'
             })
 
-            await handleAccountsChanged(accounts)
+            if (!accounts || accounts.length === 0) {
+                throw new Error('No accounts found')
+            }
+
+            let currentProvider = provider
+            if (!currentProvider) {
+                currentProvider = await initializeProvider()
+                if (!currentProvider) {
+                    throw new Error('Failed to initialize provider')
+                }
+                setProvider(currentProvider)
+            }
+
+            const usuariosContract = new ethers.Contract(
+                CONTRACTS.PARTICIPANTES.ADDRESS,
+                CONTRACTS.PARTICIPANTES.ABI,
+                currentProvider
+            )
+
+            const adminAddress = await usuariosContract.admin()
+            const isUser = await usuariosContract.esUsuario(accounts[0])
+
+            if (accounts[0].toLowerCase() === adminAddress.toLowerCase() || isUser) {
+                const allUsers = await usuariosContract.getUsuarios() as UserData[]
+                const currentUser = allUsers.find(user =>
+                    user.direccion.toLowerCase() === accounts[0].toLowerCase()
+                )
+
+                if (!currentUser && accounts[0].toLowerCase() !== adminAddress.toLowerCase()) {
+                    setWeb3Error('User data not found', 'contract')
+                    setIsAuthenticated(false)
+                    return
+                }
+
+                setAddress(accounts[0])
+                
+                if (accounts[0].toLowerCase() === adminAddress.toLowerCase()) {
+                    setRole('admin')
+                    setName('Admin')
+                    setIsAuthenticated(true)
+                    setIsUnregistered(false)
+                    router.push('/dashboard/admin')
+                } else {
+                    setRole(currentUser.rol)
+                    setName(currentUser.nombre)
+                    setIsAuthenticated(true)
+                    setIsUnregistered(false)
+                    router.push(`/dashboard/${currentUser.rol.toLowerCase()}`)
+                }
+
+                try {
+                    localStorage.setItem('web3Auth', JSON.stringify({
+                        address: accounts[0],
+                        role: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'admin' : currentUser.rol,
+                        name: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : currentUser.nombre
+                    }))
+                } catch (storageError) {
+                    console.error('Failed to save auth state:', storageError)
+                }
+            } else {
+                setIsUnregistered(true)
+                setIsAuthenticated(false)
+            }
+
         } catch (error: any) {
             console.error('Connection error:', error)
             if (error.code === 4001) {
                 setWeb3Error('Please connect your wallet', 'wallet', 4001)
             } else {
-                setWeb3Error('Failed to connect wallet', 'wallet')
+                setWeb3Error(error.message || 'Failed to connect', 'wallet')
             }
             disconnect()
         } finally {
             setIsLoading(false)
         }
-    }, [checkNetwork, disconnect, handleAccountsChanged])
+    }, [checkNetwork, disconnect, initializeProvider, provider, router])
 
     useEffect(() => {
         try {
             const savedAuth = localStorage.getItem('web3Auth')
             if (savedAuth) {
                 const { address: savedAddress, role: savedRole, name: savedName } = JSON.parse(savedAuth)
-                if (savedAddress && savedRole && savedName) {
+                // Verificar si la cuenta actual coincide con la guardada
+                if (window?.ethereum?.selectedAddress?.toLowerCase() === savedAddress.toLowerCase()) {
                     setAddress(savedAddress)
                     setRole(savedRole)
                     setName(savedName)
                     setIsAuthenticated(true)
+                } else {
+                    // Si la cuenta no coincide, limpiar el localStorage
+                    localStorage.removeItem('web3Auth')
                 }
             }
         } catch (error) {
             console.error('Failed to restore auth state:', error)
+            localStorage.removeItem('web3Auth')
         }
 
         const provider = (window as any).ethereum

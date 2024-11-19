@@ -6,6 +6,7 @@ import { CONTRACTS } from '@/constants/contracts'
 import React from 'react'
 import { FC } from 'react'
 import router from 'next/router'
+import { ArrowRightIcon, PlusIcon } from '@heroicons/react/24/outline'
 
 // Declaración de tipos para window.ethereum
 declare global {
@@ -541,7 +542,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Remesas
                                         </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Acciones
                                         </th>
                                     </tr>
@@ -584,22 +585,24 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                         ))}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <td className="px-6 py-4 whitespace-nowrap">
                                                     {role === 'productor' && (
-                                                        <>
+                                                        <div className="flex items-center justify-center space-x-4">
                                                             <button
                                                                 onClick={() => handleTransferClick(token)}
-                                                                className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                                                className="p-2 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-full transition-colors"
+                                                                title="Transferir"
                                                             >
-                                                                Transferir
+                                                                <ArrowRightIcon className="h-5 w-5" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleCreateBatchClick(token)}
-                                                                className="text-green-600 hover:text-green-900"
+                                                                className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-full transition-colors"
+                                                                title="Crear Lote"
                                                             >
-                                                                Crear Lote
+                                                                <PlusIcon className="h-5 w-5" />
                                                             </button>
-                                                        </>
+                                                        </div>
                                                     )}
                                                 </td>
                                             </tr>

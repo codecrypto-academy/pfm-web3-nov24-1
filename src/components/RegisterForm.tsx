@@ -63,26 +63,26 @@ export default function RegisterForm() {
 
     return (
         <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg">
-            <h2 className="text-2xl font-bold mb-6 text-center">Solicitud de Registro</h2>
+            <h2 className="text-2xl font-bold mb-6 text-center text-olive-600">Solicitud de Registro</h2>
             <form onSubmit={handleSubmit}>
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Nombre:</label>
+                    <label className="block text-earth-600 mb-2">Nombre:</label>
                     <input
                         type="text"
                         value={nombre}
                         onChange={(e) => setNombre(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-olive-200 rounded-lg focus:outline-none focus:border-olive-500 focus:ring-1 focus:ring-olive-500"
                         required
                     />
                 </div>
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">GPS:</label>
+                    <label className="block text-earth-600 mb-2">GPS:</label>
                     <div className="flex gap-2">
                         <input
                             type="text"
                             value={gps}
                             onChange={(e) => setGps(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-olive-200 rounded-lg focus:outline-none focus:border-olive-500 focus:ring-1 focus:ring-olive-500"
                             placeholder="Seleccione ubicación en el mapa"
                             required
                             readOnly
@@ -90,18 +90,18 @@ export default function RegisterForm() {
                         <button
                             type="button"
                             onClick={handleOpenMap}
-                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                            className="px-4 py-2 bg-olive-600 text-white rounded-lg hover:bg-olive-700 transition-colors"
                         >
                             Mapa
                         </button>
                     </div>
                 </div>
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2">Rol:</label>
+                    <label className="block text-earth-600 mb-2">Rol:</label>
                     <select
                         value={rol}
                         onChange={(e) => setRol(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-olive-200 rounded-lg focus:outline-none focus:border-olive-500 focus:ring-1 focus:ring-olive-500"
                         required
                     >
                         <option value="">Seleccione un rol</option>
@@ -113,14 +113,13 @@ export default function RegisterForm() {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+                    className="w-full bg-olive-600 text-white py-2 rounded-lg hover:bg-olive-700 disabled:bg-gray-400 transition-colors"
                 >
                     {isSubmitting ? 'Enviando...' : 'Enviar solicitud'}
                 </button>
             </form>
             {message && (
-                <div className={`mt-4 p-3 rounded-lg ${message.includes('éxito') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
+                <div className={`mt-4 p-3 rounded-lg ${message.includes('éxito') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                     {message}
                 </div>
             )}
