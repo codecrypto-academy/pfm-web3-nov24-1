@@ -24,7 +24,7 @@ const ParticipantsMap: React.FC<ParticipantsMapProps> = ({ participants }) => {
       // Inicializar el mapa
       const map = L.map(mapContainerId.current).setView([40.4168, -3.7038], 5);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: ' OpenStreetMap contributors'
       }).addTo(map);
       mapRef.current = map;
     }
@@ -42,7 +42,6 @@ const ParticipantsMap: React.FC<ParticipantsMapProps> = ({ participants }) => {
               .bindPopup(`
                 <div class="text-sm">
                   <strong>${participant.nombre}</strong><br/>
-                  ${participant.email}<br/>
                   Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}
                 </div>
               `);
