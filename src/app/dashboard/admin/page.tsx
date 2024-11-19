@@ -5,12 +5,15 @@ import { CONTRACTS } from '@/constants/contracts'
 import { ethers } from 'ethers'
 import { useState, useEffect } from 'react'
 import { withAuth } from '@/components/hoc/withAuth'
+import MapModal from '@/components/MapModal'
+import { FaMapMarkerAlt } from 'react-icons/fa'
 
 interface Participante {
     direccion: string
     nombre: string
     rol: string
     activo: boolean
+    gps: string
 }
 
 interface PendingRequest {
@@ -23,10 +26,12 @@ interface PendingRequest {
 }
 
 function AdminDashboard() {
-    const [participants, setParticipants] = useState([])
+    const [participants, setParticipants] = useState<Participante[]>([])
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([])
     const CONTRACT_ADDRESS = CONTRACTS.PARTICIPANTES.ADDRESS
     const [isApproving, setIsApproving] = useState<number | null>(null)
+    const [showMap, setShowMap] = useState(false)
+    const [selectedParticipant, setSelectedParticipant] = useState<Participante | null>(null)
 
     const fetchParticipants = async () => {
         if ((window as any).ethereum) {
@@ -135,47 +140,92 @@ function AdminDashboard() {
             )}
 
             <h1 className="custom-subtitle">Lista de Participantes</h1>
-            <table className="min-w-full bg-white shadow-md rounded-lg">
-                <thead className="bg-gray-50">
-                    <tr>
-                        <th className="px-6 py-3 text-left">Dirección</th>
-                        <th className="px-6 py-3 text-left">Nombre</th>
-                        <th className="px-6 py-3 text-left">Rol</th>
-                        <th className="px-6 py-3 text-left">Estado</th>
-                        <th className="px-6 py-3 text-left">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {participants.map((participant: Participante, index) => (
-                        <tr key={index} className="border-b">
-                            <td className="px-6 py-4">{participant.direccion}</td>
-                            <td className="px-6 py-4">{participant.nombre}</td>
-                            <td className="px-6 py-4">{participant.rol}</td>
-                            <td className="px-6 py-4">
-                                {participant.activo ?
-                                    <span className="text-green-600">Activo</span> :
-                                    <span className="text-red-600">Inactivo</span>
-                                }
-                            </td>
-                            <td className="px-6 py-4">
-                                <button
-                                    onClick={() => toggleUserStatus(participant.direccion, participant.activo)}
-
-
-                                    className={`px-4 py-2 rounded ${participant.activo
-                                        ? 'bg-red-500 hover:bg-red-600 text-white'
-                                        : 'bg-green-500 hover:bg-green-600 text-white'
-                                        }`}
-                                >
-                                    {participant.activo ? 'Desactivar' : 'Activar'}
-                                </button>
-                            </td>
+            <div className="relative">
+                <table className="min-w-full bg-white shadow-md rounded-lg">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-6 py-3 text-left">Dirección</th>
+                            <th className="px-6 py-3 text-left">Nombre</th>
+                            <th className="px-6 py-3 text-left">Rol</th>
+                            <th className="px-6 py-3 text-left">Estado</th>
+                            <th className="px-6 py-3 text-left">Mapa</th>
+                            <th className="px-6 py-3 text-left">Acciones</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {participants.map((participant: Participante, index) => (
+                            <tr key={index} className="border-b">
+                                <td className="px-6 py-4">{participant.direccion}</td>
+                                <td className="px-6 py-4">{participant.nombre}</td>
+                                <td className="px-6 py-4">{participant.rol}</td>
+                                <td className="px-6 py-4">
+                                    <span
+                                        className={`px-2 py-1 rounded ${participant.activo
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-red-100 text-red-800'
+                                            }`}
+                                    >
+                                        {participant.activo ? 'Activo' : 'Inactivo'}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedParticipant(participant)
+                                            setShowMap(true)
+                                        }}
+                                        className="text-blue-600 hover:text-blue-800"
+                                    >
+                                        <FaMapMarkerAlt className="text-xl" />
+                                    </button>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <button
+                                        onClick={() => toggleUserStatus(participant.direccion, participant.activo)}
+                                        className={`px-4 py-2 rounded ${participant.activo
+                                            ? 'bg-red-500 hover:bg-red-600'
+                                            : 'bg-green-500 hover:bg-green-600'
+                                            } text-white`}
+                                    >
+                                        {participant.activo ? 'Desactivar' : 'Activar'}
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {showMap && selectedParticipant && (
+                <div id="modal-root">
+                    <MapModal
+                        onClose={() => {
+                            setShowMap(false)
+                            setSelectedParticipant(null)
+                        }}
+                        initialCoordinates={parseGPSString(selectedParticipant.gps)}
+                        title={`Ubicación de ${selectedParticipant.nombre}`}
+                        readOnly={true}
+                    />
+                </div>
+            )}
         </div>
     )
+}
+
+// Función auxiliar para convertir la cadena GPS en coordenadas
+function parseGPSString(gps: string): [number, number] {
+    try {
+        // Asumiendo que el formato es "latitud,longitud"
+        const [lat, lng] = gps.split(',').map(coord => parseFloat(coord.trim()))
+        if (isNaN(lat) || isNaN(lng)) {
+            return [40.4168, -3.7038] // Madrid como fallback
+        }
+        return [lat, lng]
+    } catch (error) {
+        console.error('Error parsing GPS coordinates:', error)
+        return [40.4168, -3.7038] // Madrid como fallback
+    }
 }
 
 export default withAuth(AdminDashboard, 'admin')
