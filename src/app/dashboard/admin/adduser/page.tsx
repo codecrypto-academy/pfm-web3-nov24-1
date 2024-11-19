@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
+import MapModal from '@/components/MapModal'
 
 export default function AddUsser() {
     const router = useRouter()
@@ -16,6 +17,19 @@ export default function AddUsser() {
         role: '',
         gps: ''
     })
+    const [showMapModal, setShowMapModal] = useState(false)
+
+    const handleMapConfirm = (coordinates: { lat: number; lng: number }) => {
+        setFormData({
+            ...formData,
+            gps: `${coordinates.lat},${coordinates.lng}`
+        })
+        setShowMapModal(false)
+    }
+
+    const handleOpenMap = () => {
+        setShowMapModal(true)
+    }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -115,15 +129,25 @@ export default function AddUsser() {
                         <label htmlFor="gps" className="text-sm font-medium text-primary">
                             GPS
                         </label>
-                        <input
-                            type="text"
-                            id="gps"
-                            name="gps"
-                            value={formData.gps}
-                            onChange={handleChange}
-                            className="w-full p-2 border rounded-md bg-input text-primary"
-                            placeholder="GPS del usuario"
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                id="gps"
+                                name="gps"
+                                value={formData.gps}
+                                onChange={handleChange}
+                                className="w-full p-2 border rounded-md bg-input text-primary"
+                                placeholder="Seleccione ubicación en el mapa"
+                                readOnly
+                            />
+                            <button
+                                type="button"
+                                onClick={handleOpenMap}
+                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                            >
+                                Mapa
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -166,6 +190,12 @@ export default function AddUsser() {
                     </div>
                 )}
             </div>
+            {showMapModal && (
+                <MapModal
+                    onConfirm={handleMapConfirm}
+                    onClose={() => setShowMapModal(false)}
+                />
+            )}
         </div>
     )
 }

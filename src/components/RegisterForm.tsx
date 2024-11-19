@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
+import MapModal from './MapModal'
 
 export default function RegisterForm() {
     const [nombre, setNombre] = useState('')
@@ -10,6 +11,7 @@ export default function RegisterForm() {
     const [gps, setGps] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [message, setMessage] = useState('')
+    const [showMapModal, setShowMapModal] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -50,6 +52,15 @@ export default function RegisterForm() {
         }
     }
 
+    const handleMapConfirm = (coordinates: { lat: number; lng: number }) => {
+        setGps(`${coordinates.lat},${coordinates.lng}`)
+        setShowMapModal(false)
+    }
+
+    const handleOpenMap = () => {
+        setShowMapModal(true)
+    }
+
     return (
         <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg">
             <h2 className="text-2xl font-bold mb-6 text-center">Solicitud de Registro</h2>
@@ -66,14 +77,24 @@ export default function RegisterForm() {
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-700 mb-2">GPS:</label>
-                    <input
-                        type="text"
-                        value={gps}
-                        onChange={(e) => setGps(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
-                        placeholder="Ingrese las coordenadas GPS"
-                        required
-                    />
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={gps}
+                            onChange={(e) => setGps(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                            placeholder="Seleccione ubicación en el mapa"
+                            required
+                            readOnly
+                        />
+                        <button
+                            type="button"
+                            onClick={handleOpenMap}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                        >
+                            Mapa
+                        </button>
+                    </div>
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-700 mb-2">Rol:</label>
@@ -102,6 +123,12 @@ export default function RegisterForm() {
                     }`}>
                     {message}
                 </div>
+            )}
+            {showMapModal && (
+                <MapModal
+                    onConfirm={handleMapConfirm}
+                    onClose={() => setShowMapModal(false)}
+                />
             )}
         </div>
     )
