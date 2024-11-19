@@ -155,11 +155,12 @@ export default function ClientTransactions({ role }: { role: string }) {
                   return null
                 }
 
-                const [attrNames, rawMaterials, receipt, block] = await Promise.all([
+                const [attrNames, rawMaterials, receipt, block, token] = await Promise.all([
                   tokensContract.getNombresAtributos(tokenId),
                   tokensContract.getMateriasPrimas(tokenId),
                   provider.getTransactionReceipt(event.transactionHash),
-                  provider.getBlock(event.blockNumber)
+                  provider.getBlock(event.blockNumber),
+                  tokensContract.tokens(tokenId)
                 ])
 
                 if (!receipt || !block) {
@@ -177,8 +178,8 @@ export default function ClientTransactions({ role }: { role: string }) {
                   gasUsed: receipt.gasUsed.toString(),
                   gasPrice: receipt.gasPrice.toString(),
                   timestamp: block.timestamp,
-                  product: `Token #${tokenId.toString()}`,
-                  description: 'Transacción de token',
+                  product: token[1], // Usando el nombre real del producto
+                  description: token[3], // Usando la descripción real del producto
                   quantity: Number(cantidad.toString()) / 1000,
                   attributes: await Promise.all(
                     attrNames.map(async (name: string) => {

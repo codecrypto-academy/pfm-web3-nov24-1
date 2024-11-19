@@ -7,7 +7,7 @@ import Header from '@/components/ui/Header'
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
-import { HomeIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, ClockIcon, PlusIcon } from '@heroicons/react/24/outline'
 
 interface LayoutProps {
     children: ReactNode
@@ -110,6 +110,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                     href="/dashboard/productor/crear-producto"
                                     className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
                                 >
+                                    <PlusIcon className="w-5 h-5" />
                                     <span className="font-medium">Crear Producto</span>
                                 </Link>
                             </li>

@@ -56,9 +56,10 @@ export default function Home() {
                 )}
               </div>
               <div className="flex items-center justify-center backdrop-blur-sm rounded-2xl p-8">
-                <div
+                <button
                   onClick={connect}
                   className="company-access-btn"
+                  type="button"
                 >
                   <span className="flex items-center justify-center gap-2">
                     {isAuthenticated ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Acceso Empresas'}
@@ -68,7 +69,7 @@ export default function Home() {
                       </svg>
                     )}
                   </span>
-                </div>
+                </button>
               </div>
             </>
           )}
