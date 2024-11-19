@@ -6,6 +6,7 @@ import { ethers } from 'ethers'
 import { useState, useEffect } from 'react'
 import { withAuth } from '@/components/hoc/withAuth'
 import MapModal from '@/components/MapModal'
+import ParticipantsMap from '@/components/ParticipantsMap'
 import { FaMapMarkerAlt } from 'react-icons/fa'
 
 interface Participante {
@@ -97,7 +98,7 @@ function AdminDashboard() {
     }
 
     return (
-        <div className="container mx-auto">
+        <div className="container mx-auto px-4 py-8">
             {pendingRequests.length > 0 && (
                 <>
                     <h2 className="custom-subtitle mt-8 mb-4">Solicitudes Pendientes</h2>
@@ -195,7 +196,11 @@ function AdminDashboard() {
                     </tbody>
                 </table>
             </div>
-
+            
+            {participants.length > 0 && (
+                <ParticipantsMap participants={participants} />
+            )}
+            
             {showMap && selectedParticipant && (
                 <div id="modal-root">
                     <MapModal
