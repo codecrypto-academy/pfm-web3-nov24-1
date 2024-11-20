@@ -3,108 +3,145 @@ pragma solidity ^0.8.0;
 
 import "./Tokens.sol";
 
-contract OliveOilCertification {
-    Tokens public tokensContract;
-
-    // Enum para los niveles de calidad
-    enum QualityLevel {
-        None,        // Sin certificación
-        Basic,       // Nivel 1: Calidad Básica
-        Medium,      // Nivel 2: Calidad Media
-        Good,        // Nivel 3: Buena Calidad
-        High,        // Nivel 4: Alta Calidad
-        Excellence   // Nivel 5: Certificado de Excelencia
+interface ITokens {
+    struct CondicionesTransporte {
+        int256 temperaturaMinima;
+        int256 temperaturaMaxima;
+        string tipoRefrigeracion;
     }
 
-    // Estructura para representar un lote
+    function getLastTransfer(uint256 _tokenId) external view returns (
+        address from,
+        address to,
+        address transportista,
+        uint256 cantidad,
+        uint256 timestamp,
+        CondicionesTransporte memory conditions
+    );
+
+    function getAtributo(uint256 _tokenId, string memory _nombreAtributo) 
+        external view returns (string memory nombre, string memory valor, uint256 timestamp);
+
+    function tokens(uint256 _tokenId) external view returns (
+        uint256 id,
+        string memory nombre,
+        address creador,
+        string memory descripcion,
+        uint256 cantidad,
+        uint256 timestamp
+    );
+}
+
+contract OliveOilCertification {
+    Tokens public tokensContract;
+    ITokens private tokensInterface;
+
+    enum QualityLevel {
+        None,
+        Basic,
+        Medium,
+        Good,
+        High,
+        Excellence
+    }
+
     struct Batch {
-        uint256 tokenId;           // ID del token asociado
-        address producer;          // Productor (del token)
-        QualityLevel quality;      // Nivel de calidad calculado
-        bool verified;             // Si ya fue evaluado
+        uint256 tokenId;
+        address producer;
+        QualityLevel quality;
+        bool verified;
+    }
+
+    struct QualityParams {
+        uint256 acidity;
+        uint256 peroxides;
+        uint256 polyphenols;
+        uint256 tocopherols;
+        uint256 organoleptic;
+        int256 storageTemp;
     }
 
     mapping(uint256 => Batch) public batches;
 
-    // Eventos
     event QualityEvaluated(uint256 tokenId, QualityLevel quality);
 
     constructor(address _tokensContract) {
         tokensContract = Tokens(_tokensContract);
+        tokensInterface = ITokens(_tokensContract);
     }
 
-    // Evaluar la calidad de un token/lote
-    function evaluateQuality(uint256 _tokenId) external {
-        // Verificar que el token existe y obtener sus datos
-        (string memory variety,) = tokensContract.getAtributo(_tokenId, "variedad");
-        (string memory collectionMethod,) = tokensContract.getAtributo(_tokenId, "metodoRecoleccion");
-        (string memory acidityStr,) = tokensContract.getAtributo(_tokenId, "acidez");
-        (string memory peroxidesStr,) = tokensContract.getAtributo(_tokenId, "peroxidos");
-        (string memory polyphenolsStr,) = tokensContract.getAtributo(_tokenId, "polifenoles");
-        (string memory tocopherolsStr,) = tokensContract.getAtributo(_tokenId, "tocoferoles");
-        (string memory organolepticStr,) = tokensContract.getAtributo(_tokenId, "organoleptico");
+    function getQualityParams(uint256 _tokenId) internal view returns (QualityParams memory) {
+        (string memory acidityStr, ,) = tokensInterface.getAtributo(_tokenId, "acidez");
+        (string memory peroxidesStr, ,) = tokensInterface.getAtributo(_tokenId, "peroxidos");
+        (string memory polyphenolsStr, ,) = tokensInterface.getAtributo(_tokenId, "polifenoles");
+        (string memory tocopherolsStr, ,) = tokensInterface.getAtributo(_tokenId, "tocoferoles");
+        (string memory organolepticStr, ,) = tokensInterface.getAtributo(_tokenId, "organoleptico");
         
-        // Convertir strings a números
-        uint256 acidity = stringToUint(acidityStr);
-        uint256 peroxides = stringToUint(peroxidesStr);
-        uint256 polyphenols = stringToUint(polyphenolsStr);
-        uint256 tocopherols = stringToUint(tocopherolsStr);
-        uint256 organoleptic = stringToUint(organolepticStr);
+        (,,,,,ITokens.CondicionesTransporte memory conditions) = tokensInterface.getLastTransfer(_tokenId);
 
-        // Obtener temperaturas del último transporte
-        (,,,,,CondicionesTransporte memory conditions) = tokensContract.getLastTransfer(_tokenId);
-        int256 storageTemp = conditions.temperaturaMaxima;
+        return QualityParams({
+            acidity: stringToUint(acidityStr),
+            peroxides: stringToUint(peroxidesStr),
+            polyphenols: stringToUint(polyphenolsStr),
+            tocopherols: stringToUint(tocopherolsStr),
+            organoleptic: stringToUint(organolepticStr),
+            storageTemp: conditions.temperaturaMaxima
+        });
+    }
 
-        require(!batches[_tokenId].verified, "Batch already evaluated");
-
-        // Evaluar calidad basada en los parámetros
-        QualityLevel quality;
-
+    function calculateQuality(QualityParams memory params) internal pure returns (QualityLevel) {
         if (
-            acidity <= 3 && // 0.3%
-            peroxides <= 10 &&
-            polyphenols >= 300 &&
-            tocopherols >= 250 &&
-            storageTemp <= 17 &&
-            organoleptic >= 8
+            params.acidity <= 3 &&
+            params.peroxides <= 10 &&
+            params.polyphenols >= 300 &&
+            params.tocopherols >= 250 &&
+            params.storageTemp <= 17 &&
+            params.organoleptic >= 8
         ) {
-            quality = QualityLevel.Excellence;
+            return QualityLevel.Excellence;
         } else if (
-            acidity <= 4 && // 0.4%
-            peroxides <= 12 &&
-            polyphenols >= 250 &&
-            tocopherols >= 200 &&
-            storageTemp <= 18
+            params.acidity <= 4 &&
+            params.peroxides <= 12 &&
+            params.polyphenols >= 250 &&
+            params.tocopherols >= 200 &&
+            params.storageTemp <= 18
         ) {
-            quality = QualityLevel.High;
+            return QualityLevel.High;
         } else if (
-            acidity <= 5 && // 0.5%
-            peroxides <= 15 &&
-            polyphenols >= 200 &&
-            tocopherols >= 150 &&
-            storageTemp <= 20
+            params.acidity <= 5 &&
+            params.peroxides <= 15 &&
+            params.polyphenols >= 200 &&
+            params.tocopherols >= 150 &&
+            params.storageTemp <= 20
         ) {
-            quality = QualityLevel.Good;
+            return QualityLevel.Good;
         } else if (
-            acidity <= 6 && // 0.6%
-            peroxides <= 18 &&
-            polyphenols >= 150 &&
-            storageTemp <= 22
+            params.acidity <= 6 &&
+            params.peroxides <= 18 &&
+            params.polyphenols >= 150 &&
+            params.storageTemp <= 22
         ) {
-            quality = QualityLevel.Medium;
+            return QualityLevel.Medium;
         } else if (
-            acidity <= 8 && // 0.8%
-            peroxides <= 20
+            params.acidity <= 8 &&
+            params.peroxides <= 20
         ) {
-            quality = QualityLevel.Basic;
+            return QualityLevel.Basic;
         } else {
-            quality = QualityLevel.None;
+            return QualityLevel.None;
         }
+    }
 
-        // Guardar el resultado
+    function evaluateQuality(uint256 _tokenId) external {
+        require(!batches[_tokenId].verified, "Batch already evaluated");
+        
+        (, , address creator, , ,) = tokensInterface.tokens(_tokenId);
+        QualityParams memory params = getQualityParams(_tokenId);
+        QualityLevel quality = calculateQuality(params);
+
         batches[_tokenId] = Batch({
             tokenId: _tokenId,
-            producer: tokensContract.getTokenCreator(_tokenId),
+            producer: creator,
             quality: quality,
             verified: true
         });
@@ -112,7 +149,6 @@ contract OliveOilCertification {
         emit QualityEvaluated(_tokenId, quality);
     }
 
-    // Consultar certificación de un token/lote
     function getBatchCertification(uint256 _tokenId) external view returns (
         address producer,
         QualityLevel quality,
@@ -125,10 +161,10 @@ contract OliveOilCertification {
         Batch memory batch = batches[_tokenId];
         require(batch.verified, "Batch not evaluated yet");
 
-        // Obtener datos adicionales del token
-        (string memory variety,) = tokensContract.getAtributo(_tokenId, "variedad");
-        (string memory method,) = tokensContract.getAtributo(_tokenId, "metodoRecoleccion");
-        (,,,,,CondicionesTransporte memory conditions) = tokensContract.getLastTransfer(_tokenId);
+        (string memory variety, ,) = tokensInterface.getAtributo(_tokenId, "variedad");
+        (string memory method, ,) = tokensInterface.getAtributo(_tokenId, "metodoRecoleccion");
+        (, , , , uint256 tokenTimestamp,) = tokensInterface.tokens(_tokenId);
+        (,,,,,ITokens.CondicionesTransporte memory conditions) = tokensInterface.getLastTransfer(_tokenId);
 
         return (
             batch.producer,
@@ -136,12 +172,11 @@ contract OliveOilCertification {
             batch.verified,
             variety,
             method,
-            tokensContract.getTokenTimestamp(_tokenId),
+            tokenTimestamp,
             conditions.temperaturaMaxima
         );
     }
 
-    // Función auxiliar para convertir string a uint
     function stringToUint(string memory s) internal pure returns (uint256) {
         bytes memory b = bytes(s);
         uint256 result = 0;

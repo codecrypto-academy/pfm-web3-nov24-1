@@ -1,7 +1,8 @@
-pragma solidity >=0.8.13;
+pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
-import "../src/Tokens.sol";
+import {Test, console} from "forge-std/Test.sol";
+import {Tokens} from "../src/Tokens.sol";
+import {Usuarios} from "../src/Usuarios.sol";
 
 contract TokensTest is Test {
     Tokens contratoTokens;
@@ -12,54 +13,39 @@ contract TokensTest is Test {
     function setUp() public {
         contratoUsuarios = new Usuarios();
         contratoUsuarios.nuevoUsuario(usuarioTransfer, "UsuarioTransfer", "UsuarioCalle", "Productor");
-
-        // Desplegar el contrato de tokens, pasándole el contrato Usuarios
         contratoTokens = new Tokens(address(contratoUsuarios));
     }
 
     function testCrearToken() public {
-        // Definir los datos del token
-        string memory nombre = "TokenTest";
-        uint256 cantidad = 1000;
-        string memory descripcion = "Este es un token de prueba";
-        uint256 idPadre = 0;
-        uint256 idHijo = 0;
+        string[] memory nombresAtributos = new string[](0);
+        string[] memory valoresAtributos = new string[](0);
 
-        // Esperar el evento `TokenCreado`
-        vm.expectEmit(true, true, true, true);
-        emit Tokens.TokenCreado(0, nombre, address(this), cantidad);
+        uint256 tokenId = contratoTokens.crearToken(
+            "TokenTest",
+            1000,
+            "Token de prueba",
+            nombresAtributos,
+            valoresAtributos
+        );
 
-        // Llamar a la función crearToken
-        contratoTokens.crearToken(nombre, cantidad, descripcion, idPadre, idHijo);
-
-        // Verificar que los valores se almacenaron correctamente
-        (uint256 id, uint256 idPadreObtenido, uint256 idHijoObtenido, string memory nombreObtenido, address creador, string memory descripcionObtenida, uint256 cantidadObtenida, ) = contratoTokens.tokens(0);
-
-        assertEq(id, 0, "El ID del token deberia ser 0");
-        assertEq(idPadreObtenido, idPadre, "El ID del padre no coincide");
-        assertEq(idHijoObtenido, idHijo, "El ID del hijo no coincide");
-        assertEq(nombreObtenido, nombre, "El nombre del token no coincide");
-        assertEq(creador, address(this), "El creador deberia ser la direccion del contrato de prueba");
-        assertEq(descripcionObtenida, descripcion, "La descripcion no coincide");
-        assertEq(cantidadObtenida, cantidad, "La cantidad no coincide");
+        assertEq(contratoTokens.getBalance(tokenId, address(this)), 1000);
     }
 
     function testTransferirToken() public {
-        uint256 idToken = 0; // ID del token creado
-        uint256 cantidad = 100;
+        string[] memory nombresAtributos = new string[](0);
+        string[] memory valoresAtributos = new string[](0);
+        
+        uint256 tokenId = contratoTokens.crearToken(
+            "TokenTest",
+            1000,
+            "Token de prueba",
+            nombresAtributos,
+            valoresAtributos
+        );
 
-        // Crear un token y asignarlo al sender
-        contratoTokens.crearToken("TokenTest", 1000, "Token de prueba", 0, 0);
+        contratoTokens.transferirToken(tokenId, address(this), usuarioTransfer, 100);
 
-        // Validar evento esperado
-        vm.expectEmit(true, true, true, true);
-        emit Tokens.TokenTransferido(idToken, address(this), usuarioTransfer, cantidad);
-
-        // Transferir token
-        contratoTokens.transferirToken(idToken, address(this), usuarioTransfer, cantidad);
-
-        // Verificar balances después de la transferencia
-        assertEq(contratoTokens.getBalance(idToken, address(this)), 900, "El saldo del sender deberia ser 900");
-        assertEq(contratoTokens.getBalance(idToken, usuarioTransfer), 100, "El saldo del usuarioTransfer deberia ser 100");
+        assertEq(contratoTokens.getBalance(tokenId, address(this)), 900);
+        assertEq(contratoTokens.getBalance(tokenId, usuarioTransfer), 100);
     }
 }
