@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./Tokens.sol";
+
 contract OliveOilCertification {
+    Tokens public tokensContract;
+
     // Enum para los niveles de calidad
     enum QualityLevel {
         None,        // Sin certificación
@@ -14,130 +18,139 @@ contract OliveOilCertification {
 
     // Estructura para representar un lote
     struct Batch {
-        uint256 batchId; // Token ID  COJER DE CREAR TOKENS SC
-        address producer; // Ta claro   COJER DE CREAR TOKENS SC
-        string variety;         // Variedad de aceituna -- Options  
-        string collectionMethod; // Método de recolección -- Options
-        uint256 harvestDate;    // Fecha de cosecha-- Time stamp COJER DE CREAR TOKENS SC
-        uint256 extractionTemp; // Temperatura de extracción-- Temperatura ambiental en recolección
-        uint256 storageTemp;    // Temperatura de almacenamiento -- Temperatura ambiental en almacenamiento en Fabrica
-        uint256 acidity;        // Acidez (%) -- Option en fabrica
-        uint256 peroxides;      // Peróxidos (meq O2/kg) -- Tocame los huevos
-        uint256 polyphenols;    // Polifenoles (mg/kg)-- Tocame los huevos
-        uint256 tocopherols;    // Tocoferoles (mg/kg)-- Tocame los huevos
-        uint256 organoleptic;   // Puntuación organoléptica (0-10)-- Tocame los huevos
-        QualityLevel quality;   // Nivel de calidad -- Nivel dado con los puntos de encima
-        bool verified;          // Si ya fue evaluado -- Opción de desactivar ante dudas
+        uint256 tokenId;           // ID del token asociado
+        address producer;          // Productor (del token)
+        QualityLevel quality;      // Nivel de calidad calculado
+        bool verified;             // Si ya fue evaluado
     }
 
-    uint256 public nextBatchId; // ID incremental para los lotes (Cada recolecta se crea un nuevo contrato con su ID)
     mapping(uint256 => Batch) public batches;
 
     // Eventos
-    event BatchRegistered(uint256 batchId, address producer); // COJER DE CREAR TOKENS SC
-    event QualityEvaluated(uint256 batchId, QualityLevel quality);
+    event QualityEvaluated(uint256 tokenId, QualityLevel quality);
 
-    // Registro de un lote por el productor
-    function registerBatch(
-        string memory variety,
-        string memory collectionMethod,
-        uint256 harvestDate,
-        uint256 extractionTemp,
-        uint256 storageTemp,
-        uint256 acidity,
-        uint256 peroxides,
-        uint256 polyphenols,
-        uint256 tocopherols,
-        uint256 organoleptic
-    ) external {
-        require(bytes(variety).length > 0, "Variety cannot be empty");
-        require(bytes(collectionMethod).length > 0, "Collection method cannot be empty");
-        require(harvestDate <= block.timestamp, "Harvest date cannot be in the future");
-        require(acidity > 0 && acidity <= 1, "Acidity must be between 0 and 1");
-        require(peroxides > 0 && peroxides <= 25, "Peroxides must be <= 25");
-        require(extractionTemp >= 15 && extractionTemp <= 30, "Extraction temperature must be between 15 and 30");
-        require(storageTemp >= 15 && storageTemp <= 25, "Storage temperature must be between 15 and 25");
-        require(organoleptic >= 0 && organoleptic <= 10, "Organoleptic score must be between 0 and 10");
-
-        batches[nextBatchId] = Batch({
-            batchId: nextBatchId,
-            producer: msg.sender,
-            variety: variety,
-            collectionMethod: collectionMethod,
-            harvestDate: harvestDate,
-            extractionTemp: extractionTemp,
-            storageTemp: storageTemp,
-            acidity: acidity,
-            peroxides: peroxides,
-            polyphenols: polyphenols,
-            tocopherols: tocopherols,
-            organoleptic: organoleptic,
-            quality: QualityLevel.None,
-            verified: false
-        });
-
-        emit BatchRegistered(nextBatchId, msg.sender);
-        nextBatchId++;
+    constructor(address _tokensContract) {
+        tokensContract = Tokens(_tokensContract);
     }
 
-    // Evaluar la calidad de un lote
-    function evaluateQuality(uint256 batchId) external {
-        Batch storage batch = batches[batchId];
-        require(batch.producer != address(0), "Batch does not exist");
-        require(!batch.verified, "Batch already evaluated");
+    // Evaluar la calidad de un token/lote
+    function evaluateQuality(uint256 _tokenId) external {
+        // Verificar que el token existe y obtener sus datos
+        (string memory variety,) = tokensContract.getAtributo(_tokenId, "variedad");
+        (string memory collectionMethod,) = tokensContract.getAtributo(_tokenId, "metodoRecoleccion");
+        (string memory acidityStr,) = tokensContract.getAtributo(_tokenId, "acidez");
+        (string memory peroxidesStr,) = tokensContract.getAtributo(_tokenId, "peroxidos");
+        (string memory polyphenolsStr,) = tokensContract.getAtributo(_tokenId, "polifenoles");
+        (string memory tocopherolsStr,) = tokensContract.getAtributo(_tokenId, "tocoferoles");
+        (string memory organolepticStr,) = tokensContract.getAtributo(_tokenId, "organoleptico");
+        
+        // Convertir strings a números
+        uint256 acidity = stringToUint(acidityStr);
+        uint256 peroxides = stringToUint(peroxidesStr);
+        uint256 polyphenols = stringToUint(polyphenolsStr);
+        uint256 tocopherols = stringToUint(tocopherolsStr);
+        uint256 organoleptic = stringToUint(organolepticStr);
+
+        // Obtener temperaturas del último transporte
+        (,,,,,CondicionesTransporte memory conditions) = tokensContract.getLastTransfer(_tokenId);
+        int256 storageTemp = conditions.temperaturaMaxima;
+
+        require(!batches[_tokenId].verified, "Batch already evaluated");
+
+        // Evaluar calidad basada en los parámetros
+        QualityLevel quality;
 
         if (
-            (batch.acidity * 10) <= (0.3 * 10) &&
-            batch.peroxides <= 10 &&
-            batch.polyphenols >= 300 &&
-            batch.tocopherols >= 250 &&
-            batch.extractionTemp <= 20 &&
-            batch.storageTemp <= 17 &&
-            batch.organoleptic >= 8
+            acidity <= 3 && // 0.3%
+            peroxides <= 10 &&
+            polyphenols >= 300 &&
+            tocopherols >= 250 &&
+            storageTemp <= 17 &&
+            organoleptic >= 8
         ) {
-            batch.quality = QualityLevel.Excellence;
+            quality = QualityLevel.Excellence;
         } else if (
-            (batch.acidity * 10) <= (0.4 * 10) &&
-            batch.peroxides <= 12 &&
-            batch.polyphenols >= 250 &&
-            batch.tocopherols >= 200 &&
-            batch.extractionTemp <= 23 &&
-            batch.storageTemp <= 18
+            acidity <= 4 && // 0.4%
+            peroxides <= 12 &&
+            polyphenols >= 250 &&
+            tocopherols >= 200 &&
+            storageTemp <= 18
         ) {
-            batch.quality = QualityLevel.High;
+            quality = QualityLevel.High;
         } else if (
-            (batch.acidity * 10) <= (0.5 * 10) &&
-            batch.peroxides <= 15 &&
-            batch.polyphenols >= 200 &&
-            batch.tocopherols >= 150 &&
-            batch.extractionTemp <= 25 &&
-            batch.storageTemp <= 20
+            acidity <= 5 && // 0.5%
+            peroxides <= 15 &&
+            polyphenols >= 200 &&
+            tocopherols >= 150 &&
+            storageTemp <= 20
         ) {
-            batch.quality = QualityLevel.Good;
+            quality = QualityLevel.Good;
         } else if (
-            (batch.acidity * 10) <= (0.6 * 10) &&
-            batch.peroxides <= 18 &&
-            batch.polyphenols >= 150 &&
-            batch.extractionTemp <= 27 &&
-            batch.storageTemp <= 22
+            acidity <= 6 && // 0.6%
+            peroxides <= 18 &&
+            polyphenols >= 150 &&
+            storageTemp <= 22
         ) {
-            batch.quality = QualityLevel.Medium;
+            quality = QualityLevel.Medium;
         } else if (
-            (batch.acidity * 10) <= (0.8 * 10) &&
-            batch.peroxides <= 20
+            acidity <= 8 && // 0.8%
+            peroxides <= 20
         ) {
-            batch.quality = QualityLevel.Basic;
+            quality = QualityLevel.Basic;
         } else {
-            batch.quality = QualityLevel.None;
+            quality = QualityLevel.None;
         }
 
-        batch.verified = true;
-        emit QualityEvaluated(batchId, batch.quality);
+        // Guardar el resultado
+        batches[_tokenId] = Batch({
+            tokenId: _tokenId,
+            producer: tokensContract.getTokenCreator(_tokenId),
+            quality: quality,
+            verified: true
+        });
+
+        emit QualityEvaluated(_tokenId, quality);
     }
 
-    // Consultar detalles de un lote
-    function getBatch(uint256 batchId) external view returns (Batch memory) {
-        require(batches[batchId].producer != address(0), "Batch does not exist");
-        return batches[batchId];
+    // Consultar certificación de un token/lote
+    function getBatchCertification(uint256 _tokenId) external view returns (
+        address producer,
+        QualityLevel quality,
+        bool verified,
+        string memory varietyName,
+        string memory collectionMethod,
+        uint256 timestamp,
+        int256 storageTemp
+    ) {
+        Batch memory batch = batches[_tokenId];
+        require(batch.verified, "Batch not evaluated yet");
+
+        // Obtener datos adicionales del token
+        (string memory variety,) = tokensContract.getAtributo(_tokenId, "variedad");
+        (string memory method,) = tokensContract.getAtributo(_tokenId, "metodoRecoleccion");
+        (,,,,,CondicionesTransporte memory conditions) = tokensContract.getLastTransfer(_tokenId);
+
+        return (
+            batch.producer,
+            batch.quality,
+            batch.verified,
+            variety,
+            method,
+            tokensContract.getTokenTimestamp(_tokenId),
+            conditions.temperaturaMaxima
+        );
+    }
+
+    // Función auxiliar para convertir string a uint
+    function stringToUint(string memory s) internal pure returns (uint256) {
+        bytes memory b = bytes(s);
+        uint256 result = 0;
+        for(uint i = 0; i < b.length; i++) {
+            uint8 c = uint8(b[i]);
+            if (c >= 48 && c <= 57) {
+                result = result * 10 + (c - 48);
+            }
+        }
+        return result;
     }
 }
