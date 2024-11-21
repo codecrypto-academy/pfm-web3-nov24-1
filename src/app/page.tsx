@@ -19,10 +19,8 @@ export default function Home() {
   useEffect(() => {
     const loadProductCount = async () => {
       try {
-        if (isAuthenticated) {
-          const count = await fetchProductCount()
-          setProductCount(count)
-        }
+        const count = await fetchProductCount()
+        setProductCount(count)
       } catch (error) {
         console.error('Error fetching product count:', error)
         alert('Hubo un error al obtener la cantidad de productos. Por favor, inténtelo más tarde.')
