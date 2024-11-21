@@ -25,11 +25,23 @@ const CONTRACT_ABI = [
   }
 ]
 
+// Define types for product data
+interface ProductData {
+  name: string
+  details: string
+}
+
+// Create a provider for Ethereum
 const provider = new ethers.providers.JsonRpcProvider("https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID") // Replace with your provider URL
 
+// Create a contract instance
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider)
 
-export const fetchProductCount = async () => {
+/**
+ * Fetch the total number of products from the blockchain.
+ * @returns {Promise<number>} - The total number of products.
+ */
+export const fetchProductCount = async (): Promise<number> => {
   try {
     const count = await contract.getProductCount()
     return count.toNumber()
@@ -39,11 +51,18 @@ export const fetchProductCount = async () => {
   }
 }
 
-export const fetchProductData = async (id) => {
+/**
+ * Fetch product data by its ID from the blockchain.
+ * @param {string} id - The product ID.
+ * @returns {Promise<ProductData>} - The product data.
+ */
+export const fetchProductData = async (id: string): Promise<ProductData> => {
   try {
     const data = await contract.getProductData(id)
-    console.log('Product Data:', data)
-    alert(`Producto encontrado:\nNombre: ${data.name}\nDetalles: ${data.details}`)
+    return {
+      name: data.name,
+      details: data.details
+    }
   } catch (error) {
     console.error('Error fetching product data:', error)
     throw new Error('No se pudo obtener la información del producto.')
