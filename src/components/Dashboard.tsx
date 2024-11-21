@@ -185,27 +185,20 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     let atributos: TokenAttribute[] = []
 
                     try {
-                        // Verificar si el token existe antes de intentar obtener sus atributos
-                        const token = await retryRPC(() => contract.tokens(tokenId))
-                        if (token && token.creador !== ethers.ZeroAddress) {
-                            // Solo intentar obtener el atributo Procesado si el rol es fabrica
-                            if (role === 'fabrica') {
-                                try {
-                                    const attr = await retryRPC(() => contract.getAtributo(tokenId, "Procesado"))
-                                    if (attr && attr.nombre) {
-                                        atributos = [{
-                                            nombre: attr.nombre,
-                                            valor: attr.valor,
-                                            timestamp: Number(attr.timestamp)
-                                        }]
-                                    }
-                                } catch (error) {
-                                    console.log(`Error obteniendo atributo Procesado para token ${tokenId}:`, error)
-                                }
+                        // Obtener los nombres de atributos del token
+                        const nombresAtributos = await retryRPC(() => contract.getNombresAtributos(tokenId))
+                        for (const nombre of nombresAtributos) {
+                            const attr = await retryRPC(() => contract.getAtributo(tokenId, nombre))
+                            if (attr && attr[0]) { // attr[0] es el nombre
+                                atributos.push({
+                                    nombre: attr[0],
+                                    valor: attr[1], // attr[1] es el valor
+                                    timestamp: Number(attr[2]) // attr[2] es el timestamp
+                                })
                             }
                         }
                     } catch (error) {
-                        console.log(`Error obteniendo datos del token ${tokenId}:`, error)
+                        console.log(`Error obteniendo atributos para token ${tokenId}:`, error)
                     }
 
                     // Solo verificar si es un producto procesado para el rol fabrica
@@ -307,6 +300,12 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         }
     }, [role])
 
+    useEffect(() => {
+        if (selectedToken) {
+            console.log('Token seleccionado:', selectedToken);
+        }
+    }, [selectedToken]);
+
     // Función para obtener las fábricas
     const fetchFactories = async () => {
         try {
@@ -343,6 +342,18 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             )
 
             const totalTokens = Number(quantity) * 1000
+
+            // Verificar que todos los atributos requeridos tienen un valor
+            if (token.atributos && token.atributos.length > 0) {
+                const missingAttributes = token.atributos.filter(attr => 
+                    !newAttributes.find(newAttr => newAttr.nombre === attr.nombre)
+                );
+                
+                if (missingAttributes.length > 0) {
+                    alert(`Por favor, complete todos los atributos requeridos: ${missingAttributes.map(attr => attr.nombre).join(', ')}`);
+                    return;
+                }
+            }
 
             // Separar los atributos en dos arrays
             const nombresAtributos = newAttributes.map(attr => attr.nombre)

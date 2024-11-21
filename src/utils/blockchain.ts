@@ -1,41 +1,33 @@
 import { ethers } from 'ethers'
-
-const CONTRACT_ADDRESS = "0xYourContractAddress" // Sustituye con la dirección del contrato
-const CONTRACT_ABI = [
-  {
-    "constant": true,
-    "inputs": [],
-    "name": "getProductCount",
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [{ "name": "_id", "type": "uint256" }],
-    "name": "getProductData",
-    "outputs": [
-      { "name": "name", "type": "string" },
-      { "name": "details", "type": "string" }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  }
-]
+import { CONTRACTS } from '@/constants/contracts'
 
 // Define types for product data
 interface ProductData {
-  name: string
-  details: string
+  id: number;
+  nombre: string;
+  descripcion: string;
+  creador: string;
+  cantidad: number;
+  timestamp: number;
+  atributos?: Array<{
+    nombre: string;
+    valor: string;
+    timestamp: number;
+  }>;
 }
 
-// Create a provider for Ethereum
-const provider = new ethers.providers.JsonRpcProvider("https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID") // Replace with your provider URL
+// Initialize read-only provider for public data
+const getReadOnlyProvider = () => {
+  return new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia.infura.io/v3/your-project-id")
+}
 
-// Create a contract instance
-const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider)
+// Initialize wallet provider for transactions
+const getWalletProvider = async () => {
+  if (typeof window === 'undefined' || !window.ethereum) {
+    throw new Error('No se detectó una wallet de Ethereum')
+  }
+  return new ethers.BrowserProvider(window.ethereum)
+}
 
 /**
  * Fetch the total number of products from the blockchain.
@@ -43,7 +35,14 @@ const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider)
  */
 export const fetchProductCount = async (): Promise<number> => {
   try {
-    const count = await contract.getProductCount()
+    const provider = getReadOnlyProvider()
+    const contract = new ethers.Contract(
+      CONTRACTS.Tokens.address,
+      CONTRACTS.Tokens.abi,
+      provider
+    )
+
+    const count = await contract.getNumTokens()
     return count.toNumber()
   } catch (error) {
     console.error('Error fetching product count:', error)
@@ -58,11 +57,41 @@ export const fetchProductCount = async (): Promise<number> => {
  */
 export const fetchProductData = async (id: string): Promise<ProductData> => {
   try {
-    const data = await contract.getProductData(id)
-    return {
-      name: data.name,
-      details: data.details
+    const provider = getReadOnlyProvider()
+    const contract = new ethers.Contract(
+      CONTRACTS.Tokens.address,
+      CONTRACTS.Tokens.abi,
+      provider
+    )
+
+    // Get token data
+    const token = await contract.tokens(id)
+    
+    // Get token attributes
+    const nombresAtributos = await contract.getNombresAtributos(id)
+    const atributos = await Promise.all(
+      nombresAtributos.map(async (nombre: string) => {
+        const attr = await contract.getAtributo(id, nombre)
+        return {
+          nombre: attr[0],
+          valor: attr[1],
+          timestamp: Number(attr[2])
+        }
+      })
+    )
+
+    const productData: ProductData = {
+      id: Number(id),
+      nombre: token[1], // token name
+      descripcion: token[3], // token description
+      creador: token[2], // token creator
+      cantidad: Number(token[4]), // token amount
+      timestamp: Number(token[5]), // token timestamp
+      atributos
     }
+
+    console.log('Product Data:', productData)
+    return productData
   } catch (error) {
     console.error('Error fetching product data:', error)
     throw new Error('No se pudo obtener la información del producto.')
