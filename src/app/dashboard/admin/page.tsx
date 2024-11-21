@@ -27,6 +27,12 @@ interface PendingRequest {
     status: string
 }
 
+// Función para formatear roles
+const formatRole = (role: string): string => {
+    if (!role) return '';
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+}
+
 function AdminDashboard() {
     const [participants, setParticipants] = useState<Participante[]>([])
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([])
@@ -74,7 +80,9 @@ function AdminDashboard() {
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.Usuarios.abi, signer)
 
-            const tx = await contract.nuevoUsuario(request.address, request.nombre, request.gps, request.rol)
+            // Asegurarnos de que el rol tenga la primera letra en mayúscula
+            const formattedRole = formatRole(request.rol)
+            const tx = await contract.nuevoUsuario(request.address, request.nombre, request.gps, formattedRole)
             await tx.wait() // Wait for blockchain confirmation
 
             // After blockchain confirmation, remove from JSON
@@ -118,7 +126,7 @@ function AdminDashboard() {
                                 <tr key={request.id} className="border-b">
                                     <td className="px-6 py-4">{request.address}</td>
                                     <td className="px-6 py-4">{request.nombre}</td>
-                                    <td className="px-6 py-4">{request.rol}</td>
+                                    <td className="px-6 py-4">{formatRole(request.rol)}</td>
                                     <td className="px-6 py-4">
                                         {new Date(request.timestamp).toLocaleDateString()}
                                     </td>
@@ -159,7 +167,7 @@ function AdminDashboard() {
                             <tr key={index} className="border-b">
                                 <td className="px-6 py-4">{participant.direccion}</td>
                                 <td className="px-6 py-4">{participant.nombre}</td>
-                                <td className="px-6 py-4">{participant.rol}</td>
+                                <td className="px-6 py-4">{formatRole(participant.rol)}</td>
                                 <td className="px-6 py-4">
                                     <span
                                         className={`px-2 py-1 rounded ${participant.activo

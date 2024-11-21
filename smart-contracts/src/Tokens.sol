@@ -136,6 +136,12 @@ contract Tokens {
         return (attr.nombre, attr.valor, attr.timestamp);
     }
 
+    // Función para obtener los nombres de los atributos de un token
+    function getNombresAtributos(uint256 _tokenId) public view returns (string[] memory) {
+        require(_tokenId < siguienteTokenId, "Token no existe");
+        return tokens[_tokenId].nombresAtributos;
+    }
+
     // Función para obtener la última transferencia de un token
     function getLastTransfer(uint256 /* _tokenId */) public pure returns (
         address from,

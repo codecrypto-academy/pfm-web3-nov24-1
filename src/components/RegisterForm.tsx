@@ -62,7 +62,7 @@ export default function RegisterForm() {
                 body: JSON.stringify({
                     address: userAddress,
                     nombre: nombre.trim(),
-                    rol: rol.toLowerCase(),
+                    rol: rol.toLowerCase(),  // Convertimos a minúsculas aquí
                     gps
                 }),
             })
@@ -136,9 +136,9 @@ export default function RegisterForm() {
                         required
                     >
                         <option value="">Seleccione un rol</option>
-                        <option value="productor">Productor</option>
-                        <option value="fabrica">Fábrica</option>
-                        <option value="minorista">Minorista</option>
+                        <option value="Productor">Productor</option>
+                        <option value="Fabrica">Fábrica</option>
+                        <option value="Minorista">Minorista</option>
                     </select>
                 </div>
                 <button

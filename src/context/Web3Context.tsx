@@ -12,6 +12,13 @@ const SUPPORTED_NETWORKS = {
 
 // Types for better type safety
 type NetworkType = keyof typeof SUPPORTED_NETWORKS
+
+// Función para formatear roles
+const formatRole = (role: string): string => {
+    if (!role) return '';
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+}
+
 type UserData = {
     direccion: string
     nombre: string
@@ -208,13 +215,14 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 setAddress(accounts[0])
                 
                 if (accounts[0].toLowerCase() === adminAddress.toLowerCase()) {
-                    setRole('admin')
+                    setRole('Admin')
                     setName('Admin')
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
                     router.push('/dashboard/admin')
                 } else {
-                    setRole(currentUser.rol)
+                    const formattedRole = formatRole(currentUser.rol)
+                    setRole(formattedRole)
                     setName(currentUser.nombre)
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
@@ -224,7 +232,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 try {
                     localStorage.setItem('web3Auth', JSON.stringify({
                         address: accounts[0],
-                        role: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'admin' : currentUser.rol,
+                        role: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : formatRole(currentUser.rol),
                         name: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : currentUser.nombre
                     }))
                 } catch (storageError) {
