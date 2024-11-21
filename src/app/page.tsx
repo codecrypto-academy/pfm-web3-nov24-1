@@ -43,15 +43,15 @@ export default function Home() {
             <RegisterForm />
           ) : (
             <>
-              <div className="flex items-center justify-center bg-oil-light/30 backdrop-blur-sm rounded-2xl p-8">
+              <div className="w-full max-w-lg mx-auto flex items-center justify-center bg-oil-light/30 backdrop-blur-sm rounded-2xl p-4 sm:p-8">
                 {showScanner ? (
                   <QRScanner onResult={handleQRResult} />
                 ) : (
                   <div
-                    className="qr-button-container cursor-pointer"
+                    className="qr-button-container cursor-pointer w-full max-w-xs aspect-square flex items-center justify-center"
                     onClick={() => setShowScanner(true)}
                   >
-                    <QrCodeIcon className="qr-button text-blue-900" />
+                    <QrCodeIcon className="qr-button text-blue-900 w-24 h-24 sm:w-32 sm:h-32" />
                   </div>
                 )}
               </div>

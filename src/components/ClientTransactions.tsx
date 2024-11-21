@@ -87,25 +87,25 @@ export default function ClientTransactions({ role }: { role: string }) {
 
         const provider = new ethers.BrowserProvider(window.ethereum)
         const tokensContract = new ethers.Contract(
-          CONTRACTS.TOKENS.ADDRESS,
-          CONTRACTS.TOKENS.ABI,
+          CONTRACTS.Tokens.address,
+          CONTRACTS.Tokens.abi,
           provider
         )
-        const participantesContract = new ethers.Contract(
-          CONTRACTS.PARTICIPANTES.ADDRESS,
-          CONTRACTS.PARTICIPANTES.ABI,
+        const usuariosContract = new ethers.Contract(
+          CONTRACTS.Usuarios.address,
+          CONTRACTS.Usuarios.abi,
           provider
         )
 
         // Verificar que los contratos estén inicializados
-        if (!tokensContract || !participantesContract) {
+        if (!tokensContract || !usuariosContract) {
           throw new Error('Error al inicializar los contratos')
         }
 
         // Cargar usuarios
         let usuarios
         try {
-          usuarios = await participantesContract.getUsuarios()
+          usuarios = await usuariosContract.getUsuarios()
           console.log('Usuarios cargados:', usuarios.length)
         } catch (error) {
           console.error('Error al cargar usuarios:', error)

@@ -110,8 +110,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         try {
             const provider = new ethers.BrowserProvider(window.ethereum)
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 provider
             )
 
@@ -234,8 +234,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         
         const provider = new ethers.BrowserProvider(window.ethereum);
         const contract = new ethers.Contract(
-            CONTRACTS.TOKENS.ADDRESS,
-            CONTRACTS.TOKENS.ABI,
+            CONTRACTS.Tokens.address,
+            CONTRACTS.Tokens.abi,
             provider
         );
 
@@ -267,8 +267,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const contract = new ethers.Contract(
-                CONTRACTS.PARTICIPANTES.ADDRESS,
-                CONTRACTS.PARTICIPANTES.ABI,
+                CONTRACTS.Usuarios.address,
+                CONTRACTS.Usuarios.abi,
                 provider
             )
 
@@ -292,8 +292,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 signer
             )
 
@@ -322,8 +322,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 provider
             )
 
@@ -371,8 +371,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             }
 
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 signer
             )
 
@@ -386,8 +386,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
             // Verificar que el destinatario es un usuario activo
             const usuariosContract = new ethers.Contract(
-                CONTRACTS.PARTICIPANTES.ADDRESS,
-                CONTRACTS.PARTICIPANTES.ABI,
+                CONTRACTS.Usuarios.address,
+                CONTRACTS.Usuarios.abi,
                 provider
             )
             const isActive = await usuariosContract.estaActivo(selectedFactory);
@@ -446,8 +446,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 signer
             )
 

@@ -21,67 +21,59 @@
   background: #fff;
   padding: 20px;
   border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  position: relative;
-  z-index: 1001;
+  max-width: 90%;
+  max-height: 90%;
+  overflow: auto;
 }
 
-.modal-content h2 {
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.confirm-btn,
-.close-btn {
-  margin: 10px;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.confirm-btn {
-  background-color: #4caf50;
-  color: white;
-}
-
-.confirm-btn:hover {
-  background-color: #45a049;
-}
-
-.close-btn {
-  background-color: #f44336;
-  color: white;
-}
-
-.close-btn:hover {
-  background-color: #e53935;
-}
-
-#map {
-  width: 100%;
-  height: 300px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
+/* Map Styles */
 .leaflet-container {
+  width: 100%;
+  height: 100%;
   z-index: 1;
 }
 
-.leaflet-control-container {
-  z-index: 1002;
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Ensure map tiles are visible */
+.leaflet-tile-container {
+  filter: none !important;
+}
+
+.leaflet-tile {
+  filter: none !important;
+}
+
+/* Make controls visible */
+.leaflet-control-container {
+  z-index: 1000;
+}
+
+/* Ensure proper stacking of map elements */
+.leaflet-map-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 3 !important;
+}
+
+.leaflet-overlay-pane {
+  z-index: 4 !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 5 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 6 !important;
+}
+
+.leaflet-control {
+  z-index: 7 !important;
 }

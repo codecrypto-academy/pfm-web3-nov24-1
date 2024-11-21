@@ -96,15 +96,15 @@
   }
 
   .qr-button {
-    @apply text-slate-500 w-[400px] h-[400px] flex items-center justify-center;
+    @apply text-slate-500 w-full h-full flex items-center justify-center;
   }
 
   .qr-button-container {
-    @apply relative w-[450px] h-[450px] flex items-center justify-center mx-auto;
+    @apply relative w-full aspect-square flex items-center justify-center mx-auto;
   }
 
   .qr-button-container::before {
-    @apply content-[''] absolute w-full h-full border-4 border-slate-500 rounded-lg pointer-events-none;
+    @apply content-[''] absolute w-full h-full border-4 border-slate-500 rounded-lg pointer-events-none transition-all duration-300;
   }
 
   /* Estilos para Leaflet */

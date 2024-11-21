@@ -52,7 +52,7 @@ export default function AddUsser() {
             setTxStatus('Conectando con la wallet...')
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
-            const contract = new ethers.Contract(CONTRACTS.PARTICIPANTES.ADDRESS, CONTRACTS.PARTICIPANTES.ABI, signer)
+            const contract = new ethers.Contract(CONTRACTS.Usuarios.address, CONTRACTS.Usuarios.abi, signer)
 
             setTxStatus('Enviando transacción...')
             const tx = await contract.nuevoUsuario(

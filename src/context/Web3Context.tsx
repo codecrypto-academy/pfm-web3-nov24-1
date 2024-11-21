@@ -185,8 +185,8 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             }
 
             const usuariosContract = new ethers.Contract(
-                CONTRACTS.PARTICIPANTES.ADDRESS,
-                CONTRACTS.PARTICIPANTES.ABI,
+                CONTRACTS.Usuarios.address,
+                CONTRACTS.Usuarios.abi,
                 currentProvider
             )
 

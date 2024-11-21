@@ -13,10 +13,41 @@ export default function RegisterForm() {
     const [message, setMessage] = useState('')
     const [showMapModal, setShowMapModal] = useState(false)
 
+    // Validar el formulario antes de enviar
+    const validateForm = () => {
+        if (nombre.trim().length < 3) {
+            setMessage('El nombre debe tener al menos 3 caracteres')
+            return false
+        }
+
+        if (!gps) {
+            setMessage('Por favor seleccione una ubicación en el mapa')
+            return false
+        }
+
+        const [lat, lng] = gps.split(',').map(Number)
+        if (isNaN(lat) || isNaN(lng)) {
+            setMessage('Coordenadas GPS inválidas')
+            return false
+        }
+
+        if (!rol) {
+            setMessage('Por favor seleccione un rol')
+            return false
+        }
+
+        return true
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        setIsSubmitting(true)
         setMessage('')
+
+        if (!validateForm()) {
+            return
+        }
+
+        setIsSubmitting(true)
 
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
@@ -30,8 +61,8 @@ export default function RegisterForm() {
                 },
                 body: JSON.stringify({
                     address: userAddress,
-                    nombre,
-                    rol,
+                    nombre: nombre.trim(),
+                    rol: rol.toLowerCase(),
                     gps
                 }),
             })
@@ -105,9 +136,9 @@ export default function RegisterForm() {
                         required
                     >
                         <option value="">Seleccione un rol</option>
-                        <option value="Productor">Productor</option>
-                        <option value="Fabrica">Fábrica</option>
-                        <option value="Minorista">Minorista</option>
+                        <option value="productor">Productor</option>
+                        <option value="fabrica">Fábrica</option>
+                        <option value="minorista">Minorista</option>
                     </select>
                 </div>
                 <button

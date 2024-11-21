@@ -79,6 +79,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <div className="border-t border-olive-200 my-4 opacity-50" />
                             <li>
                                 <Link href="/dashboard/admin/adduser" className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2">
+                                    <PlusIcon className="w-5 h-5" />
                                     <span className="font-medium">Añadir Usuario</span>
                                 </Link>
                             </li>

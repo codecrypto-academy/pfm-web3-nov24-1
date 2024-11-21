@@ -22,6 +22,7 @@ interface PendingRequest {
     address: string
     nombre: string
     rol: string
+    gps: string;
     timestamp: string
     status: string
 }
@@ -29,7 +30,7 @@ interface PendingRequest {
 function AdminDashboard() {
     const [participants, setParticipants] = useState<Participante[]>([])
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([])
-    const CONTRACT_ADDRESS = CONTRACTS.PARTICIPANTES.ADDRESS
+    const CONTRACT_ADDRESS = CONTRACTS.Usuarios.address
     const [isApproving, setIsApproving] = useState<number | null>(null)
     const [showMap, setShowMap] = useState(false)
     const [selectedParticipant, setSelectedParticipant] = useState<Participante | null>(null)
@@ -37,7 +38,7 @@ function AdminDashboard() {
     const fetchParticipants = async () => {
         if ((window as any).ethereum) {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
-            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.PARTICIPANTES.ABI, provider)
+            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.Usuarios.abi, provider)
             const participantsList = await contract.getUsuarios()
             setParticipants(participantsList)
         }
@@ -58,7 +59,7 @@ function AdminDashboard() {
         if ((window as any).ethereum) {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
-            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.PARTICIPANTES.ABI, signer)
+            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.Usuarios.abi, signer)
 
             const tx = await contract[isCurrentlyActive ? 'desactivarUsuario' : 'activarUsuario'](direccion)
             await tx.wait() // Wait for blockchain confirmation
@@ -71,9 +72,9 @@ function AdminDashboard() {
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
-            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.PARTICIPANTES.ABI, signer)
+            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACTS.Usuarios.abi, signer)
 
-            const tx = await contract.nuevoUsuario(request.address, request.nombre, request.rol)
+            const tx = await contract.nuevoUsuario(request.address, request.nombre, request.gps, request.rol)
             await tx.wait() // Wait for blockchain confirmation
 
             // After blockchain confirmation, remove from JSON
