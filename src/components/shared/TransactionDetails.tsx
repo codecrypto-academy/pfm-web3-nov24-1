@@ -60,9 +60,11 @@ export default function TransactionDetails({
           <h3 className="text-lg font-semibold text-olive-800">
             {transaction.product}
           </h3>
-          <span className={`px-2 py-1 rounded-full text-sm ${getEstadoColor(transaction.estado)}`}>
-            {getEstadoLabel(transaction.estado)}
-          </span>
+          <div className="flex flex-col items-end">
+            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(transaction.estado)}`}>
+              {getEstadoLabel(transaction.estado)}
+            </span>
+          </div>
         </div>
         <p className="text-sm text-olive-600">
           {formatDate(transaction.timestamp)}
@@ -76,11 +78,11 @@ export default function TransactionDetails({
               key={category}
               className={({ selected }) =>
                 classNames(
-                  'w-full py-2.5 text-sm font-medium leading-5 text-olive-700 rounded-lg',
+                  'w-full py-2.5 text-sm font-medium leading-5',
                   'focus:outline-none focus:ring-2 ring-offset-2 ring-offset-olive-400 ring-white ring-opacity-60',
                   selected
-                    ? 'bg-white shadow'
-                    : 'text-olive-500 hover:bg-white/[0.12] hover:text-olive-600'
+                    ? 'bg-white text-olive-700 shadow'
+                    : 'text-olive-500 hover:bg-olive-100 hover:text-olive-700'
                 )
               }
             >
@@ -88,7 +90,7 @@ export default function TransactionDetails({
             </Tab>
           ))}
         </Tab.List>
-        <Tab.Panels className="mt-2">
+        <Tab.Panels>
           <Tab.Panel className="bg-white rounded-xl p-3">
             <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
               <div className="sm:col-span-1">
@@ -99,28 +101,58 @@ export default function TransactionDetails({
                 <dt className="text-sm font-medium text-gray-500">Cantidad</dt>
                 <dd className="mt-1 text-sm text-gray-900">{transaction.quantity}</dd>
               </div>
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Hash de Transacción</dt>
-                <dd className="mt-1 text-sm text-gray-900">{formatAddress(transaction.id)}</dd>
-              </div>
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Bloque</dt>
-                <dd className="mt-1 text-sm text-gray-900">{transaction.blockNumber}</dd>
+              <div className="sm:col-span-2">
+                <dt className="text-sm font-medium text-gray-500">Descripción</dt>
+                <dd className="mt-1 text-sm text-gray-900">{transaction.description || 'Sin descripción'}</dd>
               </div>
             </dl>
           </Tab.Panel>
           <Tab.Panel className="bg-white rounded-xl p-3">
             <dl className="grid grid-cols-1 gap-x-4 gap-y-4">
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Descripción</dt>
-                <dd className="mt-1 text-sm text-gray-900">{transaction.description}</dd>
+              <div className="col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Atributos</dt>
+                <dd className="mt-1">
+                  {transaction.attributes.length > 0 ? (
+                    <ul className="divide-y divide-gray-200">
+                      {transaction.attributes.map((attr, index) => (
+                        <li key={index} className="py-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-900">{attr.nombre}</span>
+                            <span className="text-sm text-gray-500">{attr.valor}</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(attr.timestamp)}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500">No hay atributos</p>
+                  )}
+                </dd>
               </div>
-              {transaction.attributes.map((attr, index) => (
-                <div key={index} className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">{attr.nombre}</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{attr.valor}</dd>
+              {transaction.rawMaterials.length > 0 && (
+                <div className="col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">Materias Primas</dt>
+                  <dd className="mt-1">
+                    <ul className="divide-y divide-gray-200">
+                      {transaction.rawMaterials.map((material, index) => (
+                        <li key={index} className="py-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-900">Token #{material.tokenHijo}</span>
+                            <span className="text-sm text-gray-500">
+                              {material.cantidadUsada} unidades
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Usado en Token #{material.tokenPadre} - {formatDate(material.timestamp)}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </dd>
                 </div>
-              ))}
+              )}
             </dl>
           </Tab.Panel>
           <Tab.Panel className="bg-white rounded-xl p-3">

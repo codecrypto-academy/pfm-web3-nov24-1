@@ -146,3 +146,12 @@ forge clean
 forge build
 
 y ya finalmente forge script
+
+
+
+// PROMPT
+Vale, instrucciones importantes, antes de crear un archivo, me tienes que consultar.
+Antes de modificar un smart contract, me tienes que consultar.
+Antes de crear un smart contract, me tienes que consultar.
+Al implementar alguna funcion nueva, no borres funciones ya hechas, sin antes explicarme el porque.
+Y me hablas en Español.

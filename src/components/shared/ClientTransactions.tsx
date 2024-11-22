@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useWeb3 } from '@/context/Web3Context'
-import TransactionMap from '@/components/TransactionMap'
-import TransactionDetails from '@/components/TransactionDetails'
+import TransactionMap from '@/components/shared/TransactionMap'
+import TransactionDetails from '@/components/shared/TransactionDetails'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import { DetailedTransaction, RawMaterial, EstadoTransferencia } from '@/types/transactions'
@@ -35,54 +35,6 @@ export default function ClientTransactions({ role }: { role: string }) {
   const { address, isAuthenticated, isLoading: isAuthLoading, role: userRole } = useWeb3()
   const router = useRouter()
   const urlRole = role
-
-  // Función para aceptar una transferencia
-  const handleAcceptTransfer = async (transferId: number) => {
-    if (!address) return
-
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const tokensContract = new ethers.Contract(
-        CONTRACTS.Tokens.address,
-        CONTRACTS.Tokens.abi,
-        signer
-      )
-
-      const tx = await tokensContract.aceptarTransferencia(transferId)
-      await tx.wait()
-
-      // Recargar las transacciones
-      loadTransactions()
-    } catch (error) {
-      console.error('Error al aceptar la transferencia:', error)
-      setError('Error al aceptar la transferencia')
-    }
-  }
-
-  // Función para rechazar una transferencia
-  const handleRejectTransfer = async (transferId: number) => {
-    if (!address) return
-
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const tokensContract = new ethers.Contract(
-        CONTRACTS.Tokens.address,
-        CONTRACTS.Tokens.abi,
-        signer
-      )
-
-      const tx = await tokensContract.rechazarTransferencia(transferId)
-      await tx.wait()
-
-      // Recargar las transacciones
-      loadTransactions()
-    } catch (error) {
-      console.error('Error al rechazar la transferencia:', error)
-      setError('Error al rechazar la transferencia')
-    }
-  }
 
   // Efecto para manejar la redirección basada en el rol
   useEffect(() => {

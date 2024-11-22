@@ -1,6 +1,6 @@
 'use client'
 
-import ClientTransactions from '@/components/ClientTransactions'
+import ClientTransactions from '@/components/shared/ClientTransactions'
 
 export default function FabricaTransactionsPage() {
     return (

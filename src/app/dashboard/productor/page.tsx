@@ -1,8 +1,7 @@
-import Dashboard from '@/components/Dashboard'
-import { NextPage } from 'next'
+'use client'
 
-const ProductorPage: NextPage = () => {
-    return <Dashboard role="productor" />
+import ProductorDashboard from './components/ProductorDashboard'
+
+export default function ProductorPage() {
+    return <ProductorDashboard />
 }
-
-export default ProductorPage

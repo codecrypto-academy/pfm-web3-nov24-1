@@ -17,7 +17,7 @@ export default function Home() {
     if (isAuthenticated && role) {
       router.push(`/dashboard/${role.toLowerCase()}`)
     }
-  }, [isAuthenticated, role])
+  }, [isAuthenticated, role, router])
 
   const handleQRResult = async (result: string) => {
     // Handle the QR code result here

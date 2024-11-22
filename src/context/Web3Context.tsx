@@ -206,34 +206,30 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                     user.direccion.toLowerCase() === accounts[0].toLowerCase()
                 )
 
-                if (!currentUser && accounts[0].toLowerCase() !== adminAddress.toLowerCase()) {
-                    setWeb3Error('User data not found', 'contract')
-                    setIsAuthenticated(false)
-                    return
-                }
-
-                setAddress(accounts[0])
-                
                 if (accounts[0].toLowerCase() === adminAddress.toLowerCase()) {
                     setRole('Admin')
                     setName('Admin')
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
                     router.push('/dashboard/admin')
-                } else {
-                    const formattedRole = formatRole(currentUser.rol)
-                    setRole(formattedRole)
+                } else if (currentUser) {
+                    const userRole = currentUser.rol.toLowerCase()
+                    setRole(userRole)
                     setName(currentUser.nombre)
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
-                    router.push(`/dashboard/${currentUser.rol.toLowerCase()}`)
+                    router.push(`/dashboard/${userRole}`)
+                } else {
+                    setWeb3Error('User data not found', 'contract')
+                    setIsAuthenticated(false)
+                    return
                 }
 
                 try {
                     localStorage.setItem('web3Auth', JSON.stringify({
                         address: accounts[0],
-                        role: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : formatRole(currentUser.rol),
-                        name: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : currentUser.nombre
+                        role: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : currentUser?.rol ? currentUser.rol.toLowerCase() : '',
+                        name: accounts[0].toLowerCase() === adminAddress.toLowerCase() ? 'Admin' : currentUser?.nombre || ''
                     }))
                 } catch (storageError) {
                     console.error('Failed to save auth state:', storageError)
