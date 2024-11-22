@@ -635,13 +635,6 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                                 >
                                                                     <PlusIcon className="h-5 w-5" />
                                                                 </button>
-                                                                <button
-                                                                    onClick={() => handleTransferClick(token)}
-                                                                    className="p-2 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-full transition-colors"
-                                                                    title="Transferir"
-                                                                >
-                                                                    <ArrowRightIcon className="h-5 w-5" />
-                                                                </button>
                                                             </div>
                                                         </td>
                                                     </tr>
