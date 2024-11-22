@@ -13,7 +13,6 @@ interface Attribute {
 export default function AddProduct() {
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
-  const [cantidad, setCantidad] = useState('')
   const [atributos, setAtributos] = useState<Attribute[]>([{ nombre: '', valor: '' }])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -43,46 +42,129 @@ export default function AddProduct() {
     setSuccess(false)
 
     try {
+      // Validaciones mejoradas
+      if (!nombre.trim()) {
+        throw new Error('El nombre del producto es requerido')
+      }
+
+      // Filtrar atributos vacíos
+      const atributosFiltrados = atributos.filter(
+        attr => attr.nombre.trim() && attr.valor.trim()
+      )
+
+      if (atributosFiltrados.length === 0) {
+        throw new Error('Debe agregar al menos un atributo válido')
+      }
+
+      // Validar que no haya nombres de atributos duplicados
+      const nombresUnicos = new Set(atributosFiltrados.map(attr => attr.nombre.trim()))
+      if (nombresUnicos.size !== atributosFiltrados.length) {
+        throw new Error('Los nombres de los atributos no pueden estar duplicados')
+      }
+
+      // Preparar los arrays de atributos (ya filtrados y trimmed)
+      const nombresAtributos = atributosFiltrados.map(attr => attr.nombre.trim())
+      const valoresAtributos = atributosFiltrados.map(attr => attr.valor.trim())
+
+      // Crear una nueva instancia del contrato con el signer
       const provider = new ethers.BrowserProvider(window.ethereum)
       const signer = await provider.getSigner()
-      const contract = new ethers.Contract(
+      
+      // Verificar que el usuario está conectado
+      if (!address) {
+        throw new Error('Por favor, conecta tu wallet primero')
+      }
+
+      console.log('Dirección del usuario:', address)
+
+      // Verificar que el usuario está registrado
+      const usuariosContract = new ethers.Contract(
+        CONTRACTS.Usuarios.address,
+        CONTRACTS.Usuarios.abi,
+        signer
+      )
+
+      console.log('Verificando registro de usuario...')
+      const esUsuarioRegistrado = await usuariosContract.esUsuario(address)
+      console.log('¿Usuario registrado?:', esUsuarioRegistrado)
+
+      const estaActivo = await usuariosContract.estaActivo(address)
+      console.log('¿Usuario activo?:', estaActivo)
+
+      if (!esUsuarioRegistrado) {
+        throw new Error('Tu dirección no está registrada en el sistema. Contacta al administrador.')
+      }
+
+      if (!estaActivo) {
+        throw new Error('Tu usuario está desactivado. Contacta al administrador.')
+      }
+
+      // Crear el contrato de tokens
+      const tokensContract = new ethers.Contract(
         CONTRACTS.Tokens.address,
         CONTRACTS.Tokens.abi,
         signer
       )
 
-      // Validar campos
-      if (!nombre || !cantidad || atributos.some(attr => !attr.nombre || !attr.valor)) {
-        throw new Error('Por favor, complete todos los campos requeridos')
-      }
+      // Obtener el balance de ETH del usuario
+      const balance = await provider.getBalance(address)
+      console.log('Balance de ETH:', ethers.formatEther(balance), 'ETH')
 
-      // Preparar los arrays de atributos
-      const nombresAtributos = atributos.map(attr => attr.nombre)
-      const valoresAtributos = atributos.map(attr => attr.valor)
+      console.log('Datos a enviar:', {
+        nombre: nombre.trim(),
+        cantidad: 0,
+        descripcion: descripcion.trim() || '',
+        nombresAtributos,
+        valoresAtributos
+      })
 
-      // Convertir la cantidad a tokens (multiplicar por 1000)
-      const cantidadTokens = Number(cantidad) * 1000
-
-      // Crear el token
-      const tx = await contract.crearToken(
-        nombre,
-        cantidadTokens,
-        descripcion || '',
+      // Enviar la transacción sin estimación de gas
+      const tx = await tokensContract.crearToken(
+        nombre.trim(),
+        0,
+        descripcion.trim() || '',
         nombresAtributos,
         valoresAtributos
       )
 
-      await tx.wait()
+      console.log('Transacción enviada:', tx.hash)
+      
+      // Esperar a que la transacción se confirme
+      const receipt = await tx.wait()
+      console.log('Transacción confirmada:', receipt)
+      
       setSuccess(true)
       
       // Limpiar el formulario
       setNombre('')
       setDescripcion('')
-      setCantidad('')
       setAtributos([{ nombre: '', valor: '' }])
-    } catch (err) {
-      console.error('Error al crear el token:', err)
-      setError(err instanceof Error ? err.message : 'Error al crear el token')
+    } catch (error: any) {
+      console.error('Error detallado:', {
+        error,
+        message: error.message,
+        code: error.code,
+        reason: error.reason,
+        data: error.data
+      })
+      
+      // Manejo de errores específicos
+      if (typeof error.message === 'string') {
+        if (error.message.includes('user rejected')) {
+          setError('Transacción rechazada por el usuario')
+        } else if (error.message.includes('insufficient funds')) {
+          setError('Fondos insuficientes para realizar la transacción')
+        } else if (error.message.includes('Los arrays de atributos')) {
+          setError('Error en los atributos: ' + error.message)
+        } else if (error.message.includes('execution reverted')) {
+          setError('Error en el contrato: La transacción fue revertida. Verifica que tienes los permisos necesarios.')
+        } else {
+          const errorMessage = error.message || error.reason || 'Error desconocido'
+          setError('Error al crear el producto: ' + errorMessage)
+        }
+      } else {
+        setError('Error desconocido al crear el producto')
+      }
     } finally {
       setLoading(false)
     }
@@ -91,15 +173,15 @@ export default function AddProduct() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
       <div>
-        <h2 className="text-2xl font-bold text-olive-800 mb-6">Crear Nuevo Producto</h2>
+        <h2 className="text-2xl font-bold text-olive-900">Crear Nuevo Producto</h2>
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+            <p className="text-red-700">{error}</p>
           </div>
         )}
         {success && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-            Producto creado exitosamente
+          <div className="bg-green-50 border-l-4 border-green-400 p-4">
+            <p className="text-green-700">¡Producto creado exitosamente! Ahora puedes crear remesas de este producto.</p>
           </div>
         )}
       </div>
@@ -128,21 +210,6 @@ export default function AddProduct() {
           onChange={(e) => setDescripcion(e.target.value)}
           rows={3}
           className="mt-1 block w-full rounded-md border-olive-300 shadow-sm focus:border-olive-500 focus:ring-olive-500"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="cantidad" className="block text-sm font-medium text-olive-700">
-          Cantidad *
-        </label>
-        <input
-          type="number"
-          id="cantidad"
-          value={cantidad}
-          onChange={(e) => setCantidad(e.target.value)}
-          className="mt-1 block w-full rounded-md border-olive-300 shadow-sm focus:border-olive-500 focus:ring-olive-500"
-          required
-          min="1"
         />
       </div>
 

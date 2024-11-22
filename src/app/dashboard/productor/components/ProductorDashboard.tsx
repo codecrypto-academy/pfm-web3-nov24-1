@@ -396,8 +396,9 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 provider
             )
 
-            const token = await contract.tokens(tokenId)
-            return Number(token.balances[address])
+            // Use the getBalance function instead of trying to access the mapping directly
+            const balance = await contract.getBalance(tokenId, address)
+            return Number(balance)
         } catch (error) {
             console.error('Error al obtener balance:', error)
             return 0
@@ -406,6 +407,12 @@ const ProductorDashboard: FC = (): React.ReactElement => {
 
     // Función para obtener el balance de la fábrica
     const checkFactoryBalance = async (tokenId: number, factoryAddress: string) => {
+        if (!factoryAddress) {
+            console.error('No factory address provided');
+            setFactoryBalance('No se ha seleccionado una fábrica');
+            return;
+        }
+
         try {
             const balance = await getTokenBalance(tokenId, factoryAddress);
             setFactoryBalance(`Balance de la fábrica: ${Number(balance)/1000} kg`);
@@ -418,7 +425,13 @@ const ProductorDashboard: FC = (): React.ReactElement => {
     // Función para transferir tokens
     const handleTransfer = async () => {
         if (!selectedToken || !selectedFactory || !transferQuantity || !address) {
-            console.error('Faltan datos para la transferencia');
+            console.error('Faltan datos para la transferencia', {
+                selectedToken,
+                selectedFactory,
+                transferQuantity,
+                address
+            });
+            alert('Por favor, completa todos los campos antes de transferir.');
             return;
         }
 
@@ -466,7 +479,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
             }
 
             // Verificar el balance antes de transferir
-            const balance = await contract.getBalance(selectedToken.id, address);
+            const balance = await getTokenBalance(selectedToken.id, address);
             console.log('Current balance:', Number(balance));
             console.log('Attempting to transfer:', totalTokens);
 
@@ -475,7 +488,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 return;
             }
 
-            console.log('Transferring token:', {
+            console.log('Iniciando transferencia:', {
                 tokenId: selectedToken.id,
                 from: address,
                 to: selectedFactory,
@@ -489,11 +502,16 @@ const ProductorDashboard: FC = (): React.ReactElement => {
             )
 
             await tx.wait()
+            
+            // Recargar balances y datos
             await checkFactoryBalance(selectedToken.id, selectedFactory);
-            reloadTokens()
+            await reloadTokens();
+            
             setIsTransferModalOpen(false)
             setTransferQuantity('')
             setSelectedFactory('')
+            
+            alert('Transferencia iniciada con éxito');
         } catch (error) {
             console.error('Error en la transferencia:', error)
             alert('Error al transferir tokens: ' + (error instanceof Error ? error.message : 'Error desconocido'))

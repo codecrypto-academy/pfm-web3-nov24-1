@@ -7,6 +7,10 @@ import { useWeb3 } from '@/context/Web3Context'
 export default function Header() {
     const router = useRouter()
     const { role, address, name, disconnect } = useWeb3()
+    
+    // Logs para debugging
+    console.log('Header Data:', { role, address, name })
+
     const handleLogout = () => {
         disconnect()
         router.push('/')
@@ -21,11 +25,13 @@ export default function Header() {
                 <div className="header-info-container">
                     <div className="header-text-container">
                         <span className="header-role">
-                            {name}:
+                            {name}
                         </span>
-                        <span className="header-account">
-                            {address && `${address.slice(0, 6)}...${address.slice(-4)}`}
-                        </span>
+                        {address && (
+                            <span className="header-account ml-2 text-gray-600">
+                                ({`${address.slice(0, 6)}...${address.slice(-4)}`})
+                            </span>
+                        )}
                     </div>
                     <button
                         className="header-icon-btn p-2 rounded-lg hover:bg-olive-600/10 transition-colors"

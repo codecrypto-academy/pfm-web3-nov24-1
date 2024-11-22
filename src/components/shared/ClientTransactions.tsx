@@ -103,17 +103,40 @@ export default function ClientTransactions({ role }: { role: string }) {
       const usuarios = await usuariosContract.getUsuarios()
       console.log('Usuarios cargados:', usuarios.length)
 
-      // Cargar transferencias pendientes si es fábrica
+      // Cargar transferencias pendientes
       let pendingTransferIds: number[] = []
-      if (role === 'fabrica') {
-        pendingTransferIds = await tokensContract.getTransferenciasPendientes(address)
+      if (role === 'fabrica' || role === 'productor') {
+        try {
+          // Get pending transfers where user is receiver
+          const receiverPending = await tokensContract.getTransferenciasPendientes(address)
+          pendingTransferIds = Array.from(receiverPending).map(id => Number(id))
+          console.log('Pending transfers:', pendingTransferIds)
+          
+          // Log details of each pending transfer
+          for (const id of pendingTransferIds) {
+            try {
+              const transfer = await tokensContract.transfers(id)
+              console.log('Transfer details:', {
+                id,
+                tokenId: transfer.tokenId.toString(),
+                from: transfer.from.toLowerCase(),
+                to: transfer.to.toLowerCase(),
+                estado: Number(transfer.estado)
+              })
+            } catch (error) {
+              console.error('Error getting transfer details:', error)
+            }
+          }
+        } catch (error) {
+          console.error('Error loading pending transfers:', error)
+        }
       }
 
       // Cargar transacciones
       const filter = tokensContract.filters.TokenTransferido()
       const latestBlock = await provider.getBlockNumber()
       const rawEvents = await tokensContract.queryFilter(filter, 0, latestBlock)
-      console.log(`Encontradas ${rawEvents.length} transacciones`)
+      console.log(`Encontradas ${rawEvents.length} transacciones totales`)
 
       // Filtrar eventos válidos y por rol
       const events = rawEvents
@@ -130,12 +153,20 @@ export default function ClientTransactions({ role }: { role: string }) {
 
           if (!userAddress) return false
 
-          if (role === 'productor') {
-            return from === userAddress
-          } else if (role === 'fabrica') {
-            return to === userAddress
+          const isRelevant = role === 'productor' 
+            ? (from === userAddress || to === userAddress)
+            : (role === 'fabrica' ? to === userAddress : false)
+
+          if (isRelevant) {
+            console.log('Evento relevante encontrado:', {
+              tokenId: event.args[0].toString(),
+              from,
+              to,
+              cantidad: event.args[3].toString()
+            })
           }
-          return from === userAddress || to === userAddress
+
+          return isRelevant
         })
 
       console.log(`Filtradas ${events.length} transacciones para el rol ${role}`)
@@ -185,25 +216,29 @@ export default function ClientTransactions({ role }: { role: string }) {
               // Determinar el estado de la transferencia
               let estado = EstadoTransferencia.COMPLETADA
               let transferId = 0
+
+              // Buscar la transferencia en el contrato
+              const transferFilter = tokensContract.filters.TokenTransferido(tokenId, from, to)
+              const transferEvents = await tokensContract.queryFilter(transferFilter)
               
-              // Si es una transferencia pendiente, actualizar su estado
-              if (pendingTransferIds.length > 0) {
-                for (const id of pendingTransferIds) {
-                  const transfer = await tokensContract.transfers(id)
-                  if (transfer.tokenId.toString() === tokenId.toString() &&
-                      transfer.from.toLowerCase() === fromAddress &&
-                      transfer.to.toLowerCase() === toAddress) {
-                    console.log('Estado de transferencia:', Number(transfer.estado))
-                    // Asegurarse de que el estado sea un número válido del enum
-                    const estadoNum = Number(transfer.estado)
-                    if (estadoNum >= 0 && estadoNum <= 2) {
-                      estado = estadoNum
-                    } else {
-                      console.warn('Estado de transferencia inválido:', estadoNum)
-                      estado = EstadoTransferencia.COMPLETADA // valor por defecto
+              if (transferEvents.length > 0) {
+                // Obtener el último evento de transferencia
+                const lastTransferEvent = transferEvents[transferEvents.length - 1]
+                const blockNumber = lastTransferEvent.blockNumber
+
+                // Buscar todas las transferencias para este token
+                for (let i = 0; i < await tokensContract.siguienteTransferId(); i++) {
+                  try {
+                    const transfer = await tokensContract.transfers(i)
+                    if (transfer.tokenId.toString() === tokenId.toString() &&
+                        transfer.from.toLowerCase() === fromAddress &&
+                        transfer.to.toLowerCase() === toAddress) {
+                      transferId = i
+                      estado = Number(transfer.estado)
+                      break
                     }
-                    transferId = id
-                    break
+                  } catch (error) {
+                    console.error('Error al obtener transferencia:', error)
                   }
                 }
               }

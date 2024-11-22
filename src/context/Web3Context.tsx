@@ -209,6 +209,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 if (accounts[0].toLowerCase() === adminAddress.toLowerCase()) {
                     setRole('Admin')
                     setName('Admin')
+                    setAddress(accounts[0])
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
                     router.push('/dashboard/admin')
@@ -216,6 +217,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                     const userRole = currentUser.rol.toLowerCase()
                     setRole(userRole)
                     setName(currentUser.nombre)
+                    setAddress(accounts[0])
                     setIsAuthenticated(true)
                     setIsUnregistered(false)
                     router.push(`/dashboard/${userRole}`)
@@ -268,20 +270,49 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                     const accounts = await window.ethereum.request({ method: 'eth_accounts' })
                     const currentAddress = accounts[0]?.toLowerCase()
 
-                    if (currentAddress === savedAddress.toLowerCase()) {
+                    if (currentAddress && currentAddress === savedAddress.toLowerCase()) {
                         // Verificar que la red es correcta
                         const networkValid = await checkNetwork()
                         if (!networkValid) {
                             throw new Error('Invalid network')
                         }
 
-                        setAddress(savedAddress)
-                        setRole(savedRole)
-                        setName(savedName)
-                        setIsAuthenticated(true)
-                        setIsUnregistered(false)
+                        // Verificar que el usuario sigue siendo válido y activo
+                        let currentProvider = provider
+                        if (!currentProvider) {
+                            currentProvider = await initializeProvider()
+                            if (!currentProvider) {
+                                throw new Error('Failed to initialize provider')
+                            }
+                        }
+
+                        const usuariosContract = new ethers.Contract(
+                            CONTRACTS.Usuarios.address,
+                            CONTRACTS.Usuarios.abi,
+                            currentProvider
+                        )
+
+                        const adminAddress = await usuariosContract.admin()
+                        const isUser = await usuariosContract.esUsuario(currentAddress)
+                        const isActive = isUser ? await usuariosContract.estaActivo(currentAddress) : false
+
+                        if ((currentAddress === adminAddress.toLowerCase()) || (isUser && isActive)) {
+                            setAddress(savedAddress)
+                            setRole(savedRole)
+                            setName(savedName)
+                            setIsAuthenticated(true)
+                            setIsUnregistered(false)
+                            
+                            // Solo redirigir si no estamos ya en la ruta correcta
+                            const targetRoute = `/dashboard/${savedRole.toLowerCase()}`
+                            if (window.location.pathname !== targetRoute) {
+                                router.push(targetRoute)
+                            }
+                        } else {
+                            throw new Error('User no longer valid or inactive')
+                        }
                     } else {
-                        throw new Error('Account mismatch')
+                        throw new Error('Account mismatch or not connected')
                     }
                 }
             } catch (error) {
@@ -291,6 +322,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 setAddress('')
                 setRole('')
                 setName('')
+                router.push('/')
             } finally {
                 setIsLoading(false)
             }
@@ -325,8 +357,9 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
         } else {
             // Si no hay window.ethereum, terminar la carga
             setIsLoading(false)
+            router.push('/')
         }
-    }, [disconnect, handleAccountsChanged, checkNetwork])
+    }, [disconnect, handleAccountsChanged, checkNetwork, provider, initializeProvider, router])
 
     return (
         <Web3Context.Provider
