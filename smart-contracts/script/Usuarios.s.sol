@@ -12,14 +12,6 @@ contract UsuariosDeploy is Script {
 
         Usuarios usuarios = new Usuarios();
         
-        // Registrar la cuenta de prueba como productor
-        usuarios.nuevoUsuario(
-            0x70997970C51812dc3A010C7d01b50e0d17dc79C8,
-            "Productor Test",
-            "GPS Test",
-            "Productor"
-        );
-
         console2.log("Usuarios contract deployed at:", address(usuarios));
 
         vm.stopBroadcast();
