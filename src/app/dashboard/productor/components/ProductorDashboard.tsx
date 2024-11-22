@@ -1,70 +1,16 @@
 'use client'
+
 import { useWeb3 } from '@/context/Web3Context'
 import { useState, useEffect, useCallback } from 'react'
-import { ethers, EventLog, Log } from 'ethers'
+import { ethers, EventLog } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import React from 'react'
 import { FC } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRightIcon, PlusIcon } from '@heroicons/react/24/outline'
-import Link from 'next/link'
-import { createPortal } from 'react-dom'
-
-// Declaración de tipos para window.ethereum
-declare global {
-    interface Window {
-        ethereum?: any;
-    }
-}
-
-interface TokenAttribute {
-    nombre: string;     // Nombre del atributo
-    valor: string;      // Valor del atributo
-    timestamp: number;  // Timestamp de cuando se añadió
-}
-
-interface RelatedToken {
-    id: number;
-    cantidad: number;
-    timestamp: number;
-}
-
-interface Token {
-    id: number;
-    nombre: string;
-    descripcion?: string;
-    creador: string;
-    cantidad: number;
-    timestamp: number;
-    isProcesado?: boolean;
-    tokenPadre?: string;
-    atributos: { [key: string]: TokenAttribute };  // Cambiado a un objeto para reflejar el mapping
-    nombresAtributos: string[];                    // Array para iterar sobre los atributos
-    relatedTokens: RelatedToken[];
-}
-
-// Definir la interfaz para los argumentos del evento
-interface TransferEventArgs {
-    tokenId: bigint;
-    from: string;
-    to: string;
-    cantidad: bigint;
-}
-
-interface TokenTransferidoEvent extends Omit<EventLog, 'args'> {
-    args: TransferEventArgs;
-}
-
-interface CreatedEventArgs {
-    id: bigint;
-    nombre: string;
-    creador: string;
-    cantidad: bigint;
-}
-
-interface TokenCreadoEvent extends Omit<EventLog, 'args'> {
-    args: CreatedEventArgs;
-}
+import { PlusIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
+import { Token, TokenTransferidoEvent, TokenCreadoEvent, TokenAttribute, RelatedToken } from '../types'
+import CreateBatchModal from './modals/CreateBatchModal'
+import TransferModal from './modals/TransferModal'
 
 const ProductorDashboard: FC = (): React.ReactElement => {
     const { address, isAuthenticated, isLoading: isAuthLoading, role: userRole } = useWeb3()
@@ -75,15 +21,15 @@ const ProductorDashboard: FC = (): React.ReactElement => {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
     const [selectedToken, setSelectedToken] = useState<Token | null>(null)
-    const [newQuantity, setNewQuantity] = useState('')
-    const [transferQuantity, setTransferQuantity] = useState('')
-    const [selectedFactory, setSelectedFactory] = useState('')
     const [factories, setFactories] = useState<{ direccion: string; nombre: string }[]>([])
-    const [factoryBalance, setFactoryBalance] = useState<string>('')
     const [lastUpdate, setLastUpdate] = useState(Date.now())
-    const [newDescription, setNewDescription] = useState('')
-    const [newAttributes, setNewAttributes] = useState<{ nombre: string; valor: string; timestamp: number }[]>([])
     const router = useRouter()
+    const [newQuantity, setNewQuantity] = useState('')
+    const [newDescription, setNewDescription] = useState('')
+    const [newAttributes, setNewAttributes] = useState<TokenAttribute[]>([])
+    const [selectedFactory, setSelectedFactory] = useState('')
+    const [transferQuantity, setTransferQuantity] = useState('')
+    const [factoryBalance, setFactoryBalance] = useState('')
 
     useEffect(() => {
         if (isAuthLoading) return
@@ -146,22 +92,27 @@ const ProductorDashboard: FC = (): React.ReactElement => {
 
             // Get the latest block number
             const latestBlock = await provider.getBlockNumber()
-            // Get events from the last 1000 blocks or from block 0 if chain is shorter
-            const fromBlock = Math.max(0, latestBlock - 1000)
+            // Get events from block 0 to ensure we capture all events
+            const fromBlock = 0
+            
+            console.log('Buscando eventos desde el bloque', fromBlock, 'hasta', latestBlock);
             
             // Get all creation events first
             const creationFilter = contract.filters.TokenCreado()
             const creationEvents = await retryRPC(() => contract.queryFilter(creationFilter, fromBlock, latestBlock))
+            console.log('Eventos de creación encontrados:', creationEvents.length);
             const typedCreationEvents = creationEvents.filter((e): e is TokenCreadoEvent => e instanceof EventLog)
             
             // Filter creation events by creator
             const myCreatedTokens = typedCreationEvents.filter(event =>
                 event.args.creador.toLowerCase() === address?.toLowerCase()
             )
+            console.log('Mis tokens creados:', myCreatedTokens.length);
 
             // Get transfer events
             const transferFilter = contract.filters.TokenTransferido()
             const transferEvents = await retryRPC(() => contract.queryFilter(transferFilter, fromBlock, latestBlock))
+            console.log('Eventos de transferencia encontrados:', transferEvents.length);
             const typedTransferEvents = transferEvents.filter((e): e is TokenTransferidoEvent => e instanceof EventLog)
             
             // Filter transfer events where user is involved
@@ -452,6 +403,54 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 return;
             }
 
+            // Verificar que la fábrica existe y está activa en el contrato de Usuarios
+            const usuariosContract = new ethers.Contract(
+                CONTRACTS.Usuarios.address,
+                CONTRACTS.Usuarios.abi,
+                provider
+            )
+
+            try {
+                console.log('Verificando fábrica:', selectedFactory);
+                const [existe, estaActivo] = await Promise.all([
+                    usuariosContract.esUsuario(selectedFactory),
+                    usuariosContract.estaActivo(selectedFactory)
+                ]);
+
+                console.log('Resultado verificación:', { existe, estaActivo });
+
+                if (!existe) {
+                    alert('Error: La dirección de la fábrica no existe en el sistema');
+                    return;
+                }
+
+                if (!estaActivo) {
+                    alert('Error: La fábrica seleccionada no está activa');
+                    return;
+                }
+
+                // Obtener el rol usando getUsuarios y getIndiceUsuario
+                console.log('Obteniendo índice del usuario...');
+                const indice = await usuariosContract.getIndiceUsuario(selectedFactory);
+                console.log('Índice obtenido:', indice);
+                
+                console.log('Obteniendo lista de usuarios...');
+                const usuarios = await usuariosContract.getUsuarios();
+                console.log('Usuarios obtenidos:', usuarios);
+                
+                const usuario = usuarios[indice];
+                console.log('Usuario encontrado:', usuario);
+
+                if (usuario[3].toLowerCase() !== 'fabrica') {
+                    alert('Error: La dirección seleccionada no corresponde a una fábrica');
+                    return;
+                }
+            } catch (error) {
+                console.error('Error verificando la fábrica:', error);
+                alert('Error al verificar la fábrica seleccionada');
+                return;
+            }
+
             const contract = new ethers.Contract(
                 CONTRACTS.Tokens.address,
                 CONTRACTS.Tokens.abi,
@@ -463,18 +462,6 @@ const ProductorDashboard: FC = (): React.ReactElement => {
             // Verificar que el destinatario no sea el mismo que el remitente
             if (address.toLowerCase() === selectedFactory.toLowerCase()) {
                 alert('No puedes transferir tokens a tu propia dirección');
-                return;
-            }
-
-            // Verificar que el destinatario es un usuario activo
-            const usuariosContract = new ethers.Contract(
-                CONTRACTS.Usuarios.address,
-                CONTRACTS.Usuarios.abi,
-                provider
-            )
-            const isActive = await usuariosContract.estaActivo(selectedFactory);
-            if (!isActive) {
-                alert('El destinatario no es un usuario activo');
                 return;
             }
 
@@ -492,7 +479,9 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 tokenId: selectedToken.id,
                 from: address,
                 to: selectedFactory,
-                amount: totalTokens
+                amount: totalTokens,
+                tokensContract: CONTRACTS.Tokens.address,
+                usuariosContract: CONTRACTS.Usuarios.address
             });
 
             const tx = await contract.iniciarTransferencia(
@@ -501,17 +490,15 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 totalTokens
             )
 
+            console.log('Esperando confirmación de la transacción...');
             await tx.wait()
-            
-            // Recargar balances y datos
-            await checkFactoryBalance(selectedToken.id, selectedFactory);
-            await reloadTokens();
-            
-            setIsTransferModalOpen(false)
-            setTransferQuantity('')
-            setSelectedFactory('')
-            
-            alert('Transferencia iniciada con éxito');
+            console.log('Transacción confirmada');
+
+            // Actualizar el estado
+            setLastUpdate(Date.now())
+            await reloadTokens()
+
+            alert('Transferencia iniciada con éxito')
         } catch (error) {
             console.error('Error en la transferencia:', error)
             alert('Error al transferir tokens: ' + (error instanceof Error ? error.message : 'Error desconocido'))
@@ -699,208 +686,53 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center text-gray-500">
-                                <p>No hay tokens disponibles</p>
+                            <div className="text-center py-8">
+                                <p className="text-gray-500">No hay tokens disponibles</p>
                             </div>
                         )}
                     </div>
                 )}
             </div>
 
-            {/* Modal para crear nuevo lote */}
-            {isModalOpen && selectedToken && createPortal(
-                <div className="fixed inset-0 flex items-center justify-center z-[9999]">
-                    <div className="fixed inset-0 bg-black opacity-50"></div>
-                    <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 relative z-[10000] max-h-[90vh] overflow-y-auto">
-                        <div className="space-y-6">
-                            <div className="border-b pb-4">
-                                <h3 className="text-xl font-bold text-gray-900">
-                                    Nuevo Lote: {selectedToken.nombre}
-                                </h3>
-                            </div>
+            {/* Modales */}
+            <CreateBatchModal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false)
+                    setSelectedToken(null)
+                    setNewQuantity('')
+                    setNewDescription('')
+                    setNewAttributes([])
+                }}
+                token={selectedToken}
+                onSubmit={createNewLot}
+                quantity={newQuantity}
+                setQuantity={setNewQuantity}
+                description={newDescription}
+                setDescription={setNewDescription}
+                attributes={newAttributes}
+                setAttributes={setNewAttributes}
+            />
 
-                            <div className="grid grid-cols-1 gap-6">
-                                <div>
-                                    <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
-                                        Cantidad (kg)
-                                    </label>
-                                    <input
-                                        id="quantity"
-                                        type="number"
-                                        value={newQuantity}
-                                        onChange={(e) => setNewQuantity(e.target.value)}
-                                        className="mt-1 w-full p-3 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
-                                        placeholder="Ingrese la cantidad en kg"
-                                        min="0"
-                                        step="0.001"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                                        Descripción
-                                    </label>
-                                    <textarea
-                                        id="description"
-                                        value={newDescription}
-                                        onChange={(e) => setNewDescription(e.target.value)}
-                                        className="mt-1 w-full p-3 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
-                                        placeholder="Descripción del lote"
-                                        rows={3}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Atributos del Lote
-                                    </label>
-                                    <div className="space-y-4">
-                                        {Object.keys(selectedToken.atributos).map((atributo, index) => (
-                                            <div key={index} className="flex flex-col space-y-2">
-                                                <label className="text-sm font-medium text-gray-600">
-                                                    {atributo}
-                                                </label>
-                                                <select
-                                                    value={newAttributes.find(attr => attr.nombre === atributo)?.valor || ''}
-                                                    onChange={(e) => {
-                                                        const updatedAttrs = [...newAttributes];
-                                                        const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
-                                                        
-                                                        if (existingIndex >= 0) {
-                                                            updatedAttrs[existingIndex] = {
-                                                                nombre: atributo,
-                                                                valor: e.target.value,
-                                                                timestamp: Date.now()
-                                                            };
-                                                        } else {
-                                                            updatedAttrs.push({
-                                                                nombre: atributo,
-                                                                valor: e.target.value,
-                                                                timestamp: Date.now()
-                                                            });
-                                                        }
-                                                        
-                                                        setNewAttributes(updatedAttrs);
-                                                    }}
-                                                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
-                                                >
-                                                    <option value="">Seleccionar {atributo}</option>
-                                                    {selectedToken.atributos[atributo].valor.split(',').map((opcion, idx) => (
-                                                        <option key={idx} value={opcion.trim()}>
-                                                            {opcion.trim()}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-6 border-t">
-                                <button
-                                    onClick={() => {
-                                        setIsModalOpen(false)
-                                        setNewQuantity('')
-                                        setNewDescription('')
-                                        setNewAttributes([])
-                                        setSelectedToken(null)
-                                    }}
-                                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={() => createNewLot(selectedToken, newQuantity)}
-                                    className="px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={!newQuantity || Number(newQuantity) <= 0}
-                                >
-                                    Crear Lote
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
-
-            {/* Modal de Transferencia */}
-            {isTransferModalOpen && selectedToken && createPortal(
-                <div className="fixed inset-0 flex items-center justify-center z-[9999]">
-                    <div className="fixed inset-0 bg-black opacity-50"></div>
-                    <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 relative z-[10000]">
-                        <div className="space-y-6">
-                            <div className="border-b pb-4">
-                                <h2 className="text-xl font-bold text-gray-900">Transferir Token</h2>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Balance disponible: {selectedToken.cantidad / 1000} kg
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Seleccionar Destino
-                                    </label>
-                                    <select
-                                        value={selectedFactory}
-                                        onChange={(e) => setSelectedFactory(e.target.value)}
-                                        className="w-full p-3 border rounded-md shadow-sm focus:ring-2 focus:ring-olive-500 focus:border-olive-500"
-                                    >
-                                        <option value="">Seleccionar Fábrica</option>
-                                        {factories.map((factory) => (
-                                            <option key={factory.direccion} value={factory.direccion}>
-                                                {factory.nombre}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Cantidad a Transferir
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={transferQuantity}
-                                        onChange={(e) => setTransferQuantity(e.target.value)}
-                                        className="w-full p-3 border rounded-md shadow-sm focus:ring-2 focus:ring-olive-500 focus:border-olive-500"
-                                        placeholder="Cantidad en kg"
-                                    />
-                                </div>
-
-                                {factoryBalance && (
-                                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
-                                        {factoryBalance}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-6 border-t">
-                                <button
-                                    onClick={() => {
-                                        setIsTransferModalOpen(false)
-                                        setTransferQuantity('')
-                                        setSelectedFactory('')
-                                        setSelectedToken(null)
-                                    }}
-                                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleTransfer}
-                                    disabled={!selectedFactory || !transferQuantity || Number(transferQuantity) <= 0}
-                                    className="px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Transferir
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+            <TransferModal
+                isOpen={isTransferModalOpen}
+                onClose={() => {
+                    setIsTransferModalOpen(false)
+                    setSelectedToken(null)
+                    setSelectedFactory('')
+                    setTransferQuantity('')
+                    setFactoryBalance('')
+                }}
+                token={selectedToken}
+                onSubmit={handleTransfer}
+                factories={factories}
+                selectedFactory={selectedFactory}
+                setSelectedFactory={setSelectedFactory}
+                quantity={transferQuantity}
+                setQuantity={setTransferQuantity}
+                factoryBalance={factoryBalance}
+                onFactorySelect={checkFactoryBalance}
+            />
         </>
     )
 }

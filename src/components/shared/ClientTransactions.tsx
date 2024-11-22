@@ -217,29 +217,48 @@ export default function ClientTransactions({ role }: { role: string }) {
               let estado = EstadoTransferencia.COMPLETADA
               let transferId = 0
 
-              // Buscar la transferencia en el contrato
-              const transferFilter = tokensContract.filters.TokenTransferido(tokenId, from, to)
+              // Buscar todas las transferencias para este token
+              const transferFilter = tokensContract.filters.TokenTransferido()
               const transferEvents = await tokensContract.queryFilter(transferFilter)
               
-              if (transferEvents.length > 0) {
+              // Filtrar los eventos que coincidan con el tokenId y las direcciones
+              const relevantTransfers = transferEvents.filter(event => {
+                if (!('args' in event)) return false
+                const args = event.args
+                return args[0] === tokenId && 
+                       args[1].toLowerCase() === from.toLowerCase() && 
+                       args[2].toLowerCase() === to.toLowerCase()
+              })
+              
+              if (relevantTransfers.length > 0) {
                 // Obtener el último evento de transferencia
-                const lastTransferEvent = transferEvents[transferEvents.length - 1]
-                const blockNumber = lastTransferEvent.blockNumber
-
-                // Buscar todas las transferencias para este token
-                for (let i = 0; i < await tokensContract.siguienteTransferId(); i++) {
-                  try {
-                    const transfer = await tokensContract.transfers(i)
-                    if (transfer.tokenId.toString() === tokenId.toString() &&
-                        transfer.from.toLowerCase() === fromAddress &&
-                        transfer.to.toLowerCase() === toAddress) {
-                      transferId = i
-                      estado = Number(transfer.estado)
-                      break
+                const lastTransferEvent = relevantTransfers[relevantTransfers.length - 1]
+                
+                try {
+                  // Obtener las transferencias pendientes del destinatario
+                  const pendingTransfers = await tokensContract.getTransferenciasPendientes(to)
+                  
+                  // Si hay transferencias pendientes, el estado es EN_TRANSITO
+                  if (pendingTransfers.length > 0) {
+                    estado = EstadoTransferencia.EN_TRANSITO
+                    // Buscar el ID de la transferencia que coincide
+                    for (const id of pendingTransfers) {
+                      try {
+                        const transfer = await tokensContract.transfers(id)
+                        if (transfer.tokenId.toString() === tokenId.toString() &&
+                            transfer.from.toLowerCase() === from.toLowerCase() &&
+                            transfer.to.toLowerCase() === to.toLowerCase()) {
+                          transferId = id
+                          break
+                        }
+                      } catch (error) {
+                        console.error('Error al verificar transferencia:', error)
+                        continue // Continue with next transfer if one fails
+                      }
                     }
-                  } catch (error) {
-                    console.error('Error al obtener transferencia:', error)
                   }
+                } catch (error) {
+                  console.error('Error al obtener transferencias pendientes:', error)
                 }
               }
 
