@@ -481,9 +481,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 amount: totalTokens
             });
 
-            const tx = await contract.transferirToken(
+            const tx = await contract.iniciarTransferencia(
                 selectedToken.id,
-                address,
                 selectedFactory,
                 totalTokens
             )
@@ -519,9 +518,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                 signer
             )
 
-            const tx = await contract.transferirToken(
+            const tx = await contract.iniciarTransferencia(
                 tokenId,
-                address,
                 toAddress,
                 cantidad
             )

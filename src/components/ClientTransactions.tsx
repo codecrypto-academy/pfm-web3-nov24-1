@@ -6,7 +6,7 @@ import TransactionMap from '@/components/TransactionMap'
 import TransactionDetails from '@/components/TransactionDetails'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
-import { DetailedTransaction, RawMaterial } from '@/types/transactions'
+import { DetailedTransaction, RawMaterial, EstadoTransferencia } from '@/types/transactions'
 import { useRouter } from 'next/navigation'
 
 interface Participant {
@@ -36,6 +36,54 @@ export default function ClientTransactions({ role }: { role: string }) {
   const router = useRouter()
   const urlRole = role
 
+  // Función para aceptar una transferencia
+  const handleAcceptTransfer = async (transferId: number) => {
+    if (!address) return
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+      const tokensContract = new ethers.Contract(
+        CONTRACTS.Tokens.address,
+        CONTRACTS.Tokens.abi,
+        signer
+      )
+
+      const tx = await tokensContract.aceptarTransferencia(transferId)
+      await tx.wait()
+
+      // Recargar las transacciones
+      loadTransactions()
+    } catch (error) {
+      console.error('Error al aceptar la transferencia:', error)
+      setError('Error al aceptar la transferencia')
+    }
+  }
+
+  // Función para rechazar una transferencia
+  const handleRejectTransfer = async (transferId: number) => {
+    if (!address) return
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+      const tokensContract = new ethers.Contract(
+        CONTRACTS.Tokens.address,
+        CONTRACTS.Tokens.abi,
+        signer
+      )
+
+      const tx = await tokensContract.rechazarTransferencia(transferId)
+      await tx.wait()
+
+      // Recargar las transacciones
+      loadTransactions()
+    } catch (error) {
+      console.error('Error al rechazar la transferencia:', error)
+      setError('Error al rechazar la transferencia')
+    }
+  }
+
   // Efecto para manejar la redirección basada en el rol
   useEffect(() => {
     if (isAuthLoading) return
@@ -54,11 +102,6 @@ export default function ClientTransactions({ role }: { role: string }) {
 
   // Efecto para cargar las transacciones
   useEffect(() => {
-    // No cargar transacciones si:
-    // - La autenticación está cargando
-    // - No está autenticado
-    // - No hay dirección de wallet
-    // - El rol en la URL no coincide con el rol del usuario
     if (
       isAuthLoading ||
       !isAuthenticated ||
@@ -68,206 +111,203 @@ export default function ClientTransactions({ role }: { role: string }) {
       return
     }
 
-    const loadTransactions = async () => {
-      if (!address) {
-        setError('No hay dirección de wallet conectada')
-        setLoading(false)
-        return
-      }
+    loadTransactions()
+  }, [isAuthLoading, isAuthenticated, address, userRole, urlRole])
 
-      if (typeof window === 'undefined' || !window.ethereum) {
-        setError('MetaMask no está disponible')
-        setLoading(false)
-        return
-      }
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const tokensContract = new ethers.Contract(
-          CONTRACTS.Tokens.address,
-          CONTRACTS.Tokens.abi,
-          provider
-        )
-        const usuariosContract = new ethers.Contract(
-          CONTRACTS.Usuarios.address,
-          CONTRACTS.Usuarios.abi,
-          provider
-        )
-
-        // Verificar que los contratos estén inicializados
-        if (!tokensContract || !usuariosContract) {
-          throw new Error('Error al inicializar los contratos')
-        }
-
-        // Cargar usuarios
-        let usuarios
-        try {
-          usuarios = await usuariosContract.getUsuarios()
-          console.log('Usuarios cargados:', usuarios.length)
-        } catch (error) {
-          console.error('Error al cargar usuarios:', error)
-          throw new Error('Error al cargar la lista de usuarios')
-        }
-        
-        // Cargar transacciones
-        const filter = tokensContract.filters.TokenTransferido()
-        let events
-        try {
-          // Obtener el último bloque
-          const latestBlock = await provider.getBlockNumber()
-          // Buscar desde el bloque 0 hasta el último
-          const rawEvents = await tokensContract.queryFilter(filter, 0, latestBlock)
-          console.log(`Encontradas ${rawEvents.length} transacciones`)
-          
-          // Filtrar eventos válidos y por rol
-          events = rawEvents
-            .filter((event): event is ethers.EventLog => event instanceof ethers.EventLog)
-            .filter((event) => {
-              // Verificar que el evento tiene los argumentos correctos
-              if (!event.args || event.args.length < 4) {
-                console.log('Evento sin argumentos válidos:', event)
-                return false
-              }
-
-              const from = event.args[1].toString().toLowerCase()
-              const to = event.args[2].toString().toLowerCase()
-              const userAddress = address?.toLowerCase()
-
-              if (!userAddress) return false
-
-              // Si es productor, mostrar donde es from
-              if (role === 'productor') {
-                return from === userAddress
-              }
-              // Si es fabrica, mostrar donde es to
-              else if (role === 'fabrica') {
-                return to === userAddress
-              }
-              // Para otros roles, mostrar ambos
-              return from === userAddress || to === userAddress
-            })
-          
-          console.log(`Filtradas ${events.length} transacciones para el rol ${role}`)
-        } catch (error) {
-          console.error('Error al cargar transacciones:', error)
-          throw new Error('Error al cargar las transacciones')
-        }
-
-        if (!events || events.length === 0) {
-          setTransactions([])
-          setLoading(false)
-          return
-        }
-
-        const processedTransactions = await Promise.all(
-          events
-            .filter((event): event is ethers.EventLog => 'args' in event)
-            .map(async (event) => {
-              try {
-                const args = event.args
-                if (!args || args.length < 4) {
-                  return null
-                }
-
-                const [tokenId, from, to, cantidad] = args
-                const fromAddress = from.toString().toLowerCase()
-                const toAddress = to.toString().toLowerCase()
-                
-                const fromParticipant = usuarios.find(
-                  (user: Participant) => user.direccion?.toLowerCase() === fromAddress
-                )
-                const toParticipant = usuarios.find(
-                  (user: Participant) => user.direccion?.toLowerCase() === toAddress
-                )
-
-                if (!fromParticipant || !toParticipant) {
-                  console.log('Participante no encontrado:', { fromAddress, toAddress })
-                  return null
-                }
-
-                const [attrNames, receipt, block, token] = await Promise.all([
-                  tokensContract.getNombresAtributos(tokenId),
-                  provider.getTransactionReceipt(event.transactionHash),
-                  provider.getBlock(event.blockNumber),
-                  tokensContract.tokens(tokenId)
-                ])
-
-                if (!receipt || !block) {
-                  console.log('Receipt o block no encontrado para tx:', event.transactionHash)
-                  return null
-                }
-
-                const fromGPS = fromParticipant.gps?.split(',').map(Number) || [0, 0]
-                const toGPS = toParticipant.gps?.split(',').map(Number) || [0, 0]
-
-                return {
-                  id: event.transactionHash,
-                  tokenId: Number(tokenId.toString()),
-                  blockNumber: event.blockNumber,
-                  gasUsed: receipt.gasUsed.toString(),
-                  gasPrice: receipt.gasPrice.toString(),
-                  timestamp: block.timestamp,
-                  product: token[1], // Usando el nombre real del producto
-                  description: token[3], // Usando la descripción real del producto
-                  quantity: Number(cantidad.toString()) / 1000,
-                  attributes: await Promise.all(
-                    attrNames.map(async (name: string) => {
-                      try {
-                        const attr = await tokensContract.getAtributo(tokenId, name)
-                        return {
-                          nombre: attr[0],
-                          valor: attr[1],
-                          timestamp: Number(attr[2])
-                        }
-                      } catch (error) {
-                        return {
-                          nombre: name,
-                          valor: 'Error al cargar',
-                          timestamp: 0
-                        }
-                      }
-                    })
-                  ),
-                  rawMaterials: [], // Ya no necesitamos esto
-                  from: {
-                    address: fromAddress,
-                    name: fromParticipant.nombre || 'Desconocido',
-                    role: fromParticipant.rol || 'Desconocido',
-                    gps: fromParticipant.gps || '0,0',
-                    active: fromParticipant.activo || false
-                  },
-                  to: {
-                    address: toAddress,
-                    name: toParticipant.nombre || 'Desconocido',
-                    role: toParticipant.rol || 'Desconocido',
-                    gps: toParticipant.gps || '0,0',
-                    active: toParticipant.activo || false
-                  },
-                  fromLocation: fromGPS as [number, number],
-                  toLocation: toGPS as [number, number]
-                } as DetailedTransaction
-              } catch (error) {
-                console.error('Error procesando transacción:', error)
-                return null
-              }
-            })
-        )
-
-        const validTransactions = processedTransactions.filter((tx): tx is DetailedTransaction => tx !== null)
-        setTransactions(validTransactions)
-      } catch (error: any) {
-        console.error('Error loading transactions:', error)
-        setError(error.message || 'Error al cargar las transacciones')
-      } finally {
-        setLoading(false)
-      }
+  const loadTransactions = async () => {
+    if (!address) {
+      setError('No hay dirección de wallet conectada')
+      setLoading(false)
+      return
     }
 
-    loadTransactions()
-  }, [address, isAuthenticated, isAuthLoading, router, urlRole])
+    if (typeof window === 'undefined' || !window.ethereum) {
+      setError('MetaMask no está disponible')
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const tokensContract = new ethers.Contract(
+        CONTRACTS.Tokens.address,
+        CONTRACTS.Tokens.abi,
+        provider
+      )
+      const usuariosContract = new ethers.Contract(
+        CONTRACTS.Usuarios.address,
+        CONTRACTS.Usuarios.abi,
+        provider
+      )
+
+      if (!tokensContract || !usuariosContract) {
+        throw new Error('Error al inicializar los contratos')
+      }
+
+      // Cargar usuarios
+      const usuarios = await usuariosContract.getUsuarios()
+      console.log('Usuarios cargados:', usuarios.length)
+
+      // Cargar transferencias pendientes si es fábrica
+      let pendingTransferIds: number[] = []
+      if (role === 'fabrica') {
+        pendingTransferIds = await tokensContract.getTransferenciasPendientes(address)
+      }
+
+      // Cargar transacciones
+      const filter = tokensContract.filters.TokenTransferido()
+      const latestBlock = await provider.getBlockNumber()
+      const rawEvents = await tokensContract.queryFilter(filter, 0, latestBlock)
+      console.log(`Encontradas ${rawEvents.length} transacciones`)
+
+      // Filtrar eventos válidos y por rol
+      const events = rawEvents
+        .filter((event): event is ethers.EventLog => event instanceof ethers.EventLog)
+        .filter((event) => {
+          if (!event.args || event.args.length < 4) {
+            console.log('Evento sin argumentos válidos:', event)
+            return false
+          }
+
+          const from = event.args[1].toString().toLowerCase()
+          const to = event.args[2].toString().toLowerCase()
+          const userAddress = address?.toLowerCase()
+
+          if (!userAddress) return false
+
+          if (role === 'productor') {
+            return from === userAddress
+          } else if (role === 'fabrica') {
+            return to === userAddress
+          }
+          return from === userAddress || to === userAddress
+        })
+
+      console.log(`Filtradas ${events.length} transacciones para el rol ${role}`)
+
+      if (!events || events.length === 0) {
+        setTransactions([])
+        setLoading(false)
+        return
+      }
+
+      const processedTransactions = await Promise.all(
+        events
+          .filter((event): event is ethers.EventLog => 'args' in event)
+          .map(async (event) => {
+            try {
+              const args = event.args
+              if (!args || args.length < 4) return null
+
+              const [tokenId, from, to, cantidad] = args
+              const fromAddress = from.toString().toLowerCase()
+              const toAddress = to.toString().toLowerCase()
+
+              const fromParticipant = usuarios.find(
+                (user: Participant) => user.direccion?.toLowerCase() === fromAddress
+              )
+              const toParticipant = usuarios.find(
+                (user: Participant) => user.direccion?.toLowerCase() === toAddress
+              )
+
+              if (!fromParticipant || !toParticipant) {
+                console.log('Participante no encontrado:', { fromAddress, toAddress })
+                return null
+              }
+
+              const [attrNames, receipt, block, token] = await Promise.all([
+                tokensContract.getNombresAtributos(tokenId),
+                provider.getTransactionReceipt(event.transactionHash),
+                provider.getBlock(event.blockNumber),
+                tokensContract.tokens(tokenId)
+              ])
+
+              if (!receipt || !block) {
+                console.log('Receipt o block no encontrado para tx:', event.transactionHash)
+                return null
+              }
+
+              // Determinar el estado de la transferencia
+              let estado = EstadoTransferencia.COMPLETADA
+              let transferId = 0
+              
+              // Si es una transferencia pendiente, actualizar su estado
+              if (pendingTransferIds.length > 0) {
+                for (const id of pendingTransferIds) {
+                  const transfer = await tokensContract.transfers(id)
+                  if (transfer.tokenId.toString() === tokenId.toString() &&
+                      transfer.from.toLowerCase() === fromAddress &&
+                      transfer.to.toLowerCase() === toAddress) {
+                    console.log('Estado de transferencia:', Number(transfer.estado))
+                    // Asegurarse de que el estado sea un número válido del enum
+                    const estadoNum = Number(transfer.estado)
+                    if (estadoNum >= 0 && estadoNum <= 2) {
+                      estado = estadoNum
+                    } else {
+                      console.warn('Estado de transferencia inválido:', estadoNum)
+                      estado = EstadoTransferencia.COMPLETADA // valor por defecto
+                    }
+                    transferId = id
+                    break
+                  }
+                }
+              }
+
+              const transaction: DetailedTransaction = {
+                id: event.transactionHash,
+                transferId,
+                tokenId: Number(tokenId),
+                blockNumber: event.blockNumber,
+                gasUsed: receipt.gasUsed.toString(),
+                gasPrice: receipt.gasPrice?.toString() || '0',
+                timestamp: Number(block.timestamp),
+                estado,
+                product: token.nombre,
+                description: token.descripcion,
+                quantity: Number(cantidad),
+                attributes: [],
+                rawMaterials: [],
+                from: {
+                  address: fromAddress,
+                  name: fromParticipant.nombre,
+                  role: fromParticipant.rol,
+                  gps: fromParticipant.gps,
+                  active: fromParticipant.activo
+                },
+                to: {
+                  address: toAddress,
+                  name: toParticipant.nombre,
+                  role: toParticipant.rol,
+                  gps: toParticipant.gps,
+                  active: toParticipant.activo
+                },
+                fromLocation: fromParticipant.gps.split(',').map(Number) as [number, number],
+                toLocation: toParticipant.gps.split(',').map(Number) as [number, number]
+              }
+
+              return transaction
+            } catch (error) {
+              console.error('Error procesando transacción:', error)
+              return null
+            }
+          })
+      )
+
+      const validTransactions = processedTransactions.filter(
+        (tx): tx is DetailedTransaction => tx !== null
+      )
+
+      setTransactions(validTransactions)
+      setLoading(false)
+    } catch (error) {
+      console.error('Error al cargar transacciones:', error)
+      setError('Error al cargar las transacciones')
+      setLoading(false)
+    }
+  }
 
   if (isAuthLoading) {
     return <div className="flex justify-center items-center min-h-screen">
@@ -294,10 +334,27 @@ export default function ClientTransactions({ role }: { role: string }) {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      {transactions.map((transaction) => (
-        <TransactionDetails key={transaction.id} transaction={transaction} />
-      ))}
+    <div className="container mx-auto px-4 py-8">
+      <h2 className="text-2xl font-bold mb-4">Transacciones</h2>
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      {loading ? (
+        <div className="text-center">Cargando transacciones...</div>
+      ) : transactions.length === 0 ? (
+        <div className="text-center">No hay transacciones para mostrar</div>
+      ) : (
+        <div className="space-y-4">
+          {transactions.map((transaction) => (
+            <TransactionDetails 
+              key={transaction.id} 
+              transaction={transaction}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

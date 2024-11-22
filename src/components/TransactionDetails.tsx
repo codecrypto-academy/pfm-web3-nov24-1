@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Tab } from '@headlessui/react'
 import { ethers } from 'ethers'
 import TransactionMap from './TransactionMap'
-import { DetailedTransaction } from '@/types/transactions'
+import { DetailedTransaction, EstadoTransferencia } from '@/types/transactions'
 
 interface TransactionDetailsProps {
   transaction: DetailedTransaction
@@ -14,7 +14,9 @@ function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function TransactionDetails({ transaction }: TransactionDetailsProps) {
+export default function TransactionDetails({ 
+  transaction
+}: TransactionDetailsProps) {
   const [selectedTab, setSelectedTab] = useState(0)
 
   const formatDate = (timestamp: number) => {
@@ -25,9 +27,30 @@ export default function TransactionDetails({ transaction }: TransactionDetailsPr
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
-  const getEtherscanUrl = (hash: string) => {
-    // Para red local, retornamos null ya que no hay explorador
-    return null;
+  const getEstadoLabel = (estado: EstadoTransferencia) => {
+    switch (estado) {
+      case EstadoTransferencia.EN_TRANSITO:
+        return 'En Tránsito'
+      case EstadoTransferencia.COMPLETADA:
+        return 'Completada'
+      case EstadoTransferencia.CANCELADA:
+        return 'Cancelada'
+      default:
+        return 'Desconocido'
+    }
+  }
+
+  const getEstadoColor = (estado: EstadoTransferencia) => {
+    switch (estado) {
+      case EstadoTransferencia.EN_TRANSITO:
+        return 'bg-yellow-100 text-yellow-800'
+      case EstadoTransferencia.COMPLETADA:
+        return 'bg-green-100 text-green-800'
+      case EstadoTransferencia.CANCELADA:
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
   }
 
   return (
@@ -37,6 +60,9 @@ export default function TransactionDetails({ transaction }: TransactionDetailsPr
           <h3 className="text-lg font-semibold text-olive-800">
             {transaction.product}
           </h3>
+          <span className={`px-2 py-1 rounded-full text-sm ${getEstadoColor(transaction.estado)}`}>
+            {getEstadoLabel(transaction.estado)}
+          </span>
         </div>
         <p className="text-sm text-olive-600">
           {formatDate(transaction.timestamp)}
@@ -50,10 +76,10 @@ export default function TransactionDetails({ transaction }: TransactionDetailsPr
               key={category}
               className={({ selected }) =>
                 classNames(
-                  'w-full py-2.5 text-sm font-medium leading-5',
-                  'ring-white ring-opacity-60 ring-offset-2 ring-offset-olive-400 focus:outline-none focus:ring-2',
+                  'w-full py-2.5 text-sm font-medium leading-5 text-olive-700 rounded-lg',
+                  'focus:outline-none focus:ring-2 ring-offset-2 ring-offset-olive-400 ring-white ring-opacity-60',
                   selected
-                    ? 'bg-white text-olive-700 shadow'
+                    ? 'bg-white shadow'
                     : 'text-olive-500 hover:bg-white/[0.12] hover:text-olive-600'
                 )
               }
@@ -62,152 +88,75 @@ export default function TransactionDetails({ transaction }: TransactionDetailsPr
             </Tab>
           ))}
         </Tab.List>
-        <Tab.Panels>
-          {/* Panel General */}
-          <Tab.Panel className="p-4">
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-olive-800">Resumen de la Transacción</h4>
-                <div className="mt-2 space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Producto:</span> {transaction.product}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Cantidad:</span> {transaction.quantity} kg
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Fecha:</span> {formatDate(transaction.timestamp)}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Token ID:</span> #{transaction.tokenId}
-                  </p>
-                </div>
+        <Tab.Panels className="mt-2">
+          <Tab.Panel className="bg-white rounded-xl p-3">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">ID de Token</dt>
+                <dd className="mt-1 text-sm text-gray-900">{transaction.tokenId}</dd>
               </div>
-            </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Cantidad</dt>
+                <dd className="mt-1 text-sm text-gray-900">{transaction.quantity}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Hash de Transacción</dt>
+                <dd className="mt-1 text-sm text-gray-900">{formatAddress(transaction.id)}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Bloque</dt>
+                <dd className="mt-1 text-sm text-gray-900">{transaction.blockNumber}</dd>
+              </div>
+            </dl>
           </Tab.Panel>
-
-          {/* Panel Detalles del Producto */}
-          <Tab.Panel className="p-4">
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-medium text-olive-800 mb-2">Descripción</h4>
-                <p className="text-sm text-gray-600">{transaction.description}</p>
+          <Tab.Panel className="bg-white rounded-xl p-3">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-4">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Descripción</dt>
+                <dd className="mt-1 text-sm text-gray-900">{transaction.description}</dd>
               </div>
-
-              <div>
-                <h4 className="font-medium text-olive-800 mb-2">Atributos</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {transaction.attributes.map((attr, index) => (
-                    <div key={index} className="bg-olive-50 p-3 rounded-md">
-                      <p className="text-sm font-medium text-olive-700">{attr.nombre}</p>
-                      <p className="text-sm text-olive-600">{attr.valor}</p>
-                      <p className="text-xs text-olive-400">{formatDate(attr.timestamp)}</p>
-                    </div>
-                  ))}
+              {transaction.attributes.map((attr, index) => (
+                <div key={index} className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">{attr.nombre}</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{attr.valor}</dd>
                 </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium text-olive-800 mb-2">Materias Primas</h4>
-                <div className="space-y-2">
-                  {transaction.rawMaterials.map((material, index) => (
-                    <div key={index} className="bg-olive-50 p-3 rounded-md">
-                      <p className="text-sm">
-                        <span className="font-medium">Token Hijo:</span> #{material.tokenHijo}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-medium">Token Padre:</span> #{material.tokenPadre}
-                      </p>
-                      <p className="text-sm">
-                        <span className="font-medium">Cantidad:</span> {material.cantidadUsada / 1000} kg
-                      </p>
-                      <p className="text-xs text-olive-400">{formatDate(material.timestamp)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+              ))}
+            </dl>
           </Tab.Panel>
-
-          {/* Panel Participantes */}
-          <Tab.Panel className="p-4">
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-medium text-olive-800 mb-2">Remitente</h4>
-                <div className="bg-olive-50 p-4 rounded-md">
-                  <p className="text-sm">
-                    <span className="font-medium">Nombre:</span> {transaction.from.name}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Dirección:</span>{' '}
-                    {formatAddress(transaction.from.address)}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Rol:</span> {transaction.from.role}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Estado:</span>{' '}
-                    <span className={transaction.from.active ? 'text-green-600' : 'text-red-600'}>
-                      {transaction.from.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </p>
-                </div>
+          <Tab.Panel className="bg-white rounded-xl p-3">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Remitente</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {transaction.from.name} ({formatAddress(transaction.from.address)})
+                </dd>
+                <dd className="mt-1 text-sm text-gray-500">{transaction.from.role}</dd>
               </div>
-
-              <div>
-                <h4 className="font-medium text-olive-800 mb-2">Destinatario</h4>
-                <div className="bg-olive-50 p-4 rounded-md">
-                  <p className="text-sm">
-                    <span className="font-medium">Nombre:</span> {transaction.to.name}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Dirección:</span>{' '}
-                    {formatAddress(transaction.to.address)}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Rol:</span> {transaction.to.role}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Estado:</span>{' '}
-                    <span className={transaction.to.active ? 'text-green-600' : 'text-red-600'}>
-                      {transaction.to.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </p>
-                </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Destinatario</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {transaction.to.name} ({formatAddress(transaction.to.address)})
+                </dd>
+                <dd className="mt-1 text-sm text-gray-500">{transaction.to.role}</dd>
               </div>
-            </div>
+            </dl>
           </Tab.Panel>
-
-          {/* Panel Datos Técnicos */}
-          <Tab.Panel className="p-4">
-            <div className="space-y-4">
-              <div className="bg-olive-50 p-4 rounded-md">
-                <h4 className="font-medium text-olive-800 mb-2">Detalles de la Blockchain</h4>
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Hash:</span>{' '}
-                    {formatAddress(transaction.id)}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Bloque:</span> #{transaction.blockNumber}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Gas Usado:</span> {transaction.gasUsed}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Precio del Gas:</span> {transaction.gasPrice} Wei
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Timestamp:</span> {formatDate(transaction.timestamp)}
-                  </p>
-                </div>
+          <Tab.Panel className="bg-white rounded-xl p-3">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Gas Usado</dt>
+                <dd className="mt-1 text-sm text-gray-900">{transaction.gasUsed}</dd>
               </div>
-            </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Precio del Gas</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {ethers.formatUnits(transaction.gasPrice, 'gwei')} gwei
+                </dd>
+              </div>
+            </dl>
           </Tab.Panel>
-
-          {/* Panel Mapa */}
-          <Tab.Panel className="p-4">
-            <div className="h-[600px]">
+          <Tab.Panel className="bg-white rounded-xl p-3">
+            <div className="h-96">
               <TransactionMap
                 fromLocation={transaction.fromLocation}
                 toLocation={transaction.toLocation}

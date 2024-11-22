@@ -11,14 +11,22 @@ export interface RawMaterial {
   timestamp: number
 }
 
+export enum EstadoTransferencia {
+  EN_TRANSITO,
+  COMPLETADA,
+  CANCELADA
+}
+
 export interface DetailedTransaction {
   // Datos básicos
   id: string
   tokenId: number
+  transferId: number
   blockNumber: number
   gasUsed: string
   gasPrice: string
   timestamp: number
+  estado: EstadoTransferencia
 
   // Datos del producto
   product: string

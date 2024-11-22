@@ -105,22 +105,100 @@ contract Tokens {
         return tokenId;
     }
 
-    // Función para transferir tokens
-    function transferirToken(
+    // Función para iniciar una transferencia
+    function iniciarTransferencia(
         uint256 _tokenId,
-        address _from,
         address _to,
         uint256 _cantidad
     ) public {
         require(_cantidad > 0, "La cantidad debe ser mayor que 0");
-        require(tokens[_tokenId].balances[_from] >= _cantidad, "Saldo insuficiente");
+        require(tokens[_tokenId].balances[msg.sender] >= _cantidad, "Saldo insuficiente");
         require(_to != address(0), "Direccion de destino invalida");
         require(usuarios.estaActivo(_to), "El destinatario no es un usuario activo");
 
-        tokens[_tokenId].balances[_from] -= _cantidad;
-        tokens[_tokenId].balances[_to] += _cantidad;
+        // Bloquear los tokens
+        tokens[_tokenId].balances[msg.sender] -= _cantidad;
+        tokensEnTransito[_to][_tokenId] += _cantidad;
 
-        emit TokenTransferido(_tokenId, _from, _to, _cantidad);
+        // Crear nueva transferencia
+        uint256 transferId = siguienteTransferId++;
+        transfers[transferId] = Transferencia({
+            id: transferId,
+            tokenId: _tokenId,
+            from: msg.sender,
+            to: _to,
+            transportista: address(0),
+            cantidad: _cantidad,
+            timestamp: block.timestamp,
+            estado: EstadoTransferencia.EN_TRANSITO,
+            rutaMapaId: "",
+            condiciones: CondicionesTransporte(0, 0, ""),
+            timestampCompletado: 0
+        });
+
+        emit TokenTransferido(_tokenId, msg.sender, _to, _cantidad);
+    }
+
+    // Función para aceptar una transferencia
+    function aceptarTransferencia(uint256 _transferId) public {
+        Transferencia storage transfer = transfers[_transferId];
+        require(transfer.to == msg.sender, "No eres el destinatario");
+        require(transfer.estado == EstadoTransferencia.EN_TRANSITO, "Transferencia no esta en transito");
+
+        uint256 cantidad = transfer.cantidad;
+        uint256 tokenId = transfer.tokenId;
+
+        // Transferir los tokens del estado en tránsito al destinatario
+        tokensEnTransito[msg.sender][tokenId] -= cantidad;
+        tokens[tokenId].balances[msg.sender] += cantidad;
+
+        // Actualizar estado
+        transfer.estado = EstadoTransferencia.COMPLETADA;
+        transfer.timestampCompletado = block.timestamp;
+
+        emit TokenTransferido(tokenId, transfer.from, msg.sender, cantidad);
+    }
+
+    // Función para rechazar una transferencia
+    function rechazarTransferencia(uint256 _transferId) public {
+        Transferencia storage transfer = transfers[_transferId];
+        require(transfer.to == msg.sender, "No eres el destinatario");
+        require(transfer.estado == EstadoTransferencia.EN_TRANSITO, "Transferencia no esta en transito");
+
+        uint256 cantidad = transfer.cantidad;
+        uint256 tokenId = transfer.tokenId;
+        address from = transfer.from;
+
+        // Devolver los tokens al remitente
+        tokensEnTransito[msg.sender][tokenId] -= cantidad;
+        tokens[tokenId].balances[from] += cantidad;
+
+        // Actualizar estado
+        transfer.estado = EstadoTransferencia.CANCELADA;
+        transfer.timestampCompletado = block.timestamp;
+
+        emit TokenTransferido(tokenId, msg.sender, from, cantidad);
+    }
+
+    // Función para obtener transferencias pendientes
+    function getTransferenciasPendientes(address _destinatario) public view returns (uint256[] memory) {
+        uint256[] memory pendingTransfers = new uint256[](siguienteTransferId);
+        uint256 count = 0;
+        
+        for(uint256 i = 0; i < siguienteTransferId; i++) {
+            if(transfers[i].to == _destinatario && transfers[i].estado == EstadoTransferencia.EN_TRANSITO) {
+                pendingTransfers[count] = i;
+                count++;
+            }
+        }
+        
+        // Resize array to actual count
+        uint256[] memory result = new uint256[](count);
+        for(uint256 i = 0; i < count; i++) {
+            result[i] = pendingTransfers[i];
+        }
+        
+        return result;
     }
 
     // Función para obtener el balance de tokens
