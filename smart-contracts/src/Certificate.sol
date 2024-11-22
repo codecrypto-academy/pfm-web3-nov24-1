@@ -32,6 +32,20 @@ interface ITokens {
     );
 }
 
+/*	•	Responsable de:
+	•	Registrar el proceso de extracción del aceite.
+	•	Parámetros que debe registrar:
+	•	Método de extracción:
+	•	Extracción en frío (Máximo 27°C, mejor calidad).
+	•	Extracción en caliente (Mayor temperatura, menor calidad).
+	•	Tiempo desde la cosecha hasta la extracción:
+	•	Menor de 24 horas: Excelente.
+	•	Entre 24-48 horas: Bueno.
+	•	Más de 48 horas: Regular.
+	•	Cantidad de aceite extraído por tonelada:
+	•	Indicador de eficiencia y madurez de las aceitunas.
+	•	Datos que registra la almazara en el contrato inteligente:
+*/
 contract OliveOilCertification {
     Tokens public tokensContract;
     ITokens private tokensInterface;

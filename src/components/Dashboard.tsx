@@ -22,9 +22,9 @@ interface DashboardProps {
 }
 
 interface TokenAttribute {
-    nombre: string;
-    valor: string;
-    timestamp: number;
+    nombre: string;     // Nombre del atributo
+    valor: string;      // Valor del atributo
+    timestamp: number;  // Timestamp de cuando se añadió
 }
 
 interface RelatedToken {
@@ -42,7 +42,8 @@ interface Token {
     timestamp: number;
     isProcesado?: boolean;
     tokenPadre?: string;
-    atributos?: TokenAttribute[];
+    atributos: { [key: string]: TokenAttribute };  // Cambiado a un objeto para reflejar el mapping
+    nombresAtributos: string[];                    // Array para iterar sobre los atributos
     relatedTokens: RelatedToken[];
 }
 
@@ -86,7 +87,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
     const [factoryBalance, setFactoryBalance] = useState<string>('')
     const [lastUpdate, setLastUpdate] = useState(Date.now());
     const [newDescription, setNewDescription] = useState('')
-    const [newAttributes, setNewAttributes] = useState<{ nombre: string; valor: string }[]>([])
+    const [newAttributes, setNewAttributes] = useState<{ nombre: string; valor: string; timestamp: number }[]>([])
 
     // Función auxiliar para reintentar llamadas RPC
     const retryRPC = async <T,>(
@@ -182,7 +183,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     // Obtener el balance (incluso si es 0)
                     const balance = await retryRPC(() => contract.getBalance(tokenId, address).catch(() => 0))
                     
-                    let atributos: TokenAttribute[] = []
+                    let atributos: { [key: string]: TokenAttribute } = {}
 
                     try {
                         // Obtener los nombres de atributos del token
@@ -190,11 +191,11 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                         for (const nombre of nombresAtributos) {
                             const attr = await retryRPC(() => contract.getAtributo(tokenId, nombre))
                             if (attr && attr[0]) { // attr[0] es el nombre
-                                atributos.push({
+                                atributos[nombre] = {
                                     nombre: attr[0],
                                     valor: attr[1], // attr[1] es el valor
                                     timestamp: Number(attr[2]) // attr[2] es el timestamp
-                                })
+                                }
                             }
                         }
                     } catch (error) {
@@ -202,7 +203,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                     }
 
                     // Solo verificar si es un producto procesado para el rol fabrica
-                    const isProcesado = role === 'fabrica' ? atributos.some(attr => 
+                    const isProcesado = role === 'fabrica' ? Object.values(atributos).some(attr => 
                         attr.nombre === "Procesado" && attr.valor.toLowerCase() === "true"
                     ) : false;
 
@@ -224,6 +225,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                             timestamp: Number(tokenData[5]),
                             isProcesado,
                             atributos,
+                            nombresAtributos: Object.keys(atributos),
                             relatedTokens: [relatedToken]
                         }
 
@@ -242,18 +244,22 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             const groupedTokens = allTokens.reduce((acc, token) => {
                 const existingProduct = acc.find(p => p.nombre === token.nombre)
                 if (existingProduct) {
+                    // Añadir el token a relatedTokens
                     const relatedToken: RelatedToken = {
                         id: token.id,
                         cantidad: token.cantidad,
                         timestamp: token.timestamp
                     }
                     existingProduct.relatedTokens.push(relatedToken)
+                    
+                    // Actualizar la cantidad total
+                    existingProduct.cantidad += token.cantidad
                 } else {
                     acc.push(token)
                 }
                 return acc
             }, [] as Token[])
-
+            
             // Sort tokens by timestamp, most recent first
             const sortedTokens = groupedTokens.sort((a, b) => b.timestamp - a.timestamp)
             
@@ -302,7 +308,6 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
 
     useEffect(() => {
         if (selectedToken) {
-            console.log('Token seleccionado:', selectedToken);
         }
     }, [selectedToken]);
 
@@ -344,13 +349,13 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
             const totalTokens = Number(quantity) * 1000
 
             // Verificar que todos los atributos requeridos tienen un valor
-            if (token.atributos && token.atributos.length > 0) {
-                const missingAttributes = token.atributos.filter(attr => 
-                    !newAttributes.find(newAttr => newAttr.nombre === attr.nombre)
+            if (token.atributos && Object.keys(token.atributos).length > 0) {
+                const missingAttributes = Object.keys(token.atributos).filter(attr => 
+                    !newAttributes.find(newAttr => newAttr.nombre === attr)
                 );
                 
                 if (missingAttributes.length > 0) {
-                    alert(`Por favor, complete todos los atributos requeridos: ${missingAttributes.map(attr => attr.nombre).join(', ')}`);
+                    alert(`Por favor, complete todos los atributos requeridos: ${missingAttributes.join(', ')}`);
                     return;
                 }
             }
@@ -792,7 +797,7 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                                     <div className="mb-6">
                                                                         <h4 className="text-sm font-medium text-gray-700 mb-2">Atributos del Producto:</h4>
                                                                         <div className="grid grid-cols-3 gap-4">
-                                                                            {token.atributos
+                                                                            {Object.values(token.atributos)
                                                                                 ?.filter(attr => !['Procesado', 'TokenPadre'].includes(attr.nombre))
                                                                                 .map((attr, index) => (
                                                                                     <div key={index} className="bg-white p-3 rounded shadow-sm">
@@ -827,7 +832,6 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                 <h3 className="text-xl font-bold text-gray-900">
                                     Nuevo Lote: {selectedToken.nombre}
                                 </h3>
-                                {console.log('Token seleccionado:', selectedToken)}
                             </div>
 
                             <div className="grid grid-cols-1 gap-6">
@@ -866,26 +870,26 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                         Atributos del Lote
                                     </label>
                                     <div className="space-y-4">
-                                        {selectedToken.atributos?.map((atributo, index) => (
+                                        {Object.keys(selectedToken.atributos).map((atributo, index) => (
                                             <div key={index} className="flex flex-col space-y-2">
                                                 <label className="text-sm font-medium text-gray-600">
-                                                    {atributo.nombre}
+                                                    {atributo}
                                                 </label>
                                                 <select
-                                                    value={newAttributes.find(attr => attr.nombre === atributo.nombre)?.valor || ''}
+                                                    value={newAttributes.find(attr => attr.nombre === atributo)?.valor || ''}
                                                     onChange={(e) => {
                                                         const updatedAttrs = [...newAttributes];
-                                                        const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo.nombre);
+                                                        const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
                                                         
                                                         if (existingIndex >= 0) {
                                                             updatedAttrs[existingIndex] = {
-                                                                nombre: atributo.nombre,
+                                                                nombre: atributo,
                                                                 valor: e.target.value,
                                                                 timestamp: Date.now()
                                                             };
                                                         } else {
                                                             updatedAttrs.push({
-                                                                nombre: atributo.nombre,
+                                                                nombre: atributo,
                                                                 valor: e.target.value,
                                                                 timestamp: Date.now()
                                                             });
@@ -895,8 +899,8 @@ const Dashboard: FC<DashboardProps> = ({ role }): React.ReactElement => {
                                                     }}
                                                     className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
                                                 >
-                                                    <option value="">Seleccionar {atributo.nombre}</option>
-                                                    {atributo.valor.split(',').map((opcion, idx) => (
+                                                    <option value="">Seleccionar {atributo}</option>
+                                                    {selectedToken.atributos[atributo].valor.split(',').map((opcion, idx) => (
                                                         <option key={idx} value={opcion.trim()}>
                                                             {opcion.trim()}
                                                         </option>

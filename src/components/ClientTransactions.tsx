@@ -116,8 +116,41 @@ export default function ClientTransactions({ role }: { role: string }) {
         const filter = tokensContract.filters.TokenTransferido()
         let events
         try {
-          events = await tokensContract.queryFilter(filter)
-          console.log(`Encontradas ${events.length} transacciones`)
+          // Obtener el último bloque
+          const latestBlock = await provider.getBlockNumber()
+          // Buscar desde el bloque 0 hasta el último
+          const rawEvents = await tokensContract.queryFilter(filter, 0, latestBlock)
+          console.log(`Encontradas ${rawEvents.length} transacciones`)
+          
+          // Filtrar eventos válidos y por rol
+          events = rawEvents
+            .filter((event): event is ethers.EventLog => event instanceof ethers.EventLog)
+            .filter((event) => {
+              // Verificar que el evento tiene los argumentos correctos
+              if (!event.args || event.args.length < 4) {
+                console.log('Evento sin argumentos válidos:', event)
+                return false
+              }
+
+              const from = event.args[1].toString().toLowerCase()
+              const to = event.args[2].toString().toLowerCase()
+              const userAddress = address?.toLowerCase()
+
+              if (!userAddress) return false
+
+              // Si es productor, mostrar donde es from
+              if (role === 'productor') {
+                return from === userAddress
+              }
+              // Si es fabrica, mostrar donde es to
+              else if (role === 'fabrica') {
+                return to === userAddress
+              }
+              // Para otros roles, mostrar ambos
+              return from === userAddress || to === userAddress
+            })
+          
+          console.log(`Filtradas ${events.length} transacciones para el rol ${role}`)
         } catch (error) {
           console.error('Error al cargar transacciones:', error)
           throw new Error('Error al cargar las transacciones')
@@ -140,8 +173,8 @@ export default function ClientTransactions({ role }: { role: string }) {
                 }
 
                 const [tokenId, from, to, cantidad] = args
-                const fromAddress = from.toLowerCase()
-                const toAddress = to.toLowerCase()
+                const fromAddress = from.toString().toLowerCase()
+                const toAddress = to.toString().toLowerCase()
                 
                 const fromParticipant = usuarios.find(
                   (user: Participant) => user.direccion?.toLowerCase() === fromAddress
@@ -155,9 +188,8 @@ export default function ClientTransactions({ role }: { role: string }) {
                   return null
                 }
 
-                const [attrNames, rawMaterials, receipt, block, token] = await Promise.all([
+                const [attrNames, receipt, block, token] = await Promise.all([
                   tokensContract.getNombresAtributos(tokenId),
-                  tokensContract.getMateriasPrimas(tokenId),
                   provider.getTransactionReceipt(event.transactionHash),
                   provider.getBlock(event.blockNumber),
                   tokensContract.tokens(tokenId)
@@ -186,9 +218,9 @@ export default function ClientTransactions({ role }: { role: string }) {
                       try {
                         const attr = await tokensContract.getAtributo(tokenId, name)
                         return {
-                          nombre: name,
-                          valor: attr.valor,
-                          timestamp: Number(attr.timestamp)
+                          nombre: attr[0],
+                          valor: attr[1],
+                          timestamp: Number(attr[2])
                         }
                       } catch (error) {
                         return {
@@ -199,12 +231,7 @@ export default function ClientTransactions({ role }: { role: string }) {
                       }
                     })
                   ),
-                  rawMaterials: rawMaterials.map((material: any) => ({
-                    tokenHijo: Number(material.tokenHijo),
-                    tokenPadre: Number(material.tokenPadre),
-                    cantidadUsada: Number(material.cantidadUsada),
-                    timestamp: Number(material.timestamp)
-                  })),
+                  rawMaterials: [], // Ya no necesitamos esto
                   from: {
                     address: fromAddress,
                     name: fromParticipant.nombre || 'Desconocido',

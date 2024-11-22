@@ -112,21 +112,36 @@ const TransactionMap: React.FC<TransactionMapProps> = ({ fromLocation, toLocatio
         // Crear marcadores personalizados
         const fromIcon = L.divIcon({
           className: 'custom-marker-icon',
-          html: `<div class="w-8 h-8 bg-olive-600 rounded-full flex items-center justify-center text-white font-bold">A</div>`,
+          html: `<div class="px-3 py-2 bg-white border-2 border-olive-600 rounded-lg shadow-md">
+                  <span class="text-olive-600 font-bold text-sm whitespace-nowrap">${transaction.from}</span>
+                </div>`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 40],
+          popupAnchor: [0, -40]
         });
 
         const toIcon = L.divIcon({
           className: 'custom-marker-icon',
-          html: `<div class="w-8 h-8 bg-olive-800 rounded-full flex items-center justify-center text-white font-bold">B</div>`,
+          html: `<div class="px-3 py-2 bg-white border-2 border-olive-800 rounded-lg shadow-md">
+                  <span class="text-olive-800 font-bold text-sm whitespace-nowrap">${transaction.to}</span>
+                </div>`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 40],
+          popupAnchor: [0, -40]
         });
 
         // Añadir marcadores
         const fromMarker = L.marker(fromLocation, { icon: fromIcon })
-          .bindPopup(`<b>Origen:</b> ${transaction.from}<br><b>Producto:</b> ${transaction.product}`)
+          .bindPopup(`<div class="p-2">
+            <p class="font-bold text-olive-600 mb-1">${transaction.from}</p>
+            <p class="text-gray-600"><span class="font-semibold">Producto:</span> ${transaction.product}</p>
+          </div>`)
           .addTo(mapRef.current);
         
         const toMarker = L.marker(toLocation, { icon: toIcon })
-          .bindPopup(`<b>Destino:</b> ${transaction.to}`)
+          .bindPopup(`<div class="p-2">
+            <p class="font-bold text-olive-800">${transaction.to}</p>
+          </div>`)
           .addTo(mapRef.current);
 
         markersRef.current = [fromMarker, toMarker];
@@ -148,7 +163,8 @@ const TransactionMap: React.FC<TransactionMapProps> = ({ fromLocation, toLocatio
           },
           router: L.Routing.osrmv1({
             serviceUrl: 'https://router.project-osrm.org/route/v1',
-            suppressDemoServerWarning: true
+            profile: 'driving',
+            language: 'es'
           })
         });
 
@@ -169,6 +185,10 @@ const TransactionMap: React.FC<TransactionMapProps> = ({ fromLocation, toLocatio
         if (mapRef.current) {
           routingControl.addTo(mapRef.current);
           routingControlRef.current = routingControl;
+
+          // Ajustar el zoom para mostrar toda la ruta
+          const bounds = L.latLngBounds([fromLocation, toLocation]);
+          mapRef.current.fitBounds(bounds, { padding: [50, 50] });
         }
       } catch (error) {
         console.error('Error al crear la ruta:', error);
