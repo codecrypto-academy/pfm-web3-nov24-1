@@ -1,271 +1,323 @@
 'use client'
-
-import { useState } from 'react'
+import { FC } from 'react'
 import { useWeb3 } from '@/context/Web3Context'
+import { useState } from 'react'
 import { ethers } from 'ethers'
-import {CONTRACTS} from '@/constants/contracts'
+import { CONTRACTS } from '@/constants/contracts'
+import { useRouter } from 'next/navigation'
+import { PlusCircle, XCircle, Info } from 'lucide-react'
 
-interface Attribute {
-  nombre: string
-  valor: string
+interface CreateProductProps {
+    role: 'productor' | 'fabrica' | 'distribuidor' | 'mayorista'
 }
 
-export default function AddProduct() {
-  const [nombre, setNombre] = useState('')
-  const [descripcion, setDescripcion] = useState('')
-  const [atributos, setAtributos] = useState<Attribute[]>([{ nombre: '', valor: '' }])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+interface Atributo {
+    nombre: string;
+    valor: string;
+    label?: string;  // Nombre amigable para mostrar en la UI
+    valoresPosibles?: string[];  // Lista de valores posibles para el atributo
+}
 
-  const { address } = useWeb3()
-
-  const handleAddAttribute = () => {
-    setAtributos([...atributos, { nombre: '', valor: '' }])
-  }
-
-  const handleAttributeChange = (index: number, field: 'nombre' | 'valor', value: string) => {
-    const newAtributos = [...atributos]
-    newAtributos[index][field] = value
-    setAtributos(newAtributos)
-  }
-
-  const handleRemoveAttribute = (index: number) => {
-    const newAtributos = atributos.filter((_, i) => i !== index)
-    setAtributos(newAtributos)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setSuccess(false)
-
-    try {
-      // Validaciones mejoradas
-      if (!nombre.trim()) {
-        throw new Error('El nombre del producto es requerido')
-      }
-
-      // Filtrar atributos vacíos
-      const atributosFiltrados = atributos.filter(
-        attr => attr.nombre.trim() && attr.valor.trim()
-      )
-
-      if (atributosFiltrados.length === 0) {
-        throw new Error('Debe agregar al menos un atributo válido')
-      }
-
-      // Validar que no haya nombres de atributos duplicados
-      const nombresUnicos = new Set(atributosFiltrados.map(attr => attr.nombre.trim()))
-      if (nombresUnicos.size !== atributosFiltrados.length) {
-        throw new Error('Los nombres de los atributos no pueden estar duplicados')
-      }
-
-      // Preparar los arrays de atributos (ya filtrados y trimmed)
-      const nombresAtributos = atributosFiltrados.map(attr => attr.nombre.trim())
-      const valoresAtributos = atributosFiltrados.map(attr => attr.valor.trim())
-
-      // Crear una nueva instancia del contrato con el signer
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      
-      // Verificar que el usuario está conectado
-      if (!address) {
-        throw new Error('Por favor, conecta tu wallet primero')
-      }
-
-      console.log('Dirección del usuario:', address)
-
-      // Verificar que el usuario está registrado
-      const usuariosContract = new ethers.Contract(
-        CONTRACTS.Usuarios.address,
-        CONTRACTS.Usuarios.abi,
-        signer
-      )
-
-      console.log('Verificando registro de usuario...')
-      const esUsuarioRegistrado = await usuariosContract.esUsuario(address)
-      console.log('¿Usuario registrado?:', esUsuarioRegistrado)
-
-      const estaActivo = await usuariosContract.estaActivo(address)
-      console.log('¿Usuario activo?:', estaActivo)
-
-      if (!esUsuarioRegistrado) {
-        throw new Error('Tu dirección no está registrada en el sistema. Contacta al administrador.')
-      }
-
-      if (!estaActivo) {
-        throw new Error('Tu usuario está desactivado. Contacta al administrador.')
-      }
-
-      // Crear el contrato de tokens
-      const tokensContract = new ethers.Contract(
-        CONTRACTS.Tokens.address,
-        CONTRACTS.Tokens.abi,
-        signer
-      )
-
-      // Obtener el balance de ETH del usuario
-      const balance = await provider.getBalance(address)
-      console.log('Balance de ETH:', ethers.formatEther(balance), 'ETH')
-
-      console.log('Datos a enviar:', {
-        nombre: nombre.trim(),
-        cantidad: 0,
-        descripcion: descripcion.trim() || '',
-        nombresAtributos,
-        valoresAtributos
-      })
-
-      // Enviar la transacción sin estimación de gas
-      const tx = await tokensContract.crearToken(
-        nombre.trim(),
-        0,
-        descripcion.trim() || '',
-        nombresAtributos,
-        valoresAtributos
-      )
-
-      console.log('Transacción enviada:', tx.hash)
-      
-      // Esperar a que la transacción se confirme
-      const receipt = await tx.wait()
-      console.log('Transacción confirmada:', receipt)
-      
-      setSuccess(true)
-      
-      // Limpiar el formulario
-      setNombre('')
-      setDescripcion('')
-      setAtributos([{ nombre: '', valor: '' }])
-    } catch (error: any) {
-      console.error('Error detallado:', {
-        error,
-        message: error.message,
-        code: error.code,
-        reason: error.reason,
-        data: error.data
-      })
-      
-      // Manejo de errores específicos
-      if (typeof error.message === 'string') {
-        if (error.message.includes('user rejected')) {
-          setError('Transacción rechazada por el usuario')
-        } else if (error.message.includes('insufficient funds')) {
-          setError('Fondos insuficientes para realizar la transacción')
-        } else if (error.message.includes('Los arrays de atributos')) {
-          setError('Error en los atributos: ' + error.message)
-        } else if (error.message.includes('execution reverted')) {
-          setError('Error en el contrato: La transacción fue revertida. Verifica que tienes los permisos necesarios.')
-        } else {
-          const errorMessage = error.message || error.reason || 'Error desconocido'
-          setError('Error al crear el producto: ' + errorMessage)
+const CreateProduct: FC<CreateProductProps> = ({ role }) => {
+    const router = useRouter()
+    const { address } = useWeb3()
+    const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState('')
+    const [txStatus, setTxStatus] = useState('')
+    const [formData, setFormData] = useState({
+        nombre: '',
+        descripcion: '',
+        tokenRatio: 1000,
+    })
+    const [atributos, setAtributos] = useState<Atributo[]>([
+        { 
+            nombre: 'metodoRecoleccion', 
+            valor: '', 
+            label: 'Método de Recolección',
+            valoresPosibles: []  // Aquí guardaremos los valores posibles
         }
-      } else {
-        setError('Error desconocido al crear el producto')
-      }
-    } finally {
-      setLoading(false)
+    ])
+
+    const handleAddAtributo = () => {
+        setAtributos([...atributos, { nombre: '', valor: '' }])
     }
-  }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
-      <div>
-        <h2 className="text-2xl font-bold text-olive-900">Crear Nuevo Producto</h2>
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-        {success && (
-          <div className="bg-green-50 border-l-4 border-green-400 p-4">
-            <p className="text-green-700">¡Producto creado exitosamente! Ahora puedes crear remesas de este producto.</p>
-          </div>
-        )}
-      </div>
+    const handleRemoveAtributo = (index: number) => {
+        setAtributos(atributos.filter((_, i) => i !== index))
+    }
 
-      <div>
-        <label htmlFor="nombre" className="block text-sm font-medium text-olive-700">
-          Nombre del Producto *
-        </label>
-        <input
-          type="text"
-          id="nombre"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          className="mt-1 block w-full rounded-md border-olive-300 shadow-sm focus:border-olive-500 focus:ring-olive-500"
-          required
-        />
-      </div>
+    const handleAtributoChange = (index: number, field: 'nombre' | 'valor', value: string) => {
+        const nuevosAtributos = [...atributos]
+        nuevosAtributos[index][field] = value
+        setAtributos(nuevosAtributos)
+    }
 
-      <div>
-        <label htmlFor="descripcion" className="block text-sm font-medium text-olive-700">
-          Descripción
-        </label>
-        <textarea
-          id="descripcion"
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          rows={3}
-          className="mt-1 block w-full rounded-md border-olive-300 shadow-sm focus:border-olive-500 focus:ring-olive-500"
-        />
-      </div>
+    const handleAddValorPosible = (index: number, nuevoValor: string) => {
+        const nuevosAtributos = [...atributos];
+        if (!nuevosAtributos[index].valoresPosibles) {
+            nuevosAtributos[index].valoresPosibles = [];
+        }
+        nuevosAtributos[index].valoresPosibles?.push(nuevoValor);
+        // El valor será todos los valores posibles unidos
+        nuevosAtributos[index].valor = nuevosAtributos[index].valoresPosibles?.join(', ') || '';
+        setAtributos(nuevosAtributos);
+    }
 
-      <div>
-        <div className="flex justify-between items-center mb-2">
-          <label className="block text-sm font-medium text-olive-700">Atributos</label>
-          <button
-            type="button"
-            onClick={handleAddAttribute}
-            className="px-3 py-1 text-sm bg-olive-600 text-white rounded hover:bg-olive-700"
-          >
-            Añadir Atributo
-          </button>
-        </div>
-        <div className="space-y-3">
-          {atributos.map((attr, index) => (
-            <div key={index} className="flex gap-3">
-              <input
-                type="text"
-                value={attr.nombre}
-                onChange={(e) => handleAttributeChange(index, 'nombre', e.target.value)}
-                placeholder="Nombre"
-                className="flex-1 rounded-md border-olive-300 shadow-sm focus:border-olive-500 focus:ring-olive-500"
-              />
-              <input
-                type="text"
-                value={attr.valor}
-                onChange={(e) => handleAttributeChange(index, 'valor', e.target.value)}
-                placeholder="Valor"
-                className="flex-1 rounded-md border-olive-300 shadow-sm focus:border-olive-500 focus:ring-olive-500"
-              />
-              {index > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveAttribute(index)}
-                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-                >
-                  Eliminar
-                </button>
-              )}
+    const handleRemoveValorPosible = (atributoIndex: number, valorIndex: number) => {
+        const nuevosAtributos = [...atributos];
+        nuevosAtributos[atributoIndex].valoresPosibles?.splice(valorIndex, 1);
+        // Actualizar el valor después de eliminar
+        nuevosAtributos[atributoIndex].valor = nuevosAtributos[atributoIndex].valoresPosibles?.join(', ') || '';
+        setAtributos(nuevosAtributos);
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        setTxStatus('')
+
+        if (!formData.nombre || !formData.descripcion) {
+            setError('Por favor complete todos los campos')
+            return
+        }
+
+        // Validar que los atributos no estén vacíos
+        const atributosInvalidos = atributos.some(attr => !attr.nombre || !attr.valor)
+        if (atributosInvalidos) {
+            setError('Por favor complete todos los campos de los atributos')
+            return
+        }
+
+        setIsLoading(true)
+
+        try {
+            setTxStatus('Conectando con la wallet...')
+            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const signer = await provider.getSigner()
+            const contract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                signer
+            )
+
+            // Para productos, siempre usamos cantidad 0
+            const totalTokens = 0
+
+            // Preparar arrays de atributos
+            const nombresAtributos = atributos.map(attr => {
+                if (attr.nombre === 'metodoRecoleccion') {
+                    return 'metodo_de_recoleccion'
+                }
+                return attr.nombre
+            })
+            const valoresAtributos = atributos.map(attr => attr.valor)
+
+            setTxStatus('Enviando transacción...')
+            const tx = await contract.crearToken(
+                formData.nombre,
+                totalTokens,
+                formData.descripcion,
+                nombresAtributos,
+                valoresAtributos
+            )
+
+            setTxStatus('Esperando confirmación...')
+            const receipt = await tx.wait()
+            
+            if (receipt.status === 1) {
+                setTxStatus('¡Producto creado con éxito!')
+                setTimeout(() => {
+                    router.push(`/dashboard/${role}`)
+                }, 2000)
+            } else {
+                throw new Error('La transacción falló')
+            }
+        } catch (error: any) {
+            console.error('Error:', error)
+            setError(error.message || 'Error al crear el producto')
+            setTxStatus('')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bubbles-background">
+            <div className="w-full max-w-md p-8 space-y-6 bg-card rounded-lg shadow-lg">
+                <div className="space-y-2">
+                    <h1 className="custom-subtitle text-center">Crear Nuevo Producto</h1>
+                    <div className="flex items-center justify-center gap-2 text-gray-600">
+                        <span className="text-sm">Información para el certificado</span>
+                        <div className="group relative">
+                            <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                            <div className="absolute left-1/2 -translate-x-1/2 w-80 p-3 bg-black text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 mt-1">
+                                <span className="font-bold">IMPORTANTE:</span> Para el certificado de calidad, asegúrate que:
+                                <ul className="list-disc pl-4 mt-1 space-y-1">
+                                    <li>El nombre del producto coincida con la variedad que se pide</li>
+                                    <li>Los métodos de recolección deben ser uno de los siguientes:
+                                        <ul className="list-disc pl-4 mt-1">
+                                            <li>Manual (Vareo tradicional)</li>
+                                            <li>Mecánico (Vibrador)</li>
+                                            <li>Mixto (Combinación de ambos)</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-primary">
+                            Nombre del Producto
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full p-2 border rounded-md bg-input text-primary"
+                            placeholder="Ej: Aceituna negra"
+                            value={formData.nombre}
+                            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-primary">
+                            Descripción
+                        </label>
+                        <textarea
+                            className="w-full p-2 border rounded-md bg-input text-primary"
+                            placeholder="Descripción detallada del producto"
+                            value={formData.descripcion}
+                            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                        />
+                    </div>
+
+                    {/* Campo de cantidad eliminado */}
+
+                    {/* Sección de Atributos Obligatorios */}
+                    <div className="space-y-4 border-b pb-6">
+                        <h3 className="text-lg font-semibold text-primary">Atributos Obligatorios</h3>
+                        {atributos
+                            .filter(attr => attr.label)
+                            .map((atributo, index) => (
+                                <div key={index} className="flex gap-2 items-start">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-primary mb-2">
+                                            {atributo.label}
+                                        </label>
+                                        <div className="space-y-2">
+                                            <p className="text-sm text-gray-500">
+                                                Añade los valores posibles para este atributo:
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ej: Manual"
+                                                    className="flex-1 p-2 border rounded-md bg-input text-primary"
+                                                    id={`valor-${index}`}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const input = document.getElementById(`valor-${index}`) as HTMLInputElement;
+                                                        if (input.value.trim()) {
+                                                            handleAddValorPosible(index, input.value.trim());
+                                                            input.value = '';
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                                                >
+                                                    Añadir
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {atributo.valoresPosibles?.map((valor, valorIndex) => (
+                                                    <div 
+                                                        key={valorIndex} 
+                                                        className="flex items-center gap-1 bg-blue-100 text-blue-900 px-2 py-1 rounded-md"
+                                                    >
+                                                        <span>{valor}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveValorPosible(index, valorIndex)}
+                                                            className="text-red-500 hover:text-red-700 ml-2"
+                                                        >
+                                                            <XCircle className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                    </div>
+
+                    {/* Sección de Atributos Personalizados */}
+                    <div className="space-y-4 pt-6">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-primary">Atributos Personalizados</h3>
+                            <button
+                                type="button"
+                                onClick={handleAddAtributo}
+                                className="text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                Añadir Atributo
+                            </button>
+                        </div>
+
+                        {atributos
+                            .filter(attr => !attr.label)
+                            .map((atributo, index) => (
+                                <div key={index} className="flex gap-2 items-start">
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            placeholder="Nombre del atributo"
+                                            className="w-full p-2 border rounded-md bg-input text-primary mb-2"
+                                            value={atributo.nombre}
+                                            onChange={(e) => handleAtributoChange(index + atributos.filter(a => a.label).length, 'nombre', e.target.value)}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Valor"
+                                            className="w-full p-2 border rounded-md bg-input text-primary"
+                                            value={atributo.valor}
+                                            onChange={(e) => handleAtributoChange(index + atributos.filter(a => a.label).length, 'valor', e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveAtributo(index + atributos.filter(a => a.label).length)}
+                                        className="text-red-500 hover:text-red-700"
+                                    >
+                                        <XCircle className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            ))}
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="company-access-btn w-full"
+                    >
+                        {isLoading ? 'Procesando...' : 'Crear Producto'}
+                    </button>
+
+                    {error && (
+                        <p className="text-red-500 text-sm mt-2">{error}</p>
+                    )}
+
+                    {txStatus && (
+                        <p className="text-blue-500 text-sm mt-2">{txStatus}</p>
+                    )}
+                </form>
             </div>
-          ))}
         </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={loading}
-          className={`px-4 py-2 bg-olive-600 text-white rounded hover:bg-olive-700 ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-        >
-          {loading ? 'Creando...' : 'Crear Producto'}
-        </button>
-      </div>
-    </form>
-  )
+    )
 }
+
+export default CreateProduct

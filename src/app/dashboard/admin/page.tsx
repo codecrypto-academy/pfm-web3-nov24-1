@@ -6,7 +6,7 @@ import { ethers } from 'ethers'
 import { useState, useEffect } from 'react'
 import { withAuth } from '@/components/hoc/withAuth'
 import MapModal from '@/components/MapModal'
-import ParticipantsMap from '@/components/ParticipantsMap'
+import MapaParticipantes from '@/components/MapaParticipantes'
 import { FaMapMarkerAlt } from 'react-icons/fa'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
@@ -309,7 +309,7 @@ function AdminDashboard() {
                 </div>
                 
                 {participants.length > 0 && (
-                    <ParticipantsMap participants={participants} />
+                    <MapaParticipantes participants={participants} />
                 )}
                 
                 {showMap && selectedParticipant && (

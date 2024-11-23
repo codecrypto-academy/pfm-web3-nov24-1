@@ -6,7 +6,7 @@ import { QrCodeIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect } from 'react'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
-import RegisterForm from '@/components/RegisterForm'
+import RegisterForm from '@/components/FormularioRegistro'
 
 export default function Home() {
   const [showScanner, setShowScanner] = useState(false)

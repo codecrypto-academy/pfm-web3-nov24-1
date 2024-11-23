@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import QRScanner from '@/components/ui/QRScanner'
-import ProductTimeline from '@/components/ProductTimeline'
+import ProductTimeline from '@/components/LineaTiempoProducto'
 
 export default function ProductPage() {
     const [productData, setProductData] = useState<any>(null)

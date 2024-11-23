@@ -1,5 +1,5 @@
 'use client'
-import ProcessProduct from '@/components/ProcessProduct'
+import ProcessProduct from '@/components/ProcesarProducto'
 
 export default function ProcesarPage() {
     return (

@@ -1,9 +1,9 @@
 'use client'
-import Addproduct from '@/components/Addproduct'
+import AddProduct from '../components/AddProduct'
 import { NextPage } from 'next'
 
 const AddProductPage: NextPage = () => {
-    return <Addproduct role="productor" />
+    return <AddProduct role="productor" />
 }
 
 export default AddProductPage

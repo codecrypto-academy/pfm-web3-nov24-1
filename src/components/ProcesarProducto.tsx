@@ -53,8 +53,8 @@ export default function ProcessProduct() {
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 provider
             )
 
@@ -215,8 +215,8 @@ export default function ProcessProduct() {
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
-                CONTRACTS.TOKENS.ADDRESS,
-                CONTRACTS.TOKENS.ABI,
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
                 signer
             )
 

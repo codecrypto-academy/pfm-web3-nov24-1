@@ -17,6 +17,7 @@ interface TransactionMapProps {
 
 export default function TransactionMap({ fromLocation, toLocation, transaction }: TransactionMapProps) {
   const mapRef = useRef<L.Map | null>(null)
+  const routingControlRef = useRef<any>(null)
   const mapId = `map-${transaction.id || Math.random().toString(36).substr(2, 9)}`
 
   useEffect(() => {
@@ -31,9 +32,18 @@ export default function TransactionMap({ fromLocation, toLocation, transaction }
       return
     }
 
-    // Limpiar el mapa anterior si existe
+    // Limpiar el mapa anterior y sus controles si existen
     if (mapRef.current) {
+      if (routingControlRef.current) {
+        try {
+          routingControlRef.current.remove()
+          routingControlRef.current = null
+        } catch (error) {
+          console.warn('Error al limpiar el control de rutas:', error)
+        }
+      }
       mapRef.current.remove()
+      mapRef.current = null
     }
 
     try {
@@ -131,6 +141,14 @@ export default function TransactionMap({ fromLocation, toLocation, transaction }
     // Cleanup function
     return () => {
       if (mapRef.current) {
+        if (routingControlRef.current) {
+          try {
+            routingControlRef.current.remove()
+            routingControlRef.current = null
+          } catch (error) {
+            console.warn('Error al limpiar el control de rutas:', error)
+          }
+        }
         mapRef.current.remove()
         mapRef.current = null
       }

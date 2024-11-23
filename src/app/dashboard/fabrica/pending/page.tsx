@@ -1,6 +1,6 @@
 'use client'
 
-import PendingTransfers from '@/components/PendingTransfers'
+import PendingTransfers from '@/components/TransferenciasPendientes'
 
 export default function PendingTransfersPage() {
     return (

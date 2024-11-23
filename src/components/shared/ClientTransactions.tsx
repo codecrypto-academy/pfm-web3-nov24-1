@@ -6,7 +6,7 @@ import TransactionMap from '@/components/shared/TransactionMap'
 import TransactionDetails from '@/components/shared/TransactionDetails'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
-import { DetailedTransaction, RawMaterial, EstadoTransferencia } from '@/types/transactions'
+import { DetailedTransaction, EstadoTransferencia, RawMaterial, TokenAttribute } from '@/types/transactions'
 import { useRouter } from 'next/navigation'
 
 interface Participant {
@@ -15,6 +15,12 @@ interface Participant {
   rol: string
   gps: string
   activo: boolean
+}
+
+interface Attribute {
+  nombre: string
+  valor: string
+  timestamp: number
 }
 
 interface TokenEventArgs {
@@ -83,6 +89,8 @@ export default function ClientTransactions({ role }: { role: string }) {
       setLoading(true)
       setError(null)
 
+      console.log('Iniciando carga de transacciones para rol:', role)
+
       const provider = new ethers.BrowserProvider(window.ethereum)
       const tokensContract = new ethers.Contract(
         CONTRACTS.Tokens.address,
@@ -95,51 +103,29 @@ export default function ClientTransactions({ role }: { role: string }) {
         provider
       )
 
-      if (!tokensContract || !usuariosContract) {
-        throw new Error('Error al inicializar los contratos')
+      if (!tokensContract || !provider) {
+        console.error('Contratos no inicializados')
+        setError('Error al cargar las transacciones')
+        setLoading(false)
+        return
       }
 
       // Cargar usuarios
       const usuarios = await usuariosContract.getUsuarios()
       console.log('Usuarios cargados:', usuarios.length)
 
-      // Cargar transferencias pendientes
-      let pendingTransferIds: number[] = []
-      if (role === 'fabrica' || role === 'productor') {
-        try {
-          // Get pending transfers where user is receiver
-          const receiverPending = await tokensContract.getTransferenciasPendientes(address)
-          pendingTransferIds = Array.from(receiverPending).map(id => Number(id))
-          console.log('Pending transfers:', pendingTransferIds)
-          
-          // Log details of each pending transfer
-          for (const id of pendingTransferIds) {
-            try {
-              const transfer = await tokensContract.transfers(id)
-              console.log('Transfer details:', {
-                id,
-                tokenId: transfer.tokenId.toString(),
-                from: transfer.from.toLowerCase(),
-                to: transfer.to.toLowerCase(),
-                estado: Number(transfer.estado)
-              })
-            } catch (error) {
-              console.error('Error getting transfer details:', error)
-            }
-          }
-        } catch (error) {
-          console.error('Error loading pending transfers:', error)
-        }
-      }
-
-      // Cargar transacciones
+      // Obtener todos los eventos de transferencia
       const filter = tokensContract.filters.TokenTransferido()
       const latestBlock = await provider.getBlockNumber()
-      const rawEvents = await tokensContract.queryFilter(filter, 0, latestBlock)
-      console.log(`Encontradas ${rawEvents.length} transacciones totales`)
+      const events = await tokensContract.queryFilter(filter, 0, latestBlock)
 
-      // Filtrar eventos válidos y por rol
-      const events = rawEvents
+      console.log('Total de eventos encontrados:', events.length)
+
+      // Crear un Set para mantener un registro de las transacciones únicas
+      const processedTransactionHashes = new Set<string>()
+
+      // Filtrar eventos relevantes según el rol
+      const filteredEvents = events
         .filter((event): event is ethers.EventLog => event instanceof ethers.EventLog)
         .filter((event) => {
           if (!event.args || event.args.length < 4) {
@@ -147,184 +133,168 @@ export default function ClientTransactions({ role }: { role: string }) {
             return false
           }
 
+          // Verificar si ya hemos procesado esta transacción
+          if (processedTransactionHashes.has(event.transactionHash)) {
+            console.log('Transacción duplicada encontrada:', event.transactionHash)
+            return false
+          }
+
           const from = event.args[1].toString().toLowerCase()
           const to = event.args[2].toString().toLowerCase()
           const userAddress = address?.toLowerCase()
 
-          if (!userAddress) return false
+          if (!userAddress) {
+            console.log('No hay dirección de usuario')
+            return false
+          }
 
-          const isRelevant = role === 'productor' 
-            ? (from === userAddress || to === userAddress)
-            : (role === 'fabrica' ? to === userAddress : false)
+          let isRelevant = false
+          if (role === 'productor') {
+            isRelevant = from === userAddress || to === userAddress
+          } else if (role === 'fabrica') {
+            isRelevant = to === userAddress && event.args.length >= 4
+          }
 
           if (isRelevant) {
-            console.log('Evento relevante encontrado:', {
-              tokenId: event.args[0].toString(),
-              from,
-              to,
-              cantidad: event.args[3].toString()
-            })
+            processedTransactionHashes.add(event.transactionHash)
           }
+
+          console.log('Evaluando evento:', {
+            from,
+            to,
+            userAddress,
+            role,
+            isRelevant,
+            eventId: event.transactionHash,
+            isDuplicate: processedTransactionHashes.has(event.transactionHash)
+          })
 
           return isRelevant
         })
 
-      console.log(`Filtradas ${events.length} transacciones para el rol ${role}`)
+      console.log('Eventos filtrados:', {
+        total: events.length,
+        filtrados: filteredEvents.length,
+        role,
+        address
+      })
 
-      if (!events || events.length === 0) {
+      if (!filteredEvents || filteredEvents.length === 0) {
+        console.log('No se encontraron transacciones relevantes')
         setTransactions([])
         setLoading(false)
         return
       }
 
       const processedTransactions = await Promise.all(
-        events
-          .filter((event): event is ethers.EventLog => 'args' in event)
-          .map(async (event) => {
-            try {
-              const args = event.args
-              if (!args || args.length < 4) return null
+        filteredEvents.map(async (event) => {
+          try {
+            const args = event.args
+            if (!args || args.length < 4) return null
 
-              const [tokenId, from, to, cantidad] = args
-              const fromAddress = from.toString().toLowerCase()
-              const toAddress = to.toString().toLowerCase()
+            const [tokenId, from, to, cantidad] = args
+            const fromAddress = from.toString().toLowerCase()
+            const toAddress = to.toString().toLowerCase()
 
-              const fromParticipant = usuarios.find(
-                (user: Participant) => user.direccion?.toLowerCase() === fromAddress
-              )
-              const toParticipant = usuarios.find(
-                (user: Participant) => user.direccion?.toLowerCase() === toAddress
-              )
+            const fromParticipant = usuarios.find(
+              (user: Participant) => user.direccion?.toLowerCase() === fromAddress
+            )
+            const toParticipant = usuarios.find(
+              (user: Participant) => user.direccion?.toLowerCase() === toAddress
+            )
 
-              if (!fromParticipant || !toParticipant) {
-                console.log('Participante no encontrado:', { fromAddress, toAddress })
-                return null
-              }
-
-              const [attrNames, receipt, block, token] = await Promise.all([
-                tokensContract.getNombresAtributos(tokenId),
-                provider.getTransactionReceipt(event.transactionHash),
-                provider.getBlock(event.blockNumber),
-                tokensContract.tokens(tokenId)
-              ])
-
-              if (!receipt || !block) {
-                console.log('Receipt o block no encontrado para tx:', event.transactionHash)
-                return null
-              }
-
-              // Determinar el estado de la transferencia
-              let estado = EstadoTransferencia.COMPLETADA
-              let transferId = 0
-
-              // Buscar todas las transferencias para este token
-              const transferFilter = tokensContract.filters.TokenTransferido()
-              const transferEvents = await tokensContract.queryFilter(transferFilter)
-              
-              // Filtrar los eventos que coincidan con el tokenId y las direcciones
-              const relevantTransfers = transferEvents.filter(event => {
-                if (!('args' in event)) return false
-                const args = event.args
-                return args[0] === tokenId && 
-                       args[1].toLowerCase() === from.toLowerCase() && 
-                       args[2].toLowerCase() === to.toLowerCase()
-              })
-              
-              if (relevantTransfers.length > 0) {
-                // Obtener el último evento de transferencia
-                const lastTransferEvent = relevantTransfers[relevantTransfers.length - 1]
-                
-                try {
-                  // Obtener las transferencias pendientes del destinatario
-                  const pendingTransfers = await tokensContract.getTransferenciasPendientes(to)
-                  
-                  // Si hay transferencias pendientes, el estado es EN_TRANSITO
-                  if (pendingTransfers.length > 0) {
-                    estado = EstadoTransferencia.EN_TRANSITO
-                    // Buscar el ID de la transferencia que coincide
-                    for (const id of pendingTransfers) {
-                      try {
-                        const transfer = await tokensContract.transfers(id)
-                        if (transfer.tokenId.toString() === tokenId.toString() &&
-                            transfer.from.toLowerCase() === from.toLowerCase() &&
-                            transfer.to.toLowerCase() === to.toLowerCase()) {
-                          transferId = id
-                          break
-                        }
-                      } catch (error) {
-                        console.error('Error al verificar transferencia:', error)
-                        continue // Continue with next transfer if one fails
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error al obtener transferencias pendientes:', error)
-                }
-              }
-
-              const transaction: DetailedTransaction = {
-                id: event.transactionHash,
-                transferId,
-                tokenId: Number(tokenId),
-                blockNumber: event.blockNumber,
-                gasUsed: receipt.gasUsed.toString(),
-                gasPrice: receipt.gasPrice?.toString() || '0',
-                timestamp: Number(block.timestamp),
-                estado,
-                product: token.nombre,
-                description: token.descripcion,
-                quantity: Number(cantidad),
-                attributes: [],
-                rawMaterials: [],
-                fromLocation: null,  // Inicializar como null
-                toLocation: null,    // Inicializar como null
-                from: {
-                  address: fromAddress,
-                  name: fromParticipant.nombre,
-                  role: fromParticipant.rol,
-                  gps: fromParticipant.gps,
-                  active: fromParticipant.activo
-                },
-                to: {
-                  address: toAddress,
-                  name: toParticipant.nombre,
-                  role: toParticipant.rol,
-                  gps: toParticipant.gps,
-                  active: toParticipant.activo
-                }
-              }
-
-              // Procesar coordenadas GPS
-              try {
-                if (fromParticipant.gps && toParticipant.gps) {
-                  // Las coordenadas GPS vienen en formato "longitud,latitud"
-                  // Pero Leaflet espera [latitud, longitud]
-                  const fromCoordsRaw = fromParticipant.gps.split(',').map((coord: string) => parseFloat(coord.trim()))
-                  const toCoordsRaw = toParticipant.gps.split(',').map((coord: string) => parseFloat(coord.trim()))
-
-                  if (fromCoordsRaw.length === 2 && toCoordsRaw.length === 2 &&
-                      fromCoordsRaw.every((coord: number) => !isNaN(coord)) &&
-                      toCoordsRaw.every((coord: number) => !isNaN(coord))) {
-                    // Invertir el orden de las coordenadas para Leaflet
-                    transaction.fromLocation = [fromCoordsRaw[1], fromCoordsRaw[0]] as [number, number]
-                    transaction.toLocation = [toCoordsRaw[1], toCoordsRaw[0]] as [number, number]
-                  } else {
-                    console.error('Formato de coordenadas GPS inválido:', {
-                      fromGPS: fromParticipant.gps,
-                      toGPS: toParticipant.gps
-                    })
-                  }
-                }
-              } catch (error) {
-                console.error('Error al procesar coordenadas GPS:', error)
-              }
-
-              return transaction
-            } catch (error) {
-              console.error('Error procesando transacción:', error)
+            if (!fromParticipant || !toParticipant) {
+              console.log('Participante no encontrado:', { fromAddress, toAddress })
               return null
             }
-          })
+
+            const [attrNames, receipt, block, token] = await Promise.all([
+              tokensContract.getNombresAtributos(tokenId),
+              provider.getTransactionReceipt(event.transactionHash),
+              provider.getBlock(event.blockNumber),
+              tokensContract.tokens(tokenId)
+            ])
+
+            console.log('Datos del token:', {
+              tokenId: tokenId.toString(),
+              attrNames,
+              token
+            })
+
+            if (!receipt || !block) {
+              console.log('Receipt o block no encontrado para tx:', event.transactionHash)
+              return null
+            }
+
+            // Procesar los atributos obteniendo los valores uno por uno
+            const attributes = await Promise.all(
+              attrNames.map(async (name: string) => {
+                try {
+                  const attr = await tokensContract.getAtributo(tokenId, name)
+                  return {
+                    nombre: name,
+                    valor: attr.valor || '',
+                    timestamp: Number(attr.timestamp || block.timestamp)
+                  }
+                } catch (error) {
+                  console.error('Error al obtener atributo:', name, error)
+                  return {
+                    nombre: name,
+                    valor: '',
+                    timestamp: Number(block.timestamp)
+                  }
+                }
+              })
+            ).then(attrs => attrs.filter(attr => attr.nombre !== ''))
+
+            console.log('Atributos procesados:', attributes)
+
+            // Determinar el estado de la transferencia
+            let estado = EstadoTransferencia.COMPLETADA
+            let transferId = 0
+
+            // Usar el evento actual en lugar de buscar todos los eventos de nuevo
+            const transactionHash = event.transactionHash
+            const blockTimestamp = Number(block.timestamp)
+
+            const transaction: DetailedTransaction = {
+              id: transactionHash,
+              tokenId: Number(tokenId),
+              transferId,
+              blockNumber: event.blockNumber,
+              gasUsed: receipt.gasUsed.toString(),
+              gasPrice: receipt.gasPrice?.toString() || '0',
+              timestamp: blockTimestamp,
+              estado,
+              product: token[1],
+              description: token[3],
+              quantity: Number(cantidad),
+              attributes,
+              rawMaterials: [],
+              fromLocation: fromParticipant.gps.split(',').map(Number) as [number, number],
+              toLocation: toParticipant.gps.split(',').map(Number) as [number, number],
+              from: {
+                address: fromAddress,
+                name: fromParticipant.nombre,
+                role: fromParticipant.rol,
+                gps: fromParticipant.gps,
+                active: fromParticipant.activo
+              },
+              to: {
+                address: toAddress,
+                name: toParticipant.nombre,
+                role: toParticipant.rol,
+                gps: toParticipant.gps,
+                active: toParticipant.activo
+              }
+            }
+
+            return transaction
+          } catch (error) {
+            console.error('Error procesando transacción:', error)
+            return null
+          }
+        })
       )
 
       const validTransactions = processedTransactions.filter(

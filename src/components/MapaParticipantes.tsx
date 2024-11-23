@@ -7,7 +7,7 @@ interface ParticipantsMapProps {
   participants: Participante[];
 }
 
-const ParticipantsMap: React.FC<ParticipantsMapProps> = ({ participants }) => {
+const MapaParticipantes: React.FC<ParticipantsMapProps> = ({ participants }) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerId = useRef(`map-${Math.random().toString(36).substr(2, 9)}`);
   const [error, setError] = useState<string | null>(null);
@@ -136,4 +136,4 @@ const ParticipantsMap: React.FC<ParticipantsMapProps> = ({ participants }) => {
   );
 };
 
-export default ParticipantsMap;
+export default MapaParticipantes;

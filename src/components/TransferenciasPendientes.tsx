@@ -5,7 +5,7 @@ import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import { useWeb3 } from '@/context/Web3Context'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
-import TransactionMap from './TransactionMap'
+import TransactionMap from '@/components/shared/TransactionMap'
 import { useRouter } from 'next/navigation'
 
 interface Transfer {
@@ -254,13 +254,13 @@ export default function PendingTransfers() {
                     {transfer.fromGPS && transfer.toGPS && (
                         <div className="mt-4 h-64 border rounded-lg overflow-hidden">
                             <TransactionMap
-                                fromLocation={[parseFloat(transfer.fromGPS[1]), parseFloat(transfer.fromGPS[0])]}
-                                toLocation={[parseFloat(transfer.toGPS[1]), parseFloat(transfer.toGPS[0])]}
+                                fromLocation={transfer.fromGPS as [number, number]}
+                                toLocation={transfer.toGPS as [number, number]}
                                 transaction={{
                                     from: transfer.from,
                                     to: address || '',
                                     product: transfer.token.nombre,
-                                    id: transfer.id
+                                    id: transfer.id.toString()
                                 }}
                             />
                         </div>
