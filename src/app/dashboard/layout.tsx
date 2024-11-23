@@ -7,7 +7,8 @@ import Header from '@/components/ui/Header'
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
-import { HomeIcon, ClockIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, ClockIcon, PlusIcon, TruckIcon } from '@heroicons/react/24/outline'
+import { CONTRACTS } from '@/constants/contracts'
 
 interface LayoutProps {
     children: ReactNode
@@ -15,8 +16,46 @@ interface LayoutProps {
 
 export default function DashboardLayout({ children }: LayoutProps) {
     const [account, setAccount] = useState('')
-    const { role, isAuthenticated, isLoading } = useWeb3()
+    const { role, isAuthenticated, isLoading, address } = useWeb3()
+    const [pendingTransfers, setPendingTransfers] = useState(0)
     const router = useRouter()
+
+    // Función para cargar las transferencias pendientes para la fábrica
+    const loadPendingTransfers = async () => {
+        if (!address || role !== 'fabrica') {
+            console.log('No loading transfers:', { address, role })
+            return
+        }
+
+        try {
+            console.log('Loading pending transfers for factory:', address)
+            const provider = new ethers.BrowserProvider(window.ethereum)
+            const tokensContract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                provider
+            )
+
+            // Obtener transferencias pendientes usando la función del contrato
+            const pendingTransferIds = await tokensContract.getTransferenciasPendientes(address)
+            console.log('Pending transfers found:', pendingTransferIds.length)
+            
+            setPendingTransfers(pendingTransferIds.length)
+        } catch (error) {
+            console.error('Error al cargar transferencias pendientes:', error)
+        }
+    }
+
+    useEffect(() => {
+        if (address && role === 'fabrica') {
+            console.log('Setting up transfer monitoring for factory')
+            loadPendingTransfers()
+            
+            // Actualizar cada 30 segundos
+            const interval = setInterval(loadPendingTransfers, 30000)
+            return () => clearInterval(interval)
+        }
+    }, [address, role])
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -143,7 +182,24 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                     href="/dashboard/fabrica/procesar"
                                     className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
                                 >
+                                    <PlusIcon className="w-5 h-5" />
                                     <span className="font-medium">Procesar Aceite</span>
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    href="/dashboard/fabrica/pending"
+                                    className="flex items-center justify-between text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <TruckIcon className="w-5 h-5" />
+                                        <span className="font-medium">Productos en Camino</span>
+                                    </div>
+                                    {pendingTransfers > 0 && (
+                                        <span className="flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-600 rounded-full animate-pulse">
+                                            {pendingTransfers}
+                                        </span>
+                                    )}
                                 </Link>
                             </li>
                         </ul>

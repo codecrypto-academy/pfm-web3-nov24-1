@@ -3,8 +3,6 @@
 import React, { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import 'leaflet-routing-machine'
-import 'leaflet-routing-machine/dist/leaflet-routing-machine.css'
 
 interface TransactionMapProps {
   fromLocation: [number, number]
@@ -13,39 +11,40 @@ interface TransactionMapProps {
     from: string
     to: string
     product: string
+    id?: string | number
   }
 }
 
 export default function TransactionMap({ fromLocation, toLocation, transaction }: TransactionMapProps) {
   const mapRef = useRef<L.Map | null>(null)
-  const routingControlRef = useRef<L.Routing.Control | null>(null)
-  const markersRef = useRef<L.Marker[]>([])
+  const mapId = `map-${transaction.id || Math.random().toString(36).substr(2, 9)}`
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Limpiar el mapa anterior si existe
-      if (mapRef.current) {
-        mapRef.current.remove()
-      }
+    if (typeof window === 'undefined') return
 
-      // Limpiar los marcadores anteriores
-      markersRef.current.forEach(marker => marker.remove())
-      markersRef.current = []
+    // Validar coordenadas
+    if (!Array.isArray(fromLocation) || !Array.isArray(toLocation) ||
+        fromLocation.length !== 2 || toLocation.length !== 2 ||
+        !fromLocation.every(coord => typeof coord === 'number') ||
+        !toLocation.every(coord => typeof coord === 'number')) {
+      console.error('Coordenadas inválidas:', { fromLocation, toLocation })
+      return
+    }
 
-      // Limpiar el control de ruta anterior si existe
-      if (routingControlRef.current) {
-        routingControlRef.current.remove()
-        routingControlRef.current = null
-      }
+    // Limpiar el mapa anterior si existe
+    if (mapRef.current) {
+      mapRef.current.remove()
+    }
 
+    try {
       // Inicializar el mapa
-      mapRef.current = L.map('map').setView([40.4168, -3.7038], 6)
+      const map = L.map(mapId)
+      mapRef.current = map
 
       // Añadir capa de OpenStreetMap
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(mapRef.current)
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map)
 
       // Crear iconos personalizados
       const createCustomIcon = (color: string) => {
@@ -74,84 +73,69 @@ export default function TransactionMap({ fromLocation, toLocation, transaction }
           `,
           iconSize: [24, 32],
           iconAnchor: [12, 32],
-          popupAnchor: [0, -32],
+          popupAnchor: [0, -32]
         })
       }
 
       const fromIcon = createCustomIcon('#34D399') // Verde para origen
       const toIcon = createCustomIcon('#F87171') // Rojo para destino
 
-      if (mapRef.current) {
-        try {
-          // Marcador de origen
-          const fromMarker = L.marker(fromLocation, { icon: fromIcon })
-            .addTo(mapRef.current)
-            .bindPopup(
-              `<b>Origen:</b> ${transaction.from}<br><b>Producto:</b> ${transaction.product}`
-            )
-          markersRef.current.push(fromMarker)
+      // Añadir marcadores
+      const fromMarker = L.marker(fromLocation, { icon: fromIcon })
+        .bindPopup(`<b>Origen:</b> ${transaction.from}<br><b>Producto:</b> ${transaction.product}`)
+        .addTo(map)
 
-          // Marcador de destino
-          const toMarker = L.marker(toLocation, { icon: toIcon })
-            .addTo(mapRef.current)
-            .bindPopup(`<b>Destino:</b> ${transaction.to}`)
-          markersRef.current.push(toMarker)
+      const toMarker = L.marker(toLocation, { icon: toIcon })
+        .bindPopup(`<b>Destino:</b> ${transaction.to}`)
+        .addTo(map)
 
-          // Configurar la ruta usando GraphHopper
-          const routingControl = L.Routing.control({
-            waypoints: [L.latLng(fromLocation), L.latLng(toLocation)],
-            routeWhileDragging: false,
-            addWaypoints: false,
-            draggableWaypoints: false,
-            fitSelectedRoutes: true,
-            showAlternatives: false,
-            router: L.Routing.osrmv1({
-              serviceUrl: 'https://router.project-osrm.org/route/v1',
-              profile: 'driving'
-            }),
-            lineOptions: {
-              styles: [{ color: '#4F46E5', weight: 4, opacity: 0.7 }],
-            },
-          })
+      // Crear una línea entre los puntos
+      const path = L.polyline([fromLocation, toLocation], {
+        color: '#6366F1',
+        weight: 3,
+        opacity: 0.8,
+        dashArray: '10, 10',
+        lineJoin: 'round'
+      }).addTo(map)
 
-          routingControl.addTo(mapRef.current)
-          routingControlRef.current = routingControl
+      // Calcular el punto medio y la distancia
+      const midLat = (fromLocation[0] + toLocation[0]) / 2
+      const midLng = (fromLocation[1] + toLocation[1]) / 2
+      const distance = map.distance(fromLocation, toLocation) / 1000 // convertir a km
 
-          // Ocultar la barra lateral de instrucciones
-          const container = routingControl.getContainer()
-          if (container) {
-            container.style.display = 'none'
-          }
+      // Añadir etiqueta de distancia
+      L.marker([midLat, midLng], {
+        icon: L.divIcon({
+          className: 'distance-label',
+          html: `<div style="
+            background: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #6366F1;
+            font-size: 12px;
+            color: #4F46E5;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          ">${Math.round(distance)} km</div>`,
+          iconSize: [80, 30],
+          iconAnchor: [40, 15]
+        })
+      }).addTo(map)
 
-          // Ajustar el mapa para mostrar todos los puntos
-          const bounds = L.latLngBounds([fromLocation, toLocation])
-          mapRef.current.fitBounds(bounds, { padding: [50, 50] })
-
-        } catch (error) {
-          console.error('Error al configurar el mapa:', error)
-        }
-      }
+      // Ajustar el mapa para mostrar todos los puntos
+      const bounds = L.latLngBounds([fromLocation, toLocation])
+      map.fitBounds(bounds, { padding: [50, 50] })
+    } catch (error) {
+      console.error('Error al inicializar el mapa:', error)
     }
 
-    // Cleanup
+    // Cleanup function
     return () => {
-      // Limpiar los marcadores
-      markersRef.current.forEach(marker => marker.remove())
-      markersRef.current = []
-
-      // Limpiar el control de ruta
-      if (routingControlRef.current) {
-        routingControlRef.current.remove()
-        routingControlRef.current = null
-      }
-
-      // Limpiar el mapa
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
       }
     }
-  }, [fromLocation, toLocation, transaction])
+  }, [fromLocation, toLocation, transaction, mapId])
 
-  return <div id="map" className="w-full h-full rounded-lg" />
+  return <div id={mapId} className="w-full h-full rounded-lg" />
 }

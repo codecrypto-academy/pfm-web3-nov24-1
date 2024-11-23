@@ -276,6 +276,8 @@ export default function ClientTransactions({ role }: { role: string }) {
                 quantity: Number(cantidad),
                 attributes: [],
                 rawMaterials: [],
+                fromLocation: null,  // Inicializar como null
+                toLocation: null,    // Inicializar como null
                 from: {
                   address: fromAddress,
                   name: fromParticipant.nombre,
@@ -289,9 +291,32 @@ export default function ClientTransactions({ role }: { role: string }) {
                   role: toParticipant.rol,
                   gps: toParticipant.gps,
                   active: toParticipant.activo
-                },
-                fromLocation: fromParticipant.gps.split(',').map(Number) as [number, number],
-                toLocation: toParticipant.gps.split(',').map(Number) as [number, number]
+                }
+              }
+
+              // Procesar coordenadas GPS
+              try {
+                if (fromParticipant.gps && toParticipant.gps) {
+                  // Las coordenadas GPS vienen en formato "longitud,latitud"
+                  // Pero Leaflet espera [latitud, longitud]
+                  const fromCoordsRaw = fromParticipant.gps.split(',').map((coord: string) => parseFloat(coord.trim()))
+                  const toCoordsRaw = toParticipant.gps.split(',').map((coord: string) => parseFloat(coord.trim()))
+
+                  if (fromCoordsRaw.length === 2 && toCoordsRaw.length === 2 &&
+                      fromCoordsRaw.every((coord: number) => !isNaN(coord)) &&
+                      toCoordsRaw.every((coord: number) => !isNaN(coord))) {
+                    // Invertir el orden de las coordenadas para Leaflet
+                    transaction.fromLocation = [fromCoordsRaw[1], fromCoordsRaw[0]] as [number, number]
+                    transaction.toLocation = [toCoordsRaw[1], toCoordsRaw[0]] as [number, number]
+                  } else {
+                    console.error('Formato de coordenadas GPS inválido:', {
+                      fromGPS: fromParticipant.gps,
+                      toGPS: toParticipant.gps
+                    })
+                  }
+                }
+              } catch (error) {
+                console.error('Error al procesar coordenadas GPS:', error)
               }
 
               return transaction

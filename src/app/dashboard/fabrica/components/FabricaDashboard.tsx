@@ -4,10 +4,7 @@ import { useState, useEffect } from 'react'
 import { useWeb3 } from '@/context/Web3Context'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
-import ClientTransactions from '@/components/shared/ClientTransactions'
 import { useRouter } from 'next/navigation'
-import { PlusIcon } from '@heroicons/react/24/outline'
-import Link from 'next/link'
 
 interface Token {
     id: number
@@ -108,42 +105,32 @@ export default function FabricaDashboard() {
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">Panel de Fábrica</h1>
-                <Link
-                    href="/dashboard/fabrica/procesar"
-                    className="inline-flex items-center px-4 py-2 bg-[#6D8B74] text-white rounded-md hover:bg-[#5F7A65] transition-colors"
-                >
-                    <PlusIcon className="h-5 w-5 mr-2" />
-                    Procesar Materia Prima
-                </Link>
-            </div>
+            <h1 className="text-2xl font-bold mb-6">Panel de Fábrica</h1>
 
             {/* Sección de Productos */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold mb-4">Mis Productos</h2>
                 {tokens.length === 0 ? (
                     <p className="text-gray-500">No hay productos registrados</p>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tokens.map(token => (
-                            <div key={token.id} className="border rounded-lg p-4">
-                                <h3 className="font-semibold">{token.nombre}</h3>
-                                <p className="text-gray-600">ID: {token.id}</p>
-                                <p className="text-gray-600">Cantidad: {token.cantidad}</p>
-                                <p className="text-gray-600">
-                                    Fecha: {new Date(token.timestamp).toLocaleDateString()}
-                                </p>
+                            <div key={token.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <h3 className="font-semibold text-lg text-olive-800">{token.nombre}</h3>
+                                <div className="mt-2 space-y-1">
+                                    <p className="text-gray-600">ID: {token.id}</p>
+                                    <p className="text-gray-600">Cantidad: {token.cantidad}</p>
+                                    <p className="text-gray-600">
+                                        Fecha: {new Date(token.timestamp * 1000).toLocaleDateString()}
+                                    </p>
+                                    {token.descripcion && (
+                                        <p className="text-gray-600 mt-2">{token.descripcion}</p>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
                 )}
-            </div>
-
-            {/* Sección de Historial de Transacciones */}
-            <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold mb-4">Historial de Transacciones</h2>
-                <ClientTransactions role="fabrica" />
             </div>
         </div>
     )

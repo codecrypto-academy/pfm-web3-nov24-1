@@ -7,7 +7,13 @@ import "../src/Tokens.sol";
 contract TokensDeploy is Script {
     function run() external {
         vm.startBroadcast();
-        new Tokens(0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0); // Dirección correcta con checksum
+        
+        // La dirección de Usuarios se pasará como argumento al script
+        address usuariosAddress = vm.envAddress("USUARIOS_ADDRESS");
+        Tokens tokens = new Tokens(usuariosAddress);
+        
+        console2.log("DEPLOY_ADDRESS:", address(tokens));
+
         vm.stopBroadcast();
     }
 }

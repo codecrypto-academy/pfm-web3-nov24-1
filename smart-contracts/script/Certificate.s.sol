@@ -10,14 +10,14 @@ contract CertificateDeploy is Script {
 
     function run() public {
         vm.startBroadcast();
-
-        // Dirección del contrato Tokens desplegado en el bloque 2
-        address tokensAddress = 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512;
+        
+        // La dirección de Tokens se pasará como argumento al script
+        address tokensAddress = vm.envAddress("TOKENS_ADDRESS");
         
         // Desplegar el contrato de certificación
         OliveOilCertification certification = new OliveOilCertification(tokensAddress);
         
-        console.log("Certificate contract deployed at:", address(certification));
+        console.log("DEPLOY_ADDRESS:", address(certification));
 
         vm.stopBroadcast();
     }

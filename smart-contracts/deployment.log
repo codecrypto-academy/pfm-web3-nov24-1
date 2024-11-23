@@ -1,33 +1,5 @@
-Compiling 23 files with Solc 0.8.28
-Solc 0.8.28 finished in 335.53ms
-Error: Compiler run failed:
-Error (9553): Invalid type for argument in function call. Invalid implicit conversion from literal_string "Productor1" to address requested.
-  --> script/Setup.s.sol:25:31:
-   |
-25 |         usuarios.nuevoUsuario("Productor1", "Productor", "Productor de aceite 1", "CIF123");
-   |                               ^^^^^^^^^^^^
-
-Error (9553): Invalid type for argument in function call. Invalid implicit conversion from literal_string "Transportista1" to address requested.
-  --> script/Setup.s.sol:26:31:
-   |
-26 |         usuarios.nuevoUsuario("Transportista1", "Transportista", "Transportista 1", "CIF456");
-   |                               ^^^^^^^^^^^^^^^^
-
-Error (9553): Invalid type for argument in function call. Invalid implicit conversion from literal_string "Distribuidor1" to address requested.
-  --> script/Setup.s.sol:27:31:
-   |
-27 |         usuarios.nuevoUsuario("Distribuidor1", "Distribuidor", "Distribuidor 1", "CIF789");
-   |                               ^^^^^^^^^^^^^^^
-
-Error (9553): Invalid type for argument in function call. Invalid implicit conversion from literal_string "Aceite de oliva virgen extra de primera prensada" to uint256 requested.
-  --> script/Setup.s.sol:43:13:
-   |
-43 |             "Aceite de oliva virgen extra de primera prensada",
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Error (9553): Invalid type for argument in function call. Invalid implicit conversion from int_const 1000 to string memory requested.
-  --> script/Setup.s.sol:44:13:
-   |
-44 |             1000,
-   |             ^^^^
-
+{
+  "usuarios": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "tokens": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  "certificate": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+}

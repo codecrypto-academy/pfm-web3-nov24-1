@@ -35,6 +35,10 @@ export interface DetailedTransaction {
   attributes: TokenAttribute[]
   rawMaterials: RawMaterial[]
 
+  // Ubicaciones
+  fromLocation: [number, number] | null
+  toLocation: [number, number] | null
+
   // Datos de participantes
   from: {
     address: string
@@ -50,8 +54,4 @@ export interface DetailedTransaction {
     gps: string
     active: boolean
   }
-
-  // Ubicaciones
-  fromLocation: [number, number]
-  toLocation: [number, number]
 }

@@ -58,13 +58,18 @@ const ParticipantsMap: React.FC<ParticipantsMapProps> = ({ participants }) => {
       participants.forEach(participant => {
         if (participant.gps) {
           try {
+            console.log('GPS original:', participant.gps);
+            // Las coordenadas GPS vienen en formato "latitud,longitud"
             const [lat, lng] = participant.gps.split(',').map(coord => parseFloat(coord.trim()));
+            console.log('Coordenadas procesadas:', { lat, lng });
+            
             if (!isNaN(lat) && !isNaN(lng)) {
               const marker = L.marker([lat, lng])
                 .bindPopup(`
                   <div class="text-sm">
                     <strong>${participant.nombre}</strong><br/>
-                    Coordenadas: ${lat.toFixed(4)}, ${lng.toFixed(4)}
+                    <strong>Rol:</strong> ${participant.rol}<br/>
+                    <strong>Coordenadas:</strong> ${lat.toFixed(4)}, ${lng.toFixed(4)}
                   </div>
                 `);
               markerGroup.addLayer(marker);

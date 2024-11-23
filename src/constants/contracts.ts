@@ -1,7 +1,7 @@
 // Direcciones y ABIs de los contratos
 export const CONTRACTS = {
   Usuarios: {
-    address: "0xc6e7df5e7b4f2a278906862b61205850344d4e7d",
+    address: "0x5fbdb2315678afecb367f032d93f642f64180aa3",
     abi: [
   {
     "type": "constructor",
@@ -238,7 +238,7 @@ export const CONTRACTS = {
 ]
   },
   Tokens: {
-    address: "0x59b670e9fa9d0a427751af201d676719a970857b",
+    address: "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9",
     abi: [
   {
     "type": "constructor",
@@ -728,7 +728,7 @@ export const CONTRACTS = {
 ]
   },
   Certificate: {
-    address: "0x4ed7c70f96b99c776995fb64377f0d4ab3b0e1c1",
+    address: "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9",
     abi: [
   {
     "type": "constructor",
@@ -874,9 +874,9 @@ export const CONTRACTS = {
 } as const;
 
 // Exportaciones individuales para compatibilidad
-export const USUARIOS_ADDRESS = "0xc6e7df5e7b4f2a278906862b61205850344d4e7d";
-export const TOKENS_ADDRESS = "0x59b670e9fa9d0a427751af201d676719a970857b";
-export const CERTIFICATE_ADDRESS = "0x4ed7c70f96b99c776995fb64377f0d4ab3b0e1c1";
+export const USUARIOS_ADDRESS = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
+export const TOKENS_ADDRESS = "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9";
+export const CERTIFICATE_ADDRESS = "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9";
 
 export const USUARIOS_ABI = [
   {
