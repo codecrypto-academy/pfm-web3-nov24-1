@@ -125,13 +125,13 @@ export default function ClientTransactions({ role }: { role: string }) {
       const filteredEvents = events
         .filter((event): event is ethers.EventLog => event instanceof ethers.EventLog)
         .filter((event) => {
-          if (!event.args || event.args.length < 4) {
+          if (!event.args || event.args.length < 5) {
             console.log('Evento sin argumentos válidos:', event)
             return false
           }
 
-          const from = event.args[1].toString().toLowerCase()
-          const to = event.args[2].toString().toLowerCase()
+          const from = event.args[2].toString().toLowerCase()
+          const to = event.args[3].toString().toLowerCase()
           const userAddress = address?.toLowerCase()
 
           if (!userAddress) {
@@ -173,9 +173,9 @@ export default function ClientTransactions({ role }: { role: string }) {
         filteredEvents.map(async (event) => {
           try {
             const args = event.args
-            if (!args || args.length < 4) return null
+            if (!args || args.length < 5) return null
 
-            const [tokenId, from, to, cantidad] = args
+            const [transferId, tokenId, from, to, cantidad] = args
             const fromAddress = from.toString().toLowerCase()
             const toAddress = to.toString().toLowerCase()
 
@@ -190,6 +190,29 @@ export default function ClientTransactions({ role }: { role: string }) {
               console.log('Participante no encontrado:', { fromAddress, toAddress })
               return null
             }
+
+            // Obtener el estado de la transferencia
+            const transfer = await tokensContract.transfers(transferId)
+            // Convertir el número del estado a EstadoTransferencia
+            const estadoNumero = Number(transfer.estado)
+            let estado: EstadoTransferencia
+            
+            if (estadoNumero === 0) {
+              estado = EstadoTransferencia.EN_TRANSITO
+            } else if (estadoNumero === 1) {
+              estado = EstadoTransferencia.COMPLETADA
+            } else if (estadoNumero === 2) {
+              estado = EstadoTransferencia.CANCELADA
+            } else {
+              console.error('Estado inválido recibido del contrato:', estadoNumero)
+              estado = EstadoTransferencia.EN_TRANSITO // valor por defecto
+            }
+
+            console.log('Estado de transferencia:', { 
+              transferId: transferId.toString(), 
+              estadoNumero, 
+              estado 
+            })
 
             const [attrNames, receipt, block, token] = await Promise.all([
               tokensContract.getNombresAtributos(tokenId),
@@ -232,58 +255,9 @@ export default function ClientTransactions({ role }: { role: string }) {
 
             console.log('Atributos procesados:', attributes)
 
-            // Determinar el estado de la transferencia
-            let estado = EstadoTransferencia.COMPLETADA
-            let transferId = 0
-
-            // Buscar todas las transferencias para este token
-            const transferFilter = tokensContract.filters.TokenTransferido()
-            const transferEvents = await tokensContract.queryFilter(transferFilter)
-            
-            // Filtrar los eventos que coincidan con el tokenId y las direcciones
-            const relevantTransfers = transferEvents.filter(event => {
-              if (!('args' in event)) return false
-              const args = event.args
-              return args[0] === tokenId && 
-                     args[1].toLowerCase() === from.toLowerCase() && 
-                     args[2].toLowerCase() === to.toLowerCase()
-            })
-            
-            if (relevantTransfers.length > 0) {
-              // Obtener el último evento de transferencia
-              const lastTransferEvent = relevantTransfers[relevantTransfers.length - 1]
-              
-              try {
-                // Obtener las transferencias pendientes del destinatario
-                const pendingTransfers = await tokensContract.getTransferenciasPendientes(to)
-                
-                // Si hay transferencias pendientes, el estado es EN_TRANSITO
-                if (pendingTransfers.length > 0) {
-                  estado = EstadoTransferencia.EN_TRANSITO
-                  // Buscar el ID de la transferencia que coincide
-                  for (const id of pendingTransfers) {
-                    try {
-                      const transfer = await tokensContract.transfers(id)
-                      if (transfer.tokenId.toString() === tokenId.toString() &&
-                          transfer.from.toLowerCase() === from.toLowerCase() &&
-                          transfer.to.toLowerCase() === to.toLowerCase()) {
-                        transferId = id
-                        break
-                      }
-                    } catch (error) {
-                      console.error('Error al verificar transferencia:', error)
-                      continue // Continue with next transfer if one fails
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('Error al obtener transferencias pendientes:', error)
-              }
-            }
-
             const transaction: DetailedTransaction = {
               id: event.transactionHash,
-              transferId,
+              transferId: Number(transferId),
               tokenId: Number(tokenId),
               blockNumber: event.blockNumber,
               gasUsed: receipt.gasUsed.toString(),

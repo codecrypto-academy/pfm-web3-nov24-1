@@ -699,6 +699,12 @@ export const CONTRACTS = {
     "name": "TokenTransferido",
     "inputs": [
       {
+        "name": "transferId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
         "name": "tokenId",
         "type": "uint256",
         "indexed": false,
@@ -1571,6 +1577,12 @@ export const TOKENS_ABI = [
     "type": "event",
     "name": "TokenTransferido",
     "inputs": [
+      {
+        "name": "transferId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
       {
         "name": "tokenId",
         "type": "uint256",

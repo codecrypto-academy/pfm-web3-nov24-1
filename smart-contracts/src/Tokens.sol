@@ -64,7 +64,7 @@ contract Tokens {
     mapping(address => mapping(uint256 => uint256)) public tokensEnTransito;
 
     event TokenCreado(uint256 id, string nombre, address creador, uint256 cantidad);
-    event TokenTransferido(uint256 tokenId, address from, address to, uint256 cantidad);
+    event TokenTransferido(uint256 transferId, uint256 tokenId, address from, address to, uint256 cantidad);
 
     constructor(address _direccionUsuarios) {
         usuarios = Usuarios(_direccionUsuarios);
@@ -136,7 +136,7 @@ contract Tokens {
             timestampCompletado: 0
         });
 
-        emit TokenTransferido(_tokenId, msg.sender, _to, _cantidad);
+        emit TokenTransferido(transferId, _tokenId, msg.sender, _to, _cantidad);
     }
 
     // Función para aceptar una transferencia
@@ -156,7 +156,7 @@ contract Tokens {
         transfer.estado = EstadoTransferencia.COMPLETADA;
         transfer.timestampCompletado = block.timestamp;
 
-        emit TokenTransferido(tokenId, transfer.from, msg.sender, cantidad);
+        emit TokenTransferido(_transferId, tokenId, transfer.from, msg.sender, cantidad);
     }
 
     // Función para rechazar una transferencia
@@ -177,7 +177,7 @@ contract Tokens {
         transfer.estado = EstadoTransferencia.CANCELADA;
         transfer.timestampCompletado = block.timestamp;
 
-        emit TokenTransferido(tokenId, msg.sender, from, cantidad);
+        emit TokenTransferido(_transferId, tokenId, msg.sender, from, cantidad);
     }
 
     // Función para obtener transferencias pendientes
