@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useWeb3 } from '@/context/Web3Context'
 import TransactionMap from '@/components/shared/TransactionMap'
 import TransactionDetails from '@/components/shared/TransactionDetails'
+import TransactionGroup from '@/components/shared/TransactionGroup'
 import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import { DetailedTransaction, EstadoTransferencia, RawMaterial, TokenAttribute } from '@/types/transactions'
@@ -32,6 +33,11 @@ interface TokenEventArgs {
 
 interface TokenEvent {
   args: [bigint, string, string, bigint]
+}
+
+interface TransactionGroup {
+  tokenId: number;
+  transactions: DetailedTransaction[];
 }
 
 export default function ClientTransactions({ role }: { role: string }) {
@@ -386,6 +392,16 @@ export default function ClientTransactions({ role }: { role: string }) {
         (tx): tx is DetailedTransaction => tx !== null
       )
 
+      const groupedTransactions = validTransactions.reduce<TransactionGroup[]>((acc, transaction) => {
+        const existingGroup = acc.find((group) => group.tokenId === transaction.tokenId);
+        if (existingGroup) {
+          existingGroup.transactions.push(transaction);
+        } else {
+          acc.push({ tokenId: transaction.tokenId, transactions: [transaction] });
+        }
+        return acc;
+      }, []);
+
       setTransactions(validTransactions)
       setLoading(false)
     } catch (error) {
@@ -419,28 +435,33 @@ export default function ClientTransactions({ role }: { role: string }) {
     return <div className="text-gray-600 p-4">No hay transacciones disponibles</div>
   }
 
+  const groupedTransactions = transactions.reduce<TransactionGroup[]>((acc, transaction) => {
+    const existingGroup = acc.find((group) => group.tokenId === transaction.tokenId);
+    if (existingGroup) {
+      existingGroup.transactions.push(transaction);
+    } else {
+      acc.push({ tokenId: transaction.tokenId, transactions: [transaction] });
+    }
+    return acc;
+  }, []);
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-4">Transacciones</h2>
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+    <div>
       {loading ? (
         <div className="text-center">Cargando transacciones...</div>
       ) : transactions.length === 0 ? (
         <div className="text-center">No hay transacciones para mostrar</div>
       ) : (
-        <div className="space-y-4">
-          {transactions.map((transaction) => (
-            <TransactionDetails 
-              key={transaction.id} 
-              transaction={transaction}
+        <div className="space-y-6">
+          {groupedTransactions.map((group) => (
+            <TransactionGroup 
+              key={`${group.tokenId}`} 
+              transactions={group.transactions}
+              address={address || ''}
             />
           ))}
         </div>
       )}
     </div>
-  )
+  );
 }

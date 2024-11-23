@@ -7,7 +7,7 @@ import Header from '@/components/ui/Header'
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
-import { HomeIcon, ClockIcon, PlusIcon, TruckIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, ClockIcon, PlusIcon, TruckIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { CONTRACTS } from '@/constants/contracts'
 
 interface LayoutProps {
@@ -18,6 +18,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
     const [account, setAccount] = useState('')
     const { role, isAuthenticated, isLoading, address } = useWeb3()
     const [pendingTransfers, setPendingTransfers] = useState(0)
+    const [isMenuOpen, setIsMenuOpen] = useState(true)
     const router = useRouter()
 
     // Función para cargar las transferencias pendientes para la fábrica
@@ -179,73 +180,18 @@ export default function DashboardLayout({ children }: LayoutProps) {
                             <div className="border-t border-olive-200 my-4 opacity-50" />
                             <li>
                                 <Link
-                                    href="/dashboard/fabrica/procesar"
+                                    href="/dashboard/fabrica/transferencias"
                                     className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
                                 >
-                                    <PlusIcon className="w-5 h-5" />
-                                    <span className="font-medium">Procesar Aceite</span>
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/dashboard/fabrica/pending"
-                                    className="flex items-center justify-between text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <TruckIcon className="w-5 h-5" />
-                                        <span className="font-medium">Productos en Camino</span>
-                                    </div>
+                                    <TruckIcon className="w-5 h-5" />
+                                    <span className="font-medium">Transferencias</span>
                                     {pendingTransfers > 0 && (
-                                        <span className="flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-600 rounded-full animate-pulse">
+                                        <span className="ml-auto bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium">
                                             {pendingTransfers}
                                         </span>
                                     )}
                                 </Link>
                             </li>
-                        </ul>
-                    </nav>
-                )
-            case 'distribuidor':
-                return (
-                    <nav className="p-6">
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold text-olive-800">Panel de Distribuidor</h2>
-                            <p className="text-sm text-olive-600">Distribución de Aceite</p>
-                        </div>
-                        <ul className="space-y-2">
-                            {commonNavItems.map((item) => (
-                                <li key={item.name}>
-                                    <Link
-                                        href={item.href}
-                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                    >
-                                        <item.icon className="w-5 h-5" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </nav>
-                )
-            case 'mayorista':
-                return (
-                    <nav className="p-6">
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold text-olive-800">Panel de Mayorista</h2>
-                            <p className="text-sm text-olive-600">Gestión de Ventas al Mayor</p>
-                        </div>
-                        <ul className="space-y-2">
-                            {commonNavItems.map((item) => (
-                                <li key={item.name}>
-                                    <Link
-                                        href={item.href}
-                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                    >
-                                        <item.icon className="w-5 h-5" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </Link>
-                                </li>
-                            ))}
                         </ul>
                     </nav>
                 )
@@ -271,7 +217,6 @@ export default function DashboardLayout({ children }: LayoutProps) {
                         </ul>
                     </nav>
                 )
-            // Add similar sections for other roles
         }
     }
 
@@ -281,11 +226,36 @@ export default function DashboardLayout({ children }: LayoutProps) {
             <BubbleBackground />
             <div className="pt-[73px]">
                 <div className="relative">
+                    {/* Botón para mostrar/ocultar menú */}
+                    <button
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className={`fixed z-20 top-[85px] p-2 bg-white/80 backdrop-blur-sm border border-olive-200 rounded-r-lg shadow-lg transition-all duration-300 ${
+                            isMenuOpen ? 'left-64' : 'left-0'
+                        }`}
+                    >
+                        {isMenuOpen ? (
+                            <XMarkIcon className="w-6 h-6 text-olive-600" />
+                        ) : (
+                            <Bars3Icon className="w-6 h-6 text-olive-600" />
+                        )}
+                    </button>
+
                     <div className="flex">
-                        <aside className="fixed left-0 top-[73px] h-[calc(100vh-73px)] w-64 backdrop-blur-sm bg-white/80 border-r border-olive-200 shadow-lg">
+                        {/* Menú lateral con animación */}
+                        <aside 
+                            className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] w-64 backdrop-blur-sm bg-white/80 border-r border-olive-200 shadow-lg transition-transform duration-300 ${
+                                isMenuOpen ? 'translate-x-0' : '-translate-x-full'
+                            }`}
+                        >
                             {renderNavigation()}
                         </aside>
-                        <main className="flex-1 ml-64 p-6 shadow-sm bg-white/50 backdrop-blur-sm rounded-lg">
+
+                        {/* Contenido principal con animación */}
+                        <main 
+                            className={`flex-1 p-6 shadow-sm bg-white/50 backdrop-blur-sm rounded-lg transition-all duration-300 ${
+                                isMenuOpen ? 'ml-64' : 'ml-0'
+                            }`}
+                        >
                             {children}
                         </main>
                     </div>

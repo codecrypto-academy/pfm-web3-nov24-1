@@ -34,6 +34,14 @@ export default function TransactionDetails({
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
+  const formatAttributeName = (name: string) => {
+    // Convertir de snake_case a Title Case
+    return name
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
+
   const getEstadoLabel = (estado: EstadoTransferencia) => {
     switch (estado) {
       case EstadoTransferencia.EN_TRANSITO:
@@ -119,22 +127,27 @@ export default function TransactionDetails({
           <Tab.Panel className="bg-white rounded-xl p-3">
             <dl className="grid grid-cols-1 gap-x-4 gap-y-4">
               <div className="col-span-1">
-                <dt className="text-sm font-medium text-gray-500">Atributos</dt>
+                <dt className="text-sm font-medium text-gray-500 mb-3">Atributos</dt>
                 <dd className="mt-1">
                   {transaction.attributes.length > 0 ? (
-                    <ul className="divide-y divide-gray-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {transaction.attributes.map((attr) => (
-                        <li key={`${attr.nombre}-${attr.timestamp}`} className="py-2">
-                          <div key={`attr-value-${attr.nombre}-${attr.timestamp}`} className="flex justify-between">
-                            <span className="text-sm text-gray-900">{attr.nombre}</span>
-                            <span className="text-sm text-gray-500">{attr.valor}</span>
-                          </div>
-                          <div key={`attr-date-${attr.nombre}-${attr.timestamp}`} className="text-xs text-gray-500">
+                        <div
+                          key={`${attr.nombre}-${attr.timestamp}`}
+                          className="bg-gradient-to-br from-white to-gray-50 rounded-lg border border-olive-100 p-4 shadow-sm hover:shadow-md transition-all duration-300 hover:border-olive-200"
+                        >
+                          <h4 className="text-sm font-semibold text-olive-700 mb-2 border-b border-olive-100 pb-2">
+                            {formatAttributeName(attr.nombre)}
+                          </h4>
+                          <p className="text-lg text-gray-800 mb-2 font-medium">
+                            {attr.valor}
+                          </p>
+                          <p className="text-xs text-olive-500">
                             {formatDate(attr.timestamp)}
-                          </div>
-                        </li>
+                          </p>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-500">No hay atributos</p>
                   )}

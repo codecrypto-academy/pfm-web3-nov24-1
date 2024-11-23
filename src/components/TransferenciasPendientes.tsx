@@ -5,8 +5,17 @@ import { ethers } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import { useWeb3 } from '@/context/Web3Context'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
-import TransactionMap from '@/components/shared/TransactionMap'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+
+const TransactionMap = dynamic(() => import('./shared/TransactionMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+      <div className="animate-pulse text-gray-500">Cargando mapa...</div>
+    </div>
+  )
+})
 
 interface Transfer {
     id: number
