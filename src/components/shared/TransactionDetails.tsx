@@ -3,11 +3,17 @@
 import { useState } from 'react'
 import { Tab } from '@headlessui/react'
 import { ethers } from 'ethers'
-import TransactionMap from './TransactionMap'
+import dynamic from 'next/dynamic'
 import { DetailedTransaction, EstadoTransferencia } from '@/types/transactions'
+
+const TransactionMap = dynamic(
+  () => import('./TransactionMap'),
+  { ssr: false }
+)
 
 interface TransactionDetailsProps {
   transaction: DetailedTransaction
+  showTokenId?: boolean
 }
 
 function classNames(...classes: string[]) {
@@ -15,7 +21,8 @@ function classNames(...classes: string[]) {
 }
 
 export default function TransactionDetails({ 
-  transaction
+  transaction,
+  showTokenId = true
 }: TransactionDetailsProps) {
   const [selectedTab, setSelectedTab] = useState(0)
 
@@ -93,10 +100,12 @@ export default function TransactionDetails({
         <Tab.Panels>
           <Tab.Panel className="bg-white rounded-xl p-3">
             <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-              <div className="sm:col-span-1">
-                <dt className="text-sm font-medium text-gray-500">ID de Token</dt>
-                <dd className="mt-1 text-sm text-gray-900">{transaction.tokenId}</dd>
-              </div>
+              {showTokenId && (
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">ID de Token</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{transaction.tokenId}</dd>
+                </div>
+              )}
               <div className="sm:col-span-1">
                 <dt className="text-sm font-medium text-gray-500">Cantidad</dt>
                 <dd className="mt-1 text-sm text-gray-900">{transaction.quantity}</dd>
@@ -114,13 +123,13 @@ export default function TransactionDetails({
                 <dd className="mt-1">
                   {transaction.attributes.length > 0 ? (
                     <ul className="divide-y divide-gray-200">
-                      {transaction.attributes.map((attr, index) => (
-                        <li key={index} className="py-2">
-                          <div className="flex justify-between">
+                      {transaction.attributes.map((attr) => (
+                        <li key={`${attr.nombre}-${attr.timestamp}`} className="py-2">
+                          <div key={`attr-value-${attr.nombre}-${attr.timestamp}`} className="flex justify-between">
                             <span className="text-sm text-gray-900">{attr.nombre}</span>
                             <span className="text-sm text-gray-500">{attr.valor}</span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div key={`attr-date-${attr.nombre}-${attr.timestamp}`} className="text-xs text-gray-500">
                             {formatDate(attr.timestamp)}
                           </div>
                         </li>
@@ -136,15 +145,15 @@ export default function TransactionDetails({
                   <dt className="text-sm font-medium text-gray-500">Materias Primas</dt>
                   <dd className="mt-1">
                     <ul className="divide-y divide-gray-200">
-                      {transaction.rawMaterials.map((material, index) => (
-                        <li key={index} className="py-2">
-                          <div className="flex justify-between">
+                      {transaction.rawMaterials.map((material) => (
+                        <li key={`${material.tokenHijo}-${material.tokenPadre}-${material.timestamp}`} className="py-2">
+                          <div key={`material-value-${material.tokenHijo}-${material.timestamp}`} className="flex justify-between">
                             <span className="text-sm text-gray-900">Token #{material.tokenHijo}</span>
                             <span className="text-sm text-gray-500">
                               {material.cantidadUsada} unidades
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div key={`material-date-${material.tokenHijo}-${material.timestamp}`} className="text-xs text-gray-500">
                             Usado en Token #{material.tokenPadre} - {formatDate(material.timestamp)}
                           </div>
                         </li>
@@ -189,15 +198,22 @@ export default function TransactionDetails({
           </Tab.Panel>
           <Tab.Panel className="bg-white rounded-xl p-3">
             <div className="h-96">
-              <TransactionMap
-                fromLocation={transaction.fromLocation}
-                toLocation={transaction.toLocation}
-                transaction={{
-                  from: transaction.from.name,
-                  to: transaction.to.name,
-                  product: transaction.product
-                }}
-              />
+              {transaction.fromLocation && transaction.toLocation ? (
+                <TransactionMap
+                  fromLocation={transaction.fromLocation}
+                  toLocation={transaction.toLocation}
+                  transaction={{
+                    from: transaction.from.name,
+                    to: transaction.to.name,
+                    product: transaction.product,
+                    id: transaction.id
+                  }}
+                />
+              ) : (
+                <div className="text-gray-500 text-sm">
+                  No hay coordenadas disponibles para mostrar el mapa
+                </div>
+              )}
             </div>
           </Tab.Panel>
         </Tab.Panels>

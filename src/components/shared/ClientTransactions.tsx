@@ -121,21 +121,12 @@ export default function ClientTransactions({ role }: { role: string }) {
 
       console.log('Total de eventos encontrados:', events.length)
 
-      // Crear un Set para mantener un registro de las transacciones únicas
-      const processedTransactionHashes = new Set<string>()
-
       // Filtrar eventos relevantes según el rol
       const filteredEvents = events
         .filter((event): event is ethers.EventLog => event instanceof ethers.EventLog)
         .filter((event) => {
           if (!event.args || event.args.length < 4) {
             console.log('Evento sin argumentos válidos:', event)
-            return false
-          }
-
-          // Verificar si ya hemos procesado esta transacción
-          if (processedTransactionHashes.has(event.transactionHash)) {
-            console.log('Transacción duplicada encontrada:', event.transactionHash)
             return false
           }
 
@@ -148,16 +139,9 @@ export default function ClientTransactions({ role }: { role: string }) {
             return false
           }
 
-          let isRelevant = false
-          if (role === 'productor') {
-            isRelevant = from === userAddress || to === userAddress
-          } else if (role === 'fabrica') {
-            isRelevant = to === userAddress && event.args.length >= 4
-          }
-
-          if (isRelevant) {
-            processedTransactionHashes.add(event.transactionHash)
-          }
+          const isRelevant = role === 'productor' 
+            ? (from === userAddress || to === userAddress)
+            : (role === 'fabrica' ? to === userAddress : false)
 
           console.log('Evaluando evento:', {
             from,
@@ -165,8 +149,7 @@ export default function ClientTransactions({ role }: { role: string }) {
             userAddress,
             role,
             isRelevant,
-            eventId: event.transactionHash,
-            isDuplicate: processedTransactionHashes.has(event.transactionHash)
+            eventId: event.transactionHash
           })
 
           return isRelevant
@@ -253,26 +236,67 @@ export default function ClientTransactions({ role }: { role: string }) {
             let estado = EstadoTransferencia.COMPLETADA
             let transferId = 0
 
-            // Usar el evento actual en lugar de buscar todos los eventos de nuevo
-            const transactionHash = event.transactionHash
-            const blockTimestamp = Number(block.timestamp)
+            // Buscar todas las transferencias para este token
+            const transferFilter = tokensContract.filters.TokenTransferido()
+            const transferEvents = await tokensContract.queryFilter(transferFilter)
+            
+            // Filtrar los eventos que coincidan con el tokenId y las direcciones
+            const relevantTransfers = transferEvents.filter(event => {
+              if (!('args' in event)) return false
+              const args = event.args
+              return args[0] === tokenId && 
+                     args[1].toLowerCase() === from.toLowerCase() && 
+                     args[2].toLowerCase() === to.toLowerCase()
+            })
+            
+            if (relevantTransfers.length > 0) {
+              // Obtener el último evento de transferencia
+              const lastTransferEvent = relevantTransfers[relevantTransfers.length - 1]
+              
+              try {
+                // Obtener las transferencias pendientes del destinatario
+                const pendingTransfers = await tokensContract.getTransferenciasPendientes(to)
+                
+                // Si hay transferencias pendientes, el estado es EN_TRANSITO
+                if (pendingTransfers.length > 0) {
+                  estado = EstadoTransferencia.EN_TRANSITO
+                  // Buscar el ID de la transferencia que coincide
+                  for (const id of pendingTransfers) {
+                    try {
+                      const transfer = await tokensContract.transfers(id)
+                      if (transfer.tokenId.toString() === tokenId.toString() &&
+                          transfer.from.toLowerCase() === from.toLowerCase() &&
+                          transfer.to.toLowerCase() === to.toLowerCase()) {
+                        transferId = id
+                        break
+                      }
+                    } catch (error) {
+                      console.error('Error al verificar transferencia:', error)
+                      continue // Continue with next transfer if one fails
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error al obtener transferencias pendientes:', error)
+              }
+            }
 
             const transaction: DetailedTransaction = {
-              id: transactionHash,
-              tokenId: Number(tokenId),
+              id: event.transactionHash,
               transferId,
+              tokenId: Number(tokenId),
               blockNumber: event.blockNumber,
               gasUsed: receipt.gasUsed.toString(),
               gasPrice: receipt.gasPrice?.toString() || '0',
-              timestamp: blockTimestamp,
+              timestamp: Number(block.timestamp),
               estado,
-              product: token[1],
-              description: token[3],
+              product: token.nombre,
+              description: token.descripcion,
               quantity: Number(cantidad),
-              attributes,
+              attributes, // Asignar los atributos procesados
               rawMaterials: [],
-              fromLocation: fromParticipant.gps.split(',').map(Number) as [number, number],
-              toLocation: toParticipant.gps.split(',').map(Number) as [number, number],
+              fromLocation: null,  // Inicializar como null
+              toLocation: null,    // Inicializar como null
               from: {
                 address: fromAddress,
                 name: fromParticipant.nombre,
@@ -287,6 +311,93 @@ export default function ClientTransactions({ role }: { role: string }) {
                 gps: toParticipant.gps,
                 active: toParticipant.activo
               }
+            }
+
+            // Procesar coordenadas GPS
+            try {
+              if (fromParticipant.gps && toParticipant.gps) {
+                // Las coordenadas GPS vienen en formato "latitud,longitud"
+                const fromCoordsRaw = fromParticipant.gps
+                  .split(',')
+                  .map((coord: string) => coord.trim())
+                  .map((coord: string) => {
+                    const num = parseFloat(coord)
+                    return isNaN(num) ? null : num
+                  })
+
+                const toCoordsRaw = toParticipant.gps
+                  .split(',')
+                  .map((coord: string) => coord.trim())
+                  .map((coord: string) => {
+                    const num = parseFloat(coord)
+                    return isNaN(num) ? null : num
+                  })
+
+                console.log('Coordenadas raw:', {
+                  from: fromCoordsRaw,
+                  to: toCoordsRaw,
+                  fromOriginal: fromParticipant.gps,
+                  toOriginal: toParticipant.gps
+                })
+
+                // Validar que las coordenadas estén dentro de rangos válidos
+                const fromCoords = fromCoordsRaw
+                  .map((coord: number | null) => {
+                    if (coord === null) return null
+                    // Latitud debe estar entre -90 y 90, longitud entre -180 y 180
+                    return (coord >= -180 && coord <= 180) ? coord : null
+                  })
+                  .filter((coord: number | null): coord is number => coord !== null)
+
+                const toCoords = toCoordsRaw
+                  .map((coord: number | null) => {
+                    if (coord === null) return null
+                    // Latitud debe estar entre -90 y 90, longitud entre -180 y 180
+                    return (coord >= -180 && coord <= 180) ? coord : null
+                  })
+                  .filter((coord: number | null): coord is number => coord !== null)
+
+                // Validar que las coordenadas sean números válidos y estén en rangos razonables
+                if (fromCoords.length === 2 && 
+                    toCoords.length === 2 &&
+                    fromCoords.every((coord: number | null) => coord !== null) &&
+                    toCoords.every((coord: number | null) => coord !== null)) {
+                  
+                  const [fromLat, fromLng] = fromCoords as [number, number]
+                  const [toLat, toLng] = toCoords as [number, number]
+
+                  // Validar rangos de coordenadas
+                  if (Math.abs(fromLat) <= 90 && Math.abs(fromLng) <= 180 &&
+                      Math.abs(toLat) <= 90 && Math.abs(toLng) <= 180) {
+                    
+                    transaction.fromLocation = [fromLat, fromLng]
+                    transaction.toLocation = [toLat, toLng]
+
+                    console.log('Coordenadas procesadas y validadas:', {
+                      from: transaction.fromLocation,
+                      to: transaction.toLocation
+                    })
+                  } else {
+                    console.error('Coordenadas fuera de rango:', {
+                      fromLat, fromLng, toLat, toLng
+                    })
+                  }
+                } else {
+                  console.error('Formato de coordenadas GPS inválido:', {
+                    fromGPS: fromParticipant.gps,
+                    toGPS: toParticipant.gps,
+                    fromParsed: fromCoordsRaw,
+                    toParsed: toCoordsRaw
+                  })
+                }
+              } else {
+                console.log('No hay coordenadas GPS disponibles para:', {
+                  from: fromParticipant.direccion,
+                  to: toParticipant.direccion
+                })
+              }
+            } catch (error) {
+              console.error('Error al procesar coordenadas GPS:', error)
             }
 
             return transaction

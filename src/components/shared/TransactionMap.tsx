@@ -5,8 +5,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 interface TransactionMapProps {
-  fromLocation: [number, number]
-  toLocation: [number, number]
+  fromLocation: [number, number] | null
+  toLocation: [number, number] | null
   transaction: {
     from: string
     to: string
@@ -21,6 +21,10 @@ export default function TransactionMap({ fromLocation, toLocation, transaction }
   const mapId = `map-${transaction.id || Math.random().toString(36).substr(2, 9)}`
 
   useEffect(() => {
+    if (!fromLocation || !toLocation) {
+      return
+    }
+
     if (typeof window === 'undefined') return
 
     // Validar coordenadas
