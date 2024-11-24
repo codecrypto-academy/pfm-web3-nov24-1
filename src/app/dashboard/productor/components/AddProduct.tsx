@@ -34,7 +34,19 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
             nombre: 'metodoRecoleccion', 
             valor: '', 
             label: 'Método de Recolección',
-            valoresPosibles: []  // Aquí guardaremos los valores posibles
+            valoresPosibles: ['Manual (Vareo tradicional)', 'Mecánico (Vibrador)', 'Mixto (Combinación de ambos)']
+        },
+        {
+            nombre: 'Procesado',
+            valor: 'false',
+            label: 'Procesado',
+            valoresPosibles: ['true', 'false']
+        },
+        {
+            nombre: 'MateriaPrima',
+            valor: 'true',
+            label: 'Es Materia Prima',
+            valoresPosibles: ['true', 'false']
         }
     ])
 

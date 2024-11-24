@@ -19,8 +19,30 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
     if (!isOpen || !token) return null
 
     const handleSubmit = async () => {
-        await onSubmit(token, quantity)
-        onClose()
+        // Asegurarnos de que heredamos los atributos del token base
+        const baseAttributes = Object.entries(token.atributos).map(([nombre, attr]) => ({
+            nombre,
+            valor: attributes.find(a => a.nombre === nombre)?.valor || attr.valor,
+            timestamp: Date.now()
+        }));
+
+        // Asegurarnos de que los atributos críticos se heredan
+        const criticalAttributes = ['MateriaPrima', 'Procesado', 'metodoRecoleccion'];
+        criticalAttributes.forEach(attrName => {
+            if (!baseAttributes.some(attr => attr.nombre === attrName) && token.atributos[attrName]) {
+                baseAttributes.push({
+                    nombre: attrName,
+                    valor: token.atributos[attrName].valor,
+                    timestamp: Date.now()
+                });
+            }
+        });
+
+        // Actualizar los atributos con los valores heredados
+        setAttributes(baseAttributes);
+        
+        await onSubmit(token, quantity);
+        onClose();
     }
 
     return createPortal(

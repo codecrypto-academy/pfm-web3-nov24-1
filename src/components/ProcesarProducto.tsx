@@ -18,6 +18,7 @@ interface Token {
     cantidadTotal: number
     numRemesas: number
     remesas: Remesa[]
+    isRecipe?: boolean
 }
 
 interface Ingredient {
@@ -34,6 +35,7 @@ export default function ProcessProduct() {
     const { address } = useWeb3()
     const [rawMaterials, setRawMaterials] = useState<Token[]>([])
     const [processedProducts, setProcessedProducts] = useState<Token[]>([])
+    const [recipes, setRecipes] = useState<Token[]>([])
     const [selectedIngredients, setSelectedIngredients] = useState<Ingredient[]>([])
     const [newProductName, setNewProductName] = useState('')
     const [newProductDescription, setNewProductDescription] = useState('')
@@ -41,6 +43,9 @@ export default function ProcessProduct() {
     const [error, setError] = useState('')
     const [expandedToken, setExpandedToken] = useState<string | null>(null)
     const [attributes, setAttributes] = useState<Attribute[]>([])
+    const [isRecipeMode, setIsRecipeMode] = useState(false)
+    const [selectedRecipe, setSelectedRecipe] = useState<Token | null>(null)
+    const [productQuantity, setProductQuantity] = useState(1)
 
     // Cargar tokens disponibles
     useEffect(() => {
@@ -187,26 +192,129 @@ export default function ProcessProduct() {
         }
     }
 
-    const addIngredient = (token: Token) => {
-        setSelectedIngredients(prev => [...prev, { token, quantity: 0 }])
+    // Función para cargar recetas (tokens con cantidad 0)
+    const fetchRecipes = async () => {
+        if (!address) return
+
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const contract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                provider
+            )
+
+            const filter = contract.filters.TokenCreado()
+            const events = await contract.queryFilter(filter)
+            const recipesMap = new Map<string, Token>()
+
+            for (const event of events) {
+                const parsedLog = contract.interface.parseLog({
+                    topics: event.topics,
+                    data: event.data
+                })
+                if (!parsedLog) continue
+
+                const tokenId = parsedLog.args[0]
+                const token = await contract.tokens(tokenId)
+                const balance = await contract.getBalance(tokenId, token[2]) // token[2] es el creador
+
+                // Si la cantidad es 0, es una receta
+                if (Number(balance) === 0) {
+                    const nombre = token[1]
+                    const remesa: Remesa = {
+                        id: Number(tokenId),
+                        cantidad: 0,
+                        timestamp: Number(token[5]),
+                        transactionHash: event.transactionHash,
+                        creador: token[2]
+                    }
+
+                    if (!recipesMap.has(nombre)) {
+                        recipesMap.set(nombre, {
+                            nombre: nombre,
+                            descripcion: token[3],
+                            cantidadTotal: 0,
+                            numRemesas: 1,
+                            remesas: [remesa],
+                            isRecipe: true
+                        })
+                    }
+                }
+            }
+
+            const recipesArray = Array.from(recipesMap.values())
+            recipesArray.sort((a, b) => a.nombre.localeCompare(b.nombre))
+            setRecipes(recipesArray)
+        } catch (error) {
+            console.error('Error fetching recipes:', error)
+        }
     }
 
-    const removeIngredient = (tokenId: number) => {
-        setSelectedIngredients(prev => prev.filter(ing => ing.token.remesas[0].id !== tokenId))
+    // Cargar recetas al montar el componente
+    useEffect(() => {
+        if (address) {
+            fetchRecipes()
+        }
+    }, [address])
+
+    const addIngredient = (token: Token, remesa?: Remesa) => {
+        if (isRecipeMode) {
+            // En modo receta, solo agregamos el token sin remesa específica
+            setSelectedIngredients(prev => [...prev, {
+                token: {
+                    ...token,
+                    remesas: [] // No necesitamos remesas específicas en modo receta
+                },
+                quantity: 0
+            }])
+        } else {
+            // En modo normal, necesitamos la remesa específica
+            if (remesa) {
+                setSelectedIngredients(prev => [...prev, {
+                    token: {
+                        ...token,
+                        remesas: [remesa]
+                    },
+                    quantity: 0
+                }])
+            }
+        }
     }
 
-    const updateIngredientQuantity = (tokenId: number, quantity: number) => {
+    const removeIngredient = (tokenName: string) => {
+        setSelectedIngredients(prev => prev.filter(ing => ing.token.nombre !== tokenName))
+    }
+
+    const updateIngredientQuantity = (tokenName: string, quantity: number) => {
         setSelectedIngredients(prev =>
             prev.map(ing =>
-                ing.token.remesas[0].id === tokenId
+                ing.token.nombre === tokenName
                     ? { ...ing, quantity }
                     : ing
             )
         )
     }
 
-    const processProduct = async () => {
-        if (!address || selectedIngredients.length === 0) return
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (loading) return
+
+        // Validaciones
+        if (!newProductName.trim()) {
+            setError('El nombre del producto es requerido')
+            return
+        }
+
+        if (!isRecipeMode && selectedIngredients.length === 0) {
+            setError('Debes seleccionar al menos un ingrediente')
+            return
+        }
+
+        if (!isRecipeMode && selectedIngredients.some(ing => ing.quantity <= 0)) {
+            setError('Las cantidades deben ser mayores a 0')
+            return
+        }
 
         try {
             setLoading(true)
@@ -220,41 +328,57 @@ export default function ProcessProduct() {
                 signer
             )
 
-            // Verificar que tenemos suficiente cantidad de cada ingrediente
-            for (const ing of selectedIngredients) {
-                const balance = await contract.getBalance(ing.token.remesas[0].id, address)
-                if (Number(balance) < ing.quantity * 1000) {
-                    throw new Error(`No hay suficiente cantidad de ${ing.token.nombre}`)
+            // Preparar atributos
+            const nombresAtributos = []
+            const valoresAtributos = []
+
+            // Añadir atributos personalizados
+            for (const attr of attributes) {
+                if (attr.key.trim() && attr.value.trim()) {
+                    nombresAtributos.push(attr.key)
+                    valoresAtributos.push(attr.value)
                 }
             }
 
-            // Calcular la cantidad total del nuevo producto (por ahora, suma simple)
-            const totalQuantity = selectedIngredients.reduce((sum, ing) => sum + ing.quantity, 0)
+            // Añadir ingredientes como atributos
+            for (const ing of selectedIngredients) {
+                nombresAtributos.push(`Ingrediente_${ing.token.nombre}`)
+                valoresAtributos.push(ing.quantity.toString())
+            }
 
-            // Crear el nuevo producto
-            const tx = await contract.procesarMateriasPrimas(
-                selectedIngredients.map(ing => ing.token.remesas[0].id),
-                selectedIngredients.map(ing => ing.quantity * 1000),
+            // Marcar como receta o producto procesado
+            nombresAtributos.push("Procesado")
+            valoresAtributos.push("true")
+            
+            nombresAtributos.push("EsReceta")
+            valoresAtributos.push(isRecipeMode ? "true" : "false")
+
+            // Crear el token
+            const cantidad = isRecipeMode ? 0 : productQuantity // Cantidad 0 para recetas
+            const tx = await contract.crearToken(
                 newProductName,
-                totalQuantity * 1000,
+                cantidad,
                 newProductDescription,
-                attributes.map(attr => attr.key),
-                attributes.map(attr => attr.value)
+                nombresAtributos,
+                valoresAtributos
             )
 
             await tx.wait()
-            
+
             // Limpiar el formulario
-            setSelectedIngredients([])
             setNewProductName('')
             setNewProductDescription('')
-            setAttributes([])
+            setSelectedIngredients([])
+            setAttributes([{ key: '', value: '' }])
+            setError('')
             
-            // Recargar tokens disponibles
-            await fetchAvailableTokens()
+            // Recargar datos
+            fetchAvailableTokens()
+            fetchRecipes()
+
         } catch (error: any) {
-            console.error('Error processing product:', error)
-            setError(error.message || 'Error al procesar el producto')
+            console.error('Error creating token:', error)
+            setError(error.message || 'Error al crear el token')
         } finally {
             setLoading(false)
         }
@@ -274,37 +398,162 @@ export default function ProcessProduct() {
         setAttributes(newAttributes)
     }
 
+    // Función para usar una receta
+    const useRecipe = async (recipe: Token) => {
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum)
+            const contract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                provider
+            )
+
+            // Obtener los atributos de la receta
+            const recipeId = recipe.remesas[0].id
+            const nombresAtributos = await contract.getNombresAtributos(recipeId)
+            const atributos = await Promise.all(
+                nombresAtributos.map(async (nombre: string) => {
+                    const attr = await contract.getAtributo(recipeId, nombre)
+                    return {
+                        nombre: attr[0],
+                        valor: attr[1],
+                        timestamp: Number(attr[2])
+                    }
+                })
+            )
+
+            // Filtrar los atributos que son ingredientes
+            const ingredientes = atributos
+                .filter(attr => attr.nombre.startsWith('Ingrediente_'))
+                .map(attr => {
+                    const nombreIngrediente = attr.nombre.replace('Ingrediente_', '')
+                    const cantidad = Number(attr.valor)
+                    
+                    // Buscar el token correspondiente en materias primas o productos procesados
+                    const token = [...rawMaterials, ...processedProducts]
+                        .find(t => t.nombre === nombreIngrediente)
+                    
+                    if (token) {
+                        return {
+                            token: token,
+                            quantity: cantidad
+                        }
+                    }
+                    return null
+                })
+                .filter((ing): ing is Ingredient => ing !== null)
+
+            setSelectedRecipe(recipe)
+            setNewProductName(recipe.nombre)
+            setNewProductDescription(recipe.descripcion)
+            setSelectedIngredients(ingredientes)
+            setIsRecipeMode(false) // Cambiamos a modo producción
+        } catch (error) {
+            console.error('Error al cargar la receta:', error)
+            setError('Error al cargar la receta')
+        }
+    }
+
     return (
-        <div className="max-w-4xl mx-auto p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Procesar Nuevo Producto</h2>
-            
-            {/* Paso 1: Información del Producto Final */}
-            <div className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="space-y-8">
+            {/* Switch de modo receta */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            className="sr-only peer"
+                            checked={isRecipeMode}
+                            onChange={(e) => {
+                                setIsRecipeMode(e.target.checked)
+                                if (e.target.checked) {
+                                    setSelectedRecipe(null)
+                                }
+                            }}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-olive-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-olive-600"></div>
+                    </label>
+                    <span className="text-sm font-medium text-olive-900">
+                        Modo Receta
+                    </span>
+                </div>
+                {isRecipeMode && (
+                    <span className="text-sm text-olive-600">
+                        Las recetas se guardan con cantidad 0
+                    </span>
+                )}
+            </div>
+
+            {/* Sección de recetas disponibles */}
+            {!isRecipeMode && recipes.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border border-olive-100 p-6">
+                    <h2 className="text-xl font-semibold text-olive-800 mb-4">Recetas Disponibles</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {recipes.map((recipe) => (
+                            <div key={recipe.nombre} className="bg-olive-50/50 rounded-lg p-4 border border-olive-100">
+                                <h3 className="font-medium text-olive-800">{recipe.nombre}</h3>
+                                <p className="text-sm text-olive-600 mt-1">{recipe.descripcion}</p>
+                                <button
+                                    onClick={() => useRecipe(recipe)}
+                                    className="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-olive-600 rounded-md hover:bg-olive-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500"
+                                >
+                                    Usar Receta
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Formulario principal */}
+            <div className="bg-white rounded-lg shadow-sm border border-olive-100 p-6">
+                <h3 className="text-lg font-semibold text-olive-800 mb-4 flex items-center gap-2">
                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-olive-100 text-olive-600 text-sm font-bold">1</span>
-                    Información del Producto Final
+                    {isRecipeMode ? 'Información de la Receta' : 'Información del Producto'}
                 </h3>
-                <div className="grid gap-4 md:grid-cols-2">
+                
+                <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto</label>
+                        <label className="block text-sm font-medium text-olive-700 mb-1">
+                            Nombre
+                        </label>
                         <input
                             type="text"
                             value={newProductName}
                             onChange={(e) => setNewProductName(e.target.value)}
-                            className="w-full rounded-lg border-gray-300 focus:ring-olive-500 focus:border-olive-500"
-                            placeholder="Ej: Aceite de Oliva Extra Virgen"
+                            className="w-full px-3 py-2 border border-olive-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
+                            placeholder={isRecipeMode ? "Nombre de la receta" : "Nombre del producto"}
                         />
                     </div>
+                    
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                        <input
-                            type="text"
+                        <label className="block text-sm font-medium text-olive-700 mb-1">
+                            Descripción
+                        </label>
+                        <textarea
                             value={newProductDescription}
                             onChange={(e) => setNewProductDescription(e.target.value)}
-                            className="w-full rounded-lg border-gray-300 focus:ring-olive-500 focus:border-olive-500"
-                            placeholder="Ej: Aceite de primera prensada en frío"
+                            className="w-full px-3 py-2 border border-olive-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
+                            rows={3}
+                            placeholder={isRecipeMode ? "Descripción de la receta" : "Descripción del producto"}
                         />
                     </div>
+
+                    {!isRecipeMode && (
+                        <div>
+                            <label className="block text-sm font-medium text-olive-700 mb-1">
+                                Cantidad a Producir
+                            </label>
+                            <input
+                                type="number"
+                                className="w-full px-3 py-2 border border-olive-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
+                                placeholder="Cantidad"
+                                min="1"
+                                value={productQuantity}
+                                onChange={(e) => setProductQuantity(Number(e.target.value))}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -349,34 +598,69 @@ export default function ProcessProduct() {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
-                                                className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                                                    expandedToken === token.nombre
-                                                        ? 'bg-olive-200 text-olive-800 shadow-inner'
-                                                        : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
-                                                }`}
-                                            >
-                                                {expandedToken === token.nombre ? (
-                                                    <>
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
+
+                                            {/* Controles de ingrediente */}
+                                            {selectedIngredients.some(ing => ing.token.nombre === token.nombre) ? (
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.001"
+                                                            value={selectedIngredients.find(ing => ing.token.nombre === token.nombre)?.quantity || 0}
+                                                            onChange={(e) => updateIngredientQuantity(token.nombre, Number(e.target.value))}
+                                                            className="w-28 px-3 py-2 border border-olive-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
+                                                            placeholder="Cantidad"
+                                                        />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                                                            kg
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => removeIngredient(token.nombre)}
+                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                                        title="Eliminar ingrediente"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                         </svg>
-                                                        Ocultar
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-                                                        </svg>
-                                                        Ver Remesas
-                                                    </>
-                                                )}
-                                            </button>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    {isRecipeMode ? (
+                                                        // Botón simple para agregar a receta
+                                                        <button
+                                                            onClick={() => addIngredient(token)}
+                                                            className="text-sm px-4 py-2 rounded-lg bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                                            </svg>
+                                                            Agregar a Receta
+                                                        </button>
+                                                    ) : (
+                                                        // Botón para ver remesas en modo normal
+                                                        <button
+                                                            onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
+                                                            className="text-sm px-4 py-2 rounded-lg bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                {expandedToken === token.nombre ? (
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
+                                                                ) : (
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                                                                )}
+                                                            </svg>
+                                                            {expandedToken === token.nombre ? 'Ocultar Remesas' : 'Ver Remesas'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                        
-                                        {/* Desplegable de Remesas */}
-                                        {expandedToken === token.nombre && (
+
+                                        {/* Lista de remesas (solo visible en modo normal) */}
+                                        {!isRecipeMode && expandedToken === token.nombre && (
                                             <div className="mt-4 border-t pt-4">
                                                 <h5 className="text-sm font-semibold text-gray-700 mb-3">Remesas Disponibles:</h5>
                                                 <div className="space-y-3">
@@ -408,7 +692,7 @@ export default function ProcessProduct() {
                                                                         remesas: [remesa],
                                                                         cantidadTotal: remesa.cantidad
                                                                     }
-                                                                    addIngredient(tokenWithSingleRemesa)
+                                                                    addIngredient(tokenWithSingleRemesa, remesa)
                                                                     setExpandedToken(null)
                                                                 }}
                                                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
@@ -534,7 +818,7 @@ export default function ProcessProduct() {
                                                                         remesas: [remesa],
                                                                         cantidadTotal: remesa.cantidad
                                                                     }
-                                                                    addIngredient(tokenWithSingleRemesa)
+                                                                    addIngredient(tokenWithSingleRemesa, remesa)
                                                                     setExpandedToken(null)
                                                                 }}
                                                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
@@ -578,149 +862,92 @@ export default function ProcessProduct() {
 
                         {/* Lista de Ingredientes Seleccionados */}
                         {selectedIngredients.length > 0 && (
-                            <div className="mt-8">
-                                <h4 className="text-lg font-medium mb-4 text-olive-700 border-b pb-2">Ingredientes Seleccionados:</h4>
-                                <div className="space-y-4">
-                                    {selectedIngredients.map(ing => (
-                                        <div key={ing.token.remesas[0].id} className="bg-gray-50 rounded-xl border p-4 hover:shadow-md transition-all duration-200">
-                                            <div className="flex items-center justify-between">
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-3">
-                                                        <h4 className="font-medium">{ing.token.nombre}</h4>
-                                                        <span className="px-2.5 py-1 bg-olive-50 text-olive-700 rounded-lg text-sm font-medium">
-                                                            Remesa #{ing.token.remesas[0].id}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-xs text-gray-500 flex items-center gap-1">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
-                                                        </svg>
-                                                        Disponible: {ing.token.cantidadTotal / 1000} kg
-                                                    </div>
+                            <div className="mt-6 space-y-4">
+                                <h4 className="font-medium text-gray-700">Ingredientes Seleccionados:</h4>
+                                {selectedIngredients.map((ing, index) => (
+                                    <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                            <div className="space-y-1">
+                                                <h4 className="font-medium">{ing.token.nombre}</h4>
+                                                {!isRecipeMode && ing.token.remesas[0] && (
+                                                    <span className="px-2.5 py-1 bg-olive-50 text-olive-700 rounded-lg text-sm font-medium">
+                                                        Remesa #{ing.token.remesas[0].id}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        value={ing.quantity}
+                                                        onChange={(e) => updateIngredientQuantity(ing.token.nombre, Number(e.target.value))}
+                                                        className="w-28 rounded-lg border-gray-300 pr-12 py-2 focus:ring-olive-500 focus:border-olive-500"
+                                                        placeholder="0"
+                                                        min="0"
+                                                        step="0.001"
+                                                    />
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">
+                                                        kg
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="relative">
-                                                        <input
-                                                            type="number"
-                                                            value={ing.quantity}
-                                                            onChange={(e) => updateIngredientQuantity(ing.token.remesas[0].id, Number(e.target.value))}
-                                                            className="w-28 rounded-lg border-gray-300 pr-12 py-2 focus:ring-olive-500 focus:border-olive-500"
-                                                            placeholder="0"
-                                                            min="0"
-                                                            max={ing.token.cantidadTotal / 1000}
-                                                            step="0.1"
-                                                        />
-                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">
-                                                            kg
-                                                        </span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => removeIngredient(ing.token.remesas[0].id)}
-                                                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Eliminar ingrediente"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                        </svg>
-                                                    </button>
-                                                </div>
+                                                <button
+                                                    onClick={() => removeIngredient(ing.token.nombre)}
+                                                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                                    title="Eliminar ingrediente"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                    </svg>
+                                                </button>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                        {!isRecipeMode && ing.token.remesas[0] && (
+                                            <div className="text-xs text-gray-500 flex items-center gap-1 mt-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                </svg>
+                                                {new Date(ing.token.remesas[0].timestamp * 1000).toLocaleDateString()}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </>
                 )}
             </div>
 
-            {/* Paso 3: Atributos Adicionales */}
-            <div className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-olive-100 text-olive-600 text-sm font-bold">3</span>
-                    Atributos Adicionales
-                </h3>
-
-                {/* Lista de Atributos */}
-                <div className="space-y-4">
-                    {attributes.map((attr, index) => (
-                        <div key={index} className="flex gap-4">
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    value={attr.key}
-                                    onChange={(e) => handleAttributeChange(index, 'key', e.target.value)}
-                                    placeholder="Nombre del atributo"
-                                    className="w-full rounded-lg border-gray-300 focus:ring-olive-500 focus:border-olive-500"
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    value={attr.value}
-                                    onChange={(e) => handleAttributeChange(index, 'value', e.target.value)}
-                                    placeholder="Valor del atributo"
-                                    className="w-full rounded-lg border-gray-300 focus:ring-olive-500 focus:border-olive-500"
-                                />
-                            </div>
-                            <button
-                                onClick={() => removeAttribute(index)}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Eliminar atributo"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Botón Añadir Atributo */}
+            {/* Botón de submit */}
+            <div className="flex justify-end mt-6">
                 <button
-                    onClick={addAttribute}
-                    className="mt-4 px-4 py-2 text-sm bg-olive-100 text-olive-700 hover:bg-olive-200 rounded-lg flex items-center gap-2 transition-all duration-200"
+                    type="submit"
+                    onClick={handleSubmit}
+                    disabled={loading || (!isRecipeMode && selectedIngredients.length === 0) || !newProductName}
+                    className={`
+                        px-4 py-2 rounded-md text-white font-medium
+                        ${loading || (!isRecipeMode && selectedIngredients.length === 0) || !newProductName
+                            ? 'bg-olive-400 cursor-not-allowed'
+                            : 'bg-olive-600 hover:bg-olive-700'
+                        }
+                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500
+                        flex items-center space-x-2
+                    `}
                 >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                    </svg>
-                    Añadir Atributo
-                </button>
-            </div>
-
-            {/* Botón de Procesar */}
-            <div className="mt-6 flex justify-end">
-                <button
-                    onClick={processProduct}
-                    disabled={loading || selectedIngredients.length === 0 || !newProductName}
-                    className={`px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-all duration-200 ${
-                        loading || selectedIngredients.length === 0 || !newProductName
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-[#4F7A21] hover:bg-[#3D5E1A] text-white hover:shadow-md'
-                    }`}
-                >
-                    {loading ? (
-                        <>
-                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span>Procesando...</span>
-                        </>
-                    ) : (
-                        <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span>Procesar Producto</span>
-                        </>
+                    {loading && (
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                     )}
+                    <span>
+                        {loading ? 'Procesando...' : (isRecipeMode ? 'Guardar Receta' : 'Procesar Producto')}
+                    </span>
                 </button>
             </div>
 
             {error && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-red-600">{error}</p>
+                <div className="mt-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-md">
+                    {error}
                 </div>
             )}
         </div>

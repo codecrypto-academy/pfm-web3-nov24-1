@@ -15,6 +15,23 @@ interface Token {
     creador: string
     cantidad: number
     timestamp: number
+    procesado?: boolean
+    materiaPrima?: boolean
+    atributos?: { [key: string]: TokenAttribute }
+    nombresAtributos?: string[]
+    relatedTokens?: RelatedToken[]
+}
+
+interface TokenAttribute {
+    nombre: string
+    valor: string | number | boolean
+    timestamp: number
+}
+
+interface RelatedToken {
+    id: number
+    cantidad: number
+    timestamp: number
 }
 
 export default function FabricaDashboard() {
@@ -58,10 +75,17 @@ export default function FabricaDashboard() {
             const createFilter = tokensContract.filters.TokenCreado()
             const latestBlock = await provider.getBlockNumber()
             
+            console.log('Cargando tokens para la fábrica...')
+            
             const [transferEvents, createEvents] = await Promise.all([
                 tokensContract.queryFilter(transferFilter, 0, latestBlock),
                 tokensContract.queryFilter(createFilter, 0, latestBlock)
             ])
+
+            console.log('Eventos encontrados:', {
+                transferencias: transferEvents.length,
+                creaciones: createEvents.length
+            })
 
             // Filtrar transferencias recibidas
             const receivedTransfers = transferEvents
@@ -76,52 +100,91 @@ export default function FabricaDashboard() {
                     timestamp: event.args.timestamp || Math.floor(Date.now() / 1000)
                 }))
 
+            console.log('Transferencias recibidas:', receivedTransfers.length)
+
             // Obtener detalles de los tokens recibidos
             const uniqueTokenIds = Array.from(new Set(receivedTransfers.map(t => t.tokenId)))
+            console.log('IDs únicos de tokens:', uniqueTokenIds)
+
             const tokenDetails = await Promise.all(
                 uniqueTokenIds.map(async (tokenId) => {
-                    const token = await tokensContract.tokens(tokenId)
-                    const transfers = receivedTransfers.filter(t => t.tokenId === tokenId)
-                    const totalCantidad = transfers.reduce((sum, t) => sum + t.cantidad, 0)
-                    
-                    return {
-                        id: tokenId,
-                        nombre: token.nombre,
-                        descripcion: token.descripcion || '',
-                        creador: token.creador,
-                        cantidad: totalCantidad,
-                        timestamp: transfers[transfers.length - 1].timestamp
+                    try {
+                        const tokenData = await tokensContract.tokens(tokenId)
+                        const transfers = receivedTransfers.filter(t => t.tokenId === tokenId)
+                        const totalCantidad = transfers.reduce((sum, t) => sum + t.cantidad, 0)
+                        
+                        // Obtener atributos del token
+                        const nombresAtributos = await tokensContract.getNombresAtributos(tokenId)
+                        console.log(`Token ${tokenId} - Atributos encontrados:`, nombresAtributos)
+                        
+                        const atributos: { [key: string]: TokenAttribute } = {}
+                        
+                        // Obtener cada atributo
+                        for (const nombre of nombresAtributos) {
+                            const attr = await tokensContract.getAtributo(tokenId, nombre)
+                            if (attr && attr[0]) { // attr[0] es el nombre
+                                atributos[nombre] = {
+                                    nombre: attr[0],
+                                    valor: attr[1], // attr[1] es el valor
+                                    timestamp: Number(attr[2]) // attr[2] es el timestamp
+                                }
+                            }
+                        }
+
+                        console.log(`Token ${tokenId} - Atributos cargados:`, atributos)
+
+                        // Verificar si es un producto procesado y materia prima basado en los atributos
+                        const isProcesado = atributos['Procesado']?.valor === 'true';
+                        const isMateriaPrima = atributos['MateriaPrima']?.valor === 'true';
+
+                        console.log(`Token ${tokenId} - Estado:`, {
+                            isProcesado,
+                            isMateriaPrima,
+                            cantidad: totalCantidad
+                        })
+
+                        // Si es fabrica, incluir solo las materias primas no procesadas
+                        if (!isMateriaPrima || isProcesado) {
+                            console.log(`Token ${tokenId} - Filtrado: No es materia prima o está procesado`)
+                            return null;
+                        }
+
+                        const relatedToken: RelatedToken = {
+                            id: tokenId,
+                            cantidad: totalCantidad,
+                            timestamp: transfers[transfers.length - 1].timestamp
+                        }
+
+                        const newToken: Token = {
+                            id: tokenId,
+                            nombre: tokenData[1],
+                            descripcion: tokenData[3] || '',
+                            creador: tokenData[2],
+                            cantidad: totalCantidad,
+                            timestamp: transfers[transfers.length - 1].timestamp,
+                            procesado: isProcesado,
+                            materiaPrima: isMateriaPrima,
+                            atributos,
+                            nombresAtributos: Object.keys(atributos),
+                            relatedTokens: [relatedToken]
+                        }
+
+                        return newToken
+                    } catch (error) {
+                        console.error(`Error cargando token ${tokenId}:`, error)
+                        return null
                     }
                 })
             )
 
-            // Obtener tokens creados por la fábrica
-            const createdTokens = await Promise.all(
-                createEvents
-                    .filter((event: any) => 
-                        event.args && 
-                        event.args.creador.toLowerCase() === address.toLowerCase()
-                    )
-                    .map(async (event: any) => {
-                        const token = await tokensContract.tokens(event.args.id)
-                        return {
-                            id: Number(event.args.id),
-                            nombre: token.nombre,
-                            descripcion: token.descripcion || '',
-                            creador: event.args.creador,
-                            cantidad: Number(event.args.cantidad),
-                            timestamp: event.args.timestamp || Math.floor(Date.now() / 1000)
-                        }
-                    })
-            )
+            // Filtrar tokens nulos y tokens sin cantidad
+            const validTokens = tokenDetails
+                .filter((token): token is Token => 
+                    token !== null && token.cantidad > 0
+                );
 
-            // Combinar y eliminar duplicados
-            const allTokens = [...tokenDetails, ...createdTokens]
-            const uniqueTokens = allTokens.filter((token, index, self) =>
-                index === self.findIndex((t) => t.id === token.id)
-            )
-
-            setTokens(uniqueTokens)
+            console.log('Tokens válidos encontrados:', validTokens.length)
+            setTokens(validTokens)
             setLoading(false)
         } catch (error) {
             console.error('Error al cargar tokens:', error)
@@ -154,6 +217,7 @@ export default function FabricaDashboard() {
 
     const tabs = [
         { id: 'materias', name: 'Materias Primas' },
+        { id: 'productos', name: 'Productos Procesados' },
         { id: 'procesar', name: 'Procesar Productos' },
         { id: 'historial', name: 'Historial' },
         { id: 'pendientes', name: 'Transferencias Pendientes' },
@@ -164,23 +228,57 @@ export default function FabricaDashboard() {
             case 'materias':
                 return (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {tokens.map((token) => (
-                            <div
-                                key={token.id}
-                                className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
-                            >
-                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                                    {token.nombre}
-                                </h3>
-                                <p className="text-gray-600 mb-4">
-                                    {token.descripcion || 'Sin descripción'}
-                                </p>
-                                <div className="flex justify-between items-center text-sm text-gray-500">
-                                    <span>ID: {token.id}</span>
-                                    <span>Cantidad: {token.cantidad}</span>
+                        {tokens
+                            .filter(token => token.materiaPrima && !token.procesado)
+                            .map((token) => (
+                                <div
+                                    key={token.id}
+                                    className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
+                                >
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                        {token.nombre}
+                                    </h3>
+                                    <p className="text-gray-600 mb-4">
+                                        {token.descripcion || 'Sin descripción'}
+                                    </p>
+                                    <div className="flex justify-between items-center text-sm text-gray-500">
+                                        <span>ID: {token.id}</span>
+                                        <span>Cantidad: {token.cantidad}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                    </div>
+                )
+            case 'productos':
+                return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {tokens
+                            .filter(token => token.procesado)
+                            .map((token) => (
+                                <div
+                                    key={token.id}
+                                    className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
+                                >
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                                        {token.nombre}
+                                    </h3>
+                                    <p className="text-gray-600 mb-4">
+                                        {token.descripcion || 'Sin descripción'}
+                                    </p>
+                                    <div className="flex justify-between items-center text-sm text-gray-500">
+                                        <span>ID: {token.id}</span>
+                                        <span>Cantidad: {token.cantidad}</span>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t">
+                                        <h4 className="font-medium text-gray-700 mb-2">Atributos:</h4>
+                                        {token.atributos && Object.entries(token.atributos).map(([key, attr]) => (
+                                            <div key={key} className="text-sm text-gray-600">
+                                                <span className="font-medium">{key}:</span> {String(attr.valor)}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
                     </div>
                 )
             case 'procesar':
@@ -203,7 +301,7 @@ export default function FabricaDashboard() {
                         Materias Primas
                     </h3>
                     <p className="text-2xl font-bold text-olive-600">
-                        {tokens.length}
+                        {tokens.filter(token => token.materiaPrima && !token.procesado).length}
                     </p>
                     <p className="text-gray-500">disponibles</p>
                 </div>
@@ -211,7 +309,9 @@ export default function FabricaDashboard() {
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">
                         Productos Procesados
                     </h3>
-                    <p className="text-2xl font-bold text-olive-600">0</p>
+                    <p className="text-2xl font-bold text-olive-600">
+                        {tokens.filter(token => token.procesado).length}
+                    </p>
                     <p className="text-gray-500">creados</p>
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow-md">
