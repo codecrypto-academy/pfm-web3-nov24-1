@@ -26,13 +26,11 @@ export default function DashboardLayout({ children }: LayoutProps) {
     // Función para cargar las transferencias pendientes para la fábrica
     const loadPendingTransfers = async () => {
         if (!address || role !== 'fabrica' || isLoading) {
-            console.log('No loading transfers:', { address, role, isLoading })
             return
         }
 
         try {
             setIsLoading(true)
-            console.log('Loading pending transfers for factory:', address)
             const provider = new ethers.BrowserProvider(window.ethereum)
             const tokensContract = new ethers.Contract(
                 CONTRACTS.Tokens.address,
@@ -42,8 +40,6 @@ export default function DashboardLayout({ children }: LayoutProps) {
 
             // Obtener transferencias pendientes usando la función del contrato
             const pendingTransferIds = await tokensContract.getTransferenciasPendientes(address)
-            console.log('Pending transfers found:', pendingTransferIds.length)
-            
             setPendingTransfers(pendingTransferIds.length)
         } catch (error) {
             console.error('Error al cargar transferencias pendientes:', error)
@@ -58,7 +54,6 @@ export default function DashboardLayout({ children }: LayoutProps) {
 
         const setupTransferMonitoring = async () => {
             if (address && role === 'fabrica' && isMounted) {
-                console.log('Setting up transfer monitoring for factory')
                 await loadPendingTransfers()
                 
                 // Actualizar cada 5 segundos

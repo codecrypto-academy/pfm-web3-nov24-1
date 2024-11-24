@@ -107,7 +107,7 @@ export default function ProcessProduct() {
                     if (Number(balance) > 0) {
                         const token = await contract.tokens(tokenId)
                         
-                        // Verificar si el token ya está procesado
+                        // Verificar si el token ya está procesado y si es una receta
                         const nombresAtributos = await contract.getNombresAtributos(tokenId)
                         const atributos = await Promise.all(
                             nombresAtributos.map(async (nombre: string) => {
@@ -120,9 +120,15 @@ export default function ProcessProduct() {
                             })
                         )
 
-                        // Si el token está procesado, lo saltamos
+                        // Si el token es una receta, lo saltamos
+                        const esReceta = atributos.some(attr => 
+                            attr.nombre === "EsReceta" && attr.valor === "true"
+                        )
+                        if (esReceta) continue;
+
+                        // Si el token está procesado, va a productos procesados
                         const isProcesado = atributos.some(attr => 
-                            attr.nombre === "Procesado" && attr.valor.toLowerCase() === "true"
+                            attr.nombre === "Tipo_Producto" && attr.valor === "Procesado"
                         )
 
                         const nombre = token[1]
@@ -219,8 +225,25 @@ export default function ProcessProduct() {
                 const token = await contract.tokens(tokenId)
                 const balance = await contract.getBalance(tokenId, token[2]) // token[2] es el creador
 
-                // Si la cantidad es 0, es una receta
-                if (Number(balance) === 0) {
+                // Verificar si es una receta
+                const nombresAtributos = await contract.getNombresAtributos(tokenId)
+                const atributos = await Promise.all(
+                    nombresAtributos.map(async (nombre: string) => {
+                        const attr = await contract.getAtributo(tokenId, nombre)
+                        return {
+                            nombre: attr[0],
+                            valor: attr[1],
+                            timestamp: Number(attr[2])
+                        }
+                    })
+                )
+
+                const esReceta = atributos.some(attr => 
+                    attr.nombre === "EsReceta" && attr.valor === "true"
+                )
+
+                // Solo procesar si es una receta
+                if (esReceta) {
                     const nombre = token[1]
                     const remesa: Remesa = {
                         id: Number(tokenId),
@@ -347,9 +370,6 @@ export default function ProcessProduct() {
             }
 
             // Marcar como receta o producto procesado
-            nombresAtributos.push("Procesado")
-            valoresAtributos.push("true")
-            
             nombresAtributos.push("EsReceta")
             valoresAtributos.push(isRecipeMode ? "true" : "false")
 
