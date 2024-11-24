@@ -32,55 +32,37 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
     const [atributos, setAtributos] = useState<Atributo[]>([
         { 
             nombre: 'metodoRecoleccion', 
-            valor: '', 
+            valor: JSON.stringify([]), 
             label: 'Método de Recolección',
-            valoresPosibles: ['Manual (Vareo tradicional)', 'Mecánico (Vibrador)', 'Mixto (Combinación de ambos)']
-        },
-        {
-            nombre: 'Procesado',
-            valor: 'false',
-            label: 'Procesado',
-            valoresPosibles: ['true', 'false']
-        },
-        {
-            nombre: 'MateriaPrima',
-            valor: 'true',
-            label: 'Es Materia Prima',
-            valoresPosibles: ['true', 'false']
+            valoresPosibles: []
         }
     ])
 
-    const handleAddAtributo = () => {
-        setAtributos([...atributos, { nombre: '', valor: '' }])
-    }
-
-    const handleRemoveAtributo = (index: number) => {
-        setAtributos(atributos.filter((_, i) => i !== index))
-    }
-
-    const handleAtributoChange = (index: number, field: 'nombre' | 'valor', value: string) => {
-        const nuevosAtributos = [...atributos]
-        nuevosAtributos[index][field] = value
-        setAtributos(nuevosAtributos)
-    }
-
     const handleAddValorPosible = (index: number, nuevoValor: string) => {
+        if (!nuevoValor.trim()) return; // No añadir valores vacíos
+        
         const nuevosAtributos = [...atributos];
         if (!nuevosAtributos[index].valoresPosibles) {
             nuevosAtributos[index].valoresPosibles = [];
         }
-        nuevosAtributos[index].valoresPosibles?.push(nuevoValor);
-        // El valor será todos los valores posibles unidos
-        nuevosAtributos[index].valor = nuevosAtributos[index].valoresPosibles?.join(', ') || '';
-        setAtributos(nuevosAtributos);
+        
+        // Evitar duplicados
+        if (!nuevosAtributos[index].valoresPosibles?.includes(nuevoValor.trim())) {
+            nuevosAtributos[index].valoresPosibles?.push(nuevoValor.trim());
+            // Guardar como JSON array
+            nuevosAtributos[index].valor = JSON.stringify(nuevosAtributos[index].valoresPosibles);
+            setAtributos(nuevosAtributos);
+        }
     }
 
     const handleRemoveValorPosible = (atributoIndex: number, valorIndex: number) => {
         const nuevosAtributos = [...atributos];
-        nuevosAtributos[atributoIndex].valoresPosibles?.splice(valorIndex, 1);
-        // Actualizar el valor después de eliminar
-        nuevosAtributos[atributoIndex].valor = nuevosAtributos[atributoIndex].valoresPosibles?.join(', ') || '';
-        setAtributos(nuevosAtributos);
+        if (nuevosAtributos[atributoIndex].valoresPosibles) {
+            nuevosAtributos[atributoIndex].valoresPosibles?.splice(valorIndex, 1);
+            // Actualizar el JSON array
+            nuevosAtributos[atributoIndex].valor = JSON.stringify(nuevosAtributos[atributoIndex].valoresPosibles);
+            setAtributos(nuevosAtributos);
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -88,22 +70,19 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
         setError('')
         setTxStatus('')
 
-        if (!formData.nombre || !formData.descripcion) {
-            setError('Por favor complete todos los campos')
+        const obligatoriosCompletos = atributos
+            .filter(attr => attr.label)
+            .every(attr => attr.valoresPosibles && attr.valoresPosibles.length > 0)
+
+        if (!obligatoriosCompletos) {
+            setError('Por favor define al menos un valor posible para cada atributo obligatorio')
             return
         }
-
-        // Validar que los atributos no estén vacíos
-        const atributosInvalidos = atributos.some(attr => !attr.nombre || !attr.valor)
-        if (atributosInvalidos) {
-            setError('Por favor complete todos los campos de los atributos')
-            return
-        }
-
-        setIsLoading(true)
 
         try {
-            setTxStatus('Conectando con la wallet...')
+            setIsLoading(true)
+            setTxStatus('Preparando la transacción...')
+
             const provider = new ethers.BrowserProvider((window as any).ethereum)
             const signer = await provider.getSigner()
             const contract = new ethers.Contract(
@@ -112,17 +91,18 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                 signer
             )
 
-            // Para productos, siempre usamos cantidad 0
             const totalTokens = 0
 
-            // Preparar arrays de atributos
-            const nombresAtributos = atributos.map(attr => {
-                if (attr.nombre === 'metodoRecoleccion') {
-                    return 'metodo_de_recoleccion'
+            const todosLosAtributos = [
+                ...atributos,
+                {
+                    nombre: 'Tipo_Producto',
+                    valor: 'Prima'  // Por defecto es "Prima" al crear
                 }
-                return attr.nombre
-            })
-            const valoresAtributos = atributos.map(attr => attr.valor)
+            ]
+
+            const nombresAtributos = todosLosAtributos.map(attr => attr.nombre)
+            const valoresAtributos = todosLosAtributos.map(attr => attr.valor)
 
             setTxStatus('Enviando transacción...')
             const tx = await contract.crearToken(
@@ -205,8 +185,6 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                         />
                     </div>
 
-                    {/* Campo de cantidad eliminado */}
-
                     {/* Sección de Atributos Obligatorios */}
                     <div className="space-y-4 border-b pb-6">
                         <h3 className="text-lg font-semibold text-primary">Atributos Obligatorios</h3>
@@ -220,7 +198,7 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                                         </label>
                                         <div className="space-y-2">
                                             <p className="text-sm text-gray-500">
-                                                Añade los valores posibles para este atributo:
+                                                Define los valores posibles para este atributo:
                                             </p>
                                             <div className="flex gap-2">
                                                 <input
@@ -262,51 +240,6 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                    </div>
-
-                    {/* Sección de Atributos Personalizados */}
-                    <div className="space-y-4 pt-6">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-semibold text-primary">Atributos Personalizados</h3>
-                            <button
-                                type="button"
-                                onClick={handleAddAtributo}
-                                className="text-blue-500 hover:text-blue-700 flex items-center gap-1"
-                            >
-                                <PlusCircle className="w-4 h-4" />
-                                Añadir Atributo
-                            </button>
-                        </div>
-
-                        {atributos
-                            .filter(attr => !attr.label)
-                            .map((atributo, index) => (
-                                <div key={index} className="flex gap-2 items-start">
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre del atributo"
-                                            className="w-full p-2 border rounded-md bg-input text-primary mb-2"
-                                            value={atributo.nombre}
-                                            onChange={(e) => handleAtributoChange(index + atributos.filter(a => a.label).length, 'nombre', e.target.value)}
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Valor"
-                                            className="w-full p-2 border rounded-md bg-input text-primary"
-                                            value={atributo.valor}
-                                            onChange={(e) => handleAtributoChange(index + atributos.filter(a => a.label).length, 'valor', e.target.value)}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveAtributo(index + atributos.filter(a => a.label).length)}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <XCircle className="w-5 h-5" />
-                                    </button>
                                 </div>
                             ))}
                     </div>

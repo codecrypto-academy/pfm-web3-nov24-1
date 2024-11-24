@@ -353,6 +353,10 @@ export default function ProcessProduct() {
             nombresAtributos.push("EsReceta")
             valoresAtributos.push(isRecipeMode ? "true" : "false")
 
+            // Establecer el tipo de producto
+            nombresAtributos.push("Tipo_Producto")
+            valoresAtributos.push("Procesado")
+
             // Crear el token
             const cantidad = isRecipeMode ? 0 : productQuantity // Cantidad 0 para recetas
             const tx = await contract.crearToken(

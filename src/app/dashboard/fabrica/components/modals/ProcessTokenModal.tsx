@@ -51,42 +51,18 @@ const ProcessTokenModal: FC<ProcessTokenModalProps> = ({
                 signer
             )
 
-            // Preparar los atributos del nuevo token procesado
-            const baseAttributes = Object.entries(token.atributos).map(([nombre, attr]: [string, any]) => ({
-                nombre,
-                valor: attr.valor,
-                timestamp: Date.now()
-            }));
+            console.log('Token original:', token);
 
-            // Actualizar los atributos críticos
-            const updatedAttributes = baseAttributes.map(attr => {
-                if (attr.nombre === 'Procesado') {
-                    return { ...attr, valor: 'true' };
-                }
-                if (attr.nombre === 'MateriaPrima') {
-                    return { ...attr, valor: 'false' };
-                }
-                return attr;
+            // Solo necesitamos establecer Tipo_Producto como Procesado
+            const nombresAtributos = ['Tipo_Producto'];
+            const valoresAtributos = ['Procesado'];
+
+            console.log('Procesando token:', {
+                tokenId: token.id,
+                cantidad: processedQuantity,
+                nombresAtributos,
+                valoresAtributos
             });
-
-            // Asegurarnos de que existan los atributos críticos
-            const criticalAttributes = [
-                { nombre: 'Procesado', valor: 'true' },
-                { nombre: 'MateriaPrima', valor: 'false' }
-            ];
-
-            criticalAttributes.forEach(criticalAttr => {
-                if (!updatedAttributes.some(attr => attr.nombre === criticalAttr.nombre)) {
-                    updatedAttributes.push({
-                        ...criticalAttr,
-                        timestamp: Date.now()
-                    });
-                }
-            });
-
-            // Preparar los arrays para el contrato
-            const nombresAtributos = updatedAttributes.map(attr => attr.nombre);
-            const valoresAtributos = updatedAttributes.map(attr => attr.valor);
 
             // Procesar el token
             const tx = await contract.procesarToken(
@@ -96,7 +72,11 @@ const ProcessTokenModal: FC<ProcessTokenModalProps> = ({
                 valoresAtributos,
                 { gasLimit: 500000 }
             );
-            await tx.wait();
+
+            console.log('Transacción enviada:', tx.hash);
+            
+            const receipt = await tx.wait();
+            console.log('Transacción confirmada:', receipt);
 
             await onSubmit(token, processedQuantity);
             onClose();

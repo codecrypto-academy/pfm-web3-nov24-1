@@ -20,22 +20,22 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
 
     const handleSubmit = async () => {
         // Asegurarnos de que heredamos los atributos del token base
-        const baseAttributes = Object.entries(token.atributos).map(([nombre, attr]) => ({
-            nombre,
-            valor: attributes.find(a => a.nombre === nombre)?.valor || attr.valor,
-            timestamp: Date.now()
-        }));
-
-        // Asegurarnos de que los atributos críticos se heredan
-        const criticalAttributes = ['MateriaPrima', 'Procesado', 'metodoRecoleccion'];
-        criticalAttributes.forEach(attrName => {
-            if (!baseAttributes.some(attr => attr.nombre === attrName) && token.atributos[attrName]) {
-                baseAttributes.push({
-                    nombre: attrName,
-                    valor: token.atributos[attrName].valor,
+        const baseAttributes = Object.entries(token.atributos).map(([nombre, attr]) => {
+            // Si es un atributo que requiere selección y tenemos un valor seleccionado
+            if (nombre === 'metodoRecoleccion') {
+                const selectedValue = attributes.find(a => a.nombre === nombre)?.valor;
+                return {
+                    nombre,
+                    valor: selectedValue || attr.valor,
                     timestamp: Date.now()
-                });
+                };
             }
+            // Para otros atributos (como Tipo_Producto), mantener el valor original
+            return {
+                nombre,
+                valor: attr.valor,
+                timestamp: Date.now()
+            };
         });
 
         // Actualizar los atributos con los valores heredados
@@ -84,44 +84,69 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
                             Atributos del Lote
                         </label>
                         <div className="space-y-4">
-                            {Object.keys(token.atributos).map((atributo, index) => (
-                                <div key={index} className="flex flex-col space-y-2">
-                                    <label className="text-sm font-medium text-gray-600">
-                                        {atributo}
-                                    </label>
-                                    <select
-                                        value={attributes.find(attr => attr.nombre === atributo)?.valor || ''}
-                                        onChange={(e) => {
-                                            const updatedAttrs = [...attributes];
-                                            const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
-                                            
-                                            if (existingIndex >= 0) {
-                                                updatedAttrs[existingIndex] = {
-                                                    nombre: atributo,
-                                                    valor: e.target.value,
-                                                    timestamp: Date.now()
-                                                };
-                                            } else {
-                                                updatedAttrs.push({
-                                                    nombre: atributo,
-                                                    valor: e.target.value,
-                                                    timestamp: Date.now()
-                                                });
-                                            }
-                                            
-                                            setAttributes(updatedAttrs);
-                                        }}
-                                        className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
-                                    >
-                                        <option value="">Seleccionar {atributo}</option>
-                                        {token.atributos[atributo].valor.split(',').map((opcion, idx) => (
-                                            <option key={idx} value={opcion.trim()}>
-                                                {opcion.trim()}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            ))}
+                            {Object.entries(token.atributos)
+                                .filter(([nombre]) => {
+                                    // Solo mostrar atributos que necesitan selección
+                                    return nombre === 'metodoRecoleccion';
+                                })
+                                .map(([atributo, valor], index) => {
+                                    // Intentar parsear el valor como JSON
+                                    let opciones: string[] = [];
+                                    try {
+                                        const parsed = JSON.parse(valor.valor);
+                                        if (Array.isArray(parsed)) {
+                                            opciones = parsed;
+                                        }
+                                    } catch {
+                                        // Si no es JSON, intentar split por comas (compatibilidad)
+                                        opciones = valor.valor.split(',').map(v => v.trim());
+                                    }
+
+                                    // Formatear el nombre para mostrar
+                                    const nombreMostrar = atributo === 'metodoRecoleccion' ? 'Método de Recolección' :
+                                                        atributo === 'Tipo_Producto' ? 'Tipo de Producto' :
+                                                        atributo;
+
+                                    return (
+                                        <div key={index} className="flex flex-col space-y-2">
+                                            <label className="text-sm font-medium text-gray-600">
+                                                {nombreMostrar}
+                                            </label>
+                                            <select
+                                                value={attributes.find(attr => attr.nombre === atributo)?.valor || ''}
+                                                onChange={(e) => {
+                                                    const updatedAttrs = [...attributes];
+                                                    const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
+                                                    
+                                                    if (existingIndex >= 0) {
+                                                        updatedAttrs[existingIndex] = {
+                                                            nombre: atributo,
+                                                            valor: e.target.value,
+                                                            timestamp: Date.now()
+                                                        };
+                                                    } else {
+                                                        updatedAttrs.push({
+                                                            nombre: atributo,
+                                                            valor: e.target.value,
+                                                            timestamp: Date.now()
+                                                        });
+                                                    }
+                                                    
+                                                    setAttributes(updatedAttrs);
+                                                }}
+                                                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
+                                                required
+                                            >
+                                                <option value="">Seleccionar {nombreMostrar}</option>
+                                                {opciones.map((opcion, idx) => (
+                                                    <option key={idx} value={opcion}>
+                                                        {opcion}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    );
+                                })}
                         </div>
                     </div>
                 </div>

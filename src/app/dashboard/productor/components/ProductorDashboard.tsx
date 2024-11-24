@@ -300,9 +300,10 @@ const ProductorDashboard: FC = (): React.ReactElement => {
 
             const totalTokens = Number(quantity) * 1000
 
-            // Verificar que todos los atributos requeridos tienen un valor
-            if (token.atributos && Object.keys(token.atributos).length > 0) {
-                const missingAttributes = Object.keys(token.atributos).filter(attr => 
+            // Verificar solo los atributos que requieren selección
+            if (token.atributos) {
+                const requiredAttributes = ['metodoRecoleccion'];
+                const missingAttributes = requiredAttributes.filter(attr => 
                     !newAttributes.find(newAttr => newAttr.nombre === attr)
                 );
                 
@@ -312,9 +313,26 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 }
             }
 
+            // Heredar los atributos del token base y combinarlos con los seleccionados
+            const allAttributes = Object.entries(token.atributos).map(([nombre, attr]) => {
+                // Si es un atributo que requiere selección, usar el valor seleccionado
+                if (nombre === 'metodoRecoleccion') {
+                    const selectedAttr = newAttributes.find(a => a.nombre === nombre);
+                    return {
+                        nombre,
+                        valor: selectedAttr ? selectedAttr.valor : attr.valor
+                    };
+                }
+                // Para otros atributos (como Tipo_Producto), mantener el valor original
+                return {
+                    nombre,
+                    valor: attr.valor
+                };
+            });
+
             // Separar los atributos en dos arrays
-            const nombresAtributos = newAttributes.map(attr => attr.nombre)
-            const valoresAtributos = newAttributes.map(attr => attr.valor)
+            const nombresAtributos = allAttributes.map(attr => attr.nombre);
+            const valoresAtributos = allAttributes.map(attr => attr.valor);
 
             const tx = await contract.crearToken(
                 token.nombre,
@@ -584,10 +602,10 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                     Descripción
                                                 </th>
                                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Balance Total
+                                                    Atributos
                                                 </th>
                                                 <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Acciones
+                                                    Crear Remesa
                                                 </th>
                                             </tr>
                                         </thead>
@@ -605,13 +623,65 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">{token.nombre}</td>
                                                         <td className="px-6 py-4">{token.descripcion}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="flex flex-col">
-                                                                <span>{token.cantidad / 1000} kg</span>
-                                                                <span className="text-gray-500 text-xs">
-                                                                    {token.cantidad} tokens
-                                                                </span>
-                                                            </div>
+                                                        <td className="px-6 py-4">
+                                                            {Object.entries(token.atributos)
+                                                                .filter(([nombre]) => nombre !== 'tipo_token')
+                                                                .sort((a, b) => {
+                                                                    // Poner Tipo_Producto primero
+                                                                    if (a[0] === 'Tipo_Producto') return -1;
+                                                                    if (b[0] === 'Tipo_Producto') return 1;
+                                                                    return 0;
+                                                                })
+                                                                .map(([nombre, valor]) => {
+                                                                    // Formatear el nombre del atributo para mostrar
+                                                                    const nombreMostrar = nombre === 'metodoRecoleccion' ? 'Método de Recolección' : 
+                                                                        nombre === 'Tipo_Producto' ? 'Tipo de Producto' : 
+                                                                        nombre;
+
+                                                                    // Si es Tipo_Producto
+                                                                    if (nombre === 'Tipo_Producto') {
+                                                                        return (
+                                                                            <div key={nombre} className="mb-2">
+                                                                                <span className="font-medium">{nombreMostrar}:</span>{' '}
+                                                                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                                                                                    {valor.valor}
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Para otros atributos, intentar parsear si es array
+                                                                    try {
+                                                                        const parsed = JSON.parse(valor.valor);
+                                                                        if (Array.isArray(parsed)) {
+                                                                            return (
+                                                                                <div key={nombre} className="mb-2">
+                                                                                    <span className="font-medium">{nombreMostrar}:</span>
+                                                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                                                        {parsed.map((v, i) => (
+                                                                                            <span 
+                                                                                                key={i}
+                                                                                                className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
+                                                                                            >
+                                                                                                {v}
+                                                                                            </span>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                    } catch {
+                                                                        // Si no es JSON, mostrar el valor normal
+                                                                        return (
+                                                                            <div key={nombre} className="mb-2">
+                                                                                <span className="font-medium">{nombreMostrar}:</span>
+                                                                                <div className="mt-1">
+                                                                                    {valor.valor}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                })}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             <div className="flex items-center justify-center space-x-4">
