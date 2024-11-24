@@ -6,7 +6,7 @@ import { ethers } from 'ethers'
 import { useState, useEffect } from 'react'
 import { withAuth } from '@/components/hoc/withAuth'
 import MapModal from '@/components/MapModal'
-import MapaParticipantes from '@/components/MapaParticipantes'
+import dynamic from 'next/dynamic'
 import { FaMapMarkerAlt } from 'react-icons/fa'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
@@ -29,6 +29,12 @@ interface PendingRequest {
     timestamp: string
     status: string
 }
+
+// Import MapaParticipantes dynamically
+const MapaParticipantes = dynamic(
+  () => import('@/components/MapaParticipantes'),
+  { ssr: false }
+);
 
 // Función para formatear roles
 const formatRole = (role: string): string => {
