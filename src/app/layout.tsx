@@ -3,7 +3,6 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Web3Provider } from '@/context/Web3Context'
 
-
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -26,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+      <body className="min-h-full flex flex-col">
         <Web3Provider>
           {children}
         </Web3Provider>

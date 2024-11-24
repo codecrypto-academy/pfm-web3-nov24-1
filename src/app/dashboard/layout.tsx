@@ -224,7 +224,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                     </li>
                                     <li>
                                         <Link
-                                            href="/dashboard/fabrica/transferencias"
+                                            href="/dashboard/fabrica/pending"
                                             className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
                                         >
                                             <TruckIcon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110 group-hover:-translate-x-1" />
@@ -267,11 +267,11 @@ export default function DashboardLayout({ children }: LayoutProps) {
     }
 
     return (
-        <div className="min-h-screen bg-olive-50">
+        <div className="min-h-screen bg-olive-50 flex flex-col">
             <Header />
             <BubbleBackground />
-            <div className="pt-[73px]">
-                <div className="relative">
+            <div className="pt-[73px] flex-grow">
+                <div className="relative h-full">
                     {/* Botón para mostrar/ocultar menú */}
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -286,7 +286,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                         )}
                     </button>
 
-                    <div className="flex">
+                    <div className="flex h-full">
                         {/* Menú lateral con animación */}
                         <aside 
                             className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] w-64 backdrop-blur-sm bg-white/80 border-r border-olive-200 shadow-lg transition-transform duration-300 ${
@@ -298,7 +298,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
 
                         {/* Contenido principal con animación */}
                         <main 
-                            className={`flex-1 p-6 shadow-sm bg-white/50 backdrop-blur-sm rounded-lg transition-all duration-300 ${
+                            className={`flex-1 p-6 shadow-sm bg-white/50 backdrop-blur-sm rounded-lg transition-all duration-300 min-h-[calc(100vh-73px)] ${
                                 isMenuOpen ? 'ml-64' : 'ml-0'
                             }`}
                         >

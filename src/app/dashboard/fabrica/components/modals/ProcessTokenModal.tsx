@@ -89,6 +89,15 @@ const ProcessTokenModal: FC<ProcessTokenModalProps> = ({
             const valoresAtributos = updatedAttributes.map(attr => attr.valor);
 
             // Procesar el token
+            const tx = await contract.procesarToken(
+                token.id,
+                processedQuantity,
+                nombresAtributos,
+                valoresAtributos,
+                { gasLimit: 500000 }
+            );
+            await tx.wait();
+
             await onSubmit(token, processedQuantity);
             onClose();
 

@@ -7,7 +7,7 @@ import { FaTwitter } from 'react-icons/fa6'; // X (Twitter) icon
 
 export default function Footer() {
     return (
-        <footer className="bg-olive-800 text-white py-12 border-t border-olive-600 mt-auto">
+        <footer className="bg-olive-800 text-white py-12 border-t border-olive-600 mt-auto z-50 relative">
             <div className="max-w-[2000px] mx-auto px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {/* Logo y copyright */}
                 <div className="flex flex-col items-center lg:items-start">
