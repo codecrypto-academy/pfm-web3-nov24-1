@@ -13,12 +13,20 @@ interface Token {
     nombre: string
     tipo: string
     creador: string
-    cantidad: number
+    cantidadTotal: number
     timestamp: number
     atributos: { [key: string]: any }
     nombresAtributos: string[]
     atributosJSON: string
     esReceta: boolean
+    remesas: {
+        id: number
+        cantidad: number
+        timestamp: number
+        atributos: { [key: string]: any }
+        creador: string
+    }[]
+    numRemesas: number
 }
 
 interface TokenAttribute {
@@ -117,12 +125,12 @@ export default function FabricaDashboard() {
             
             console.log('IDs de tokens únicos:', tokenIds);
 
-            // Obtener información de cada token
-            const tokens = []
+            // Agrupar tokens por nombre y tipo de producto
+            const tokensByProduct = new Map();
+
             for (const tokenId of tokenIds) {
                 try {
                     const balance = await tokensContract.getBalance(tokenId, address)
-                    
                     const tokenData = await tokensContract.tokens(tokenId)
                     const nombresAtributos = await tokensContract.getNombresAtributos(tokenId)
                     
@@ -133,26 +141,53 @@ export default function FabricaDashboard() {
                     }
 
                     // Incluir el token si tiene balance > 0 o si es una receta
-                    const esReceta = atributos['EsReceta'] === 'true'
+                    const esReceta = atributos['EsReceta'] === true || atributos['EsReceta'] === 'true'
                     if (Number(balance) > 0 || esReceta) {
-                        tokens.push({
+                        const nombre = tokenData[1];
+                        const tipo = esReceta ? 'Receta' : (atributos['Tipo_Producto'] || 'Prima');
+                        const key = `${nombre}-${tipo}`;
+
+                        const remesa = {
                             id: tokenId,
-                            nombre: tokenData[1],
-                            tipo: atributos['Tipo_Producto'] || 'Prima',
-                            creador: tokenData[2],
                             cantidad: Number(balance),
                             timestamp: Number(tokenData[4]),
                             atributos,
-                            nombresAtributos,
-                            atributosJSON: JSON.stringify(atributos),
-                            esReceta
-                        })
-                        console.log('Token', tokenId, 'añadido a la lista. Es receta:', esReceta);
+                            creador: tokenData[2]
+                        };
+
+                        if (!tokensByProduct.has(key)) {
+                            tokensByProduct.set(key, {
+                                id: tokenId,
+                                nombre,
+                                tipo,
+                                creador: tokenData[2],
+                                cantidadTotal: Number(balance),
+                                timestamp: Number(tokenData[4]),
+                                atributos,
+                                nombresAtributos,
+                                atributosJSON: JSON.stringify(atributos),
+                                esReceta,
+                                remesas: [remesa],
+                                numRemesas: 1
+                            });
+                        } else {
+                            const existing = tokensByProduct.get(key);
+                            existing.cantidadTotal += Number(balance);
+                            existing.remesas.push(remesa);
+                            existing.numRemesas += 1;
+                            // Mantenemos el timestamp más reciente
+                            if (Number(tokenData[4]) > existing.timestamp) {
+                                existing.timestamp = Number(tokenData[4]);
+                            }
+                        }
                     }
                 } catch (error) {
                     console.error('Error procesando token', tokenId, ':', error);
                 }
             }
+
+            // Convertir el Map a array para usar en el estado
+            const tokens = Array.from(tokensByProduct.values());
 
             console.log('Total de tokens encontrados:', tokens.length);
             console.log('Lista de tokens:', tokens);
@@ -281,7 +316,19 @@ export default function FabricaDashboard() {
         { id: 'recetas', label: 'Recetas' }
     ];
 
-    const renderContent = () => {
+    const renderTokens = () => {
+        const filteredTokens = tokens.filter(token =>
+            token.nombre.toLowerCase().includes(searchTerm.toLowerCase()) &&
+            ((activeTab === 'materias' && token.tipo === 'Prima') ||
+             (activeTab === 'procesados' && token.tipo === 'Procesado') ||
+             (activeTab === 'recetas' && token.tipo === 'Receta'))
+        );
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedTokens = filteredTokens.slice(startIndex, endIndex);
+        const totalPages = Math.ceil(filteredTokens.length / itemsPerPage);
+
         const renderPagination = () => (
             <div className="mt-6 flex justify-center space-x-2">
                 <button
@@ -306,67 +353,78 @@ export default function FabricaDashboard() {
 
         const content = (
             <>
-                <div className="mb-6">
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o ID..."
-                        value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            setCurrentPage(1); // Reset a primera página al buscar
-                        }}
-                        className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
-                    />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentTokens.map((token) => {
-                        if (activeTab === 'recetas') {
-                            const atributos = JSON.parse(token.atributosJSON);
-                            const ingredientes = Object.entries(atributos)
-                                .filter(([key]) => key.startsWith('Ingrediente_'))
-                                .map(([key, value]) => ({
-                                    nombre: key.replace('Ingrediente_', ''),
-                                    cantidad: value
-                                }));
-
-                            return (
-                                <div
-                                    key={token.id}
-                                    className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
-                                >
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                                        {token.nombre}
-                                    </h3>
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium text-gray-700">Ingredientes:</p>
-                                        {ingredientes.map((ing, index) => (
-                                            <p key={index} className="text-sm text-gray-500">
-                                                {ing.nombre}: {String(ing.cantidad)}
-                                            </p>
-                                        ))}
-                                        <p className="text-sm text-gray-500 mt-2">
-                                            ID: {token.id}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        }
-
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {paginatedTokens.map((token) => {
+                        const cantidadKg = token.cantidadTotal / 1000; // Convertir tokens a kg
+                        
                         return (
                             <div
-                                key={token.id}
-                                className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200"
+                                key={`${token.nombre}-${token.tipo}`}
+                                className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
                             >
-                                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                                    {token.nombre}
-                                </h3>
-                                <div className="space-y-2">
-                                    <p className="text-sm text-gray-500">
-                                        Cantidad: {token.cantidad}
-                                    </p>
-                                    <p className="text-sm text-gray-500">
-                                        ID: {token.id}
-                                    </p>
+                                <div className="p-5">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900">
+                                                {token.nombre}
+                                            </h3>
+                                            <p className="text-sm text-gray-500">
+                                                Tipo: {token.tipo}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4">
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Total Tokens:</span>
+                                            <span className="font-medium">{token.cantidadTotal.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Total KG:</span>
+                                            <span className="font-medium">{cantidadKg.toLocaleString()} kg</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Remesas:</span>
+                                            <span className="font-medium">{token.numRemesas}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4">
+                                        <p className="font-semibold text-sm text-gray-700">Atributos:</p>
+                                        {Object.entries(token.atributos).map(([key, value]) => (
+                                            <p key={key} className="text-sm text-gray-600">
+                                                {key}: {String(value)}
+                                            </p>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-900 mb-2">Desglose de Remesas:</h4>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {token.remesas.map((remesa, index) => {
+                                                const remesaKg = remesa.cantidad / 1000;
+                                                return (
+                                                    <div 
+                                                        key={remesa.id}
+                                                        className="p-2 bg-gray-50 rounded text-sm"
+                                                    >
+                                                        <div className="flex justify-between">
+                                                            <span>Remesa #{index + 1}</span>
+                                                            <span>{new Date(remesa.timestamp * 1000).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-gray-600">
+                                                            <span>Tokens:</span>
+                                                            <span>{remesa.cantidad.toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-gray-600">
+                                                            <span>KG:</span>
+                                                            <span>{remesaKg.toLocaleString()} kg</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -377,6 +435,31 @@ export default function FabricaDashboard() {
         );
 
         return content;
+    };
+
+    const handleTokenClick = (token: Token) => {
+        console.log('Token clicked:', token);
+    };
+
+    // Función para formatear nombres de atributos
+    const formatAttributeName = (key: string): string => {
+        // Casos especiales
+        if (key === 'MetodoRecoleccion') {
+            return 'Método de Recolección';
+        }
+
+        // Eliminar prefijos comunes
+        let formatted = key.replace(/^Ingrediente_/, '');
+        
+        // Reemplazar guiones bajos por espacios
+        formatted = formatted.replace(/_/g, ' ');
+        
+        // Capitalizar cada palabra
+        formatted = formatted.split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+        
+        return formatted;
     };
 
     return (
@@ -400,6 +483,17 @@ export default function FabricaDashboard() {
                         {tokens.filter(token => token.tipo === 'Procesado' && !token.esReceta).length}
                     </p>
                     <p className="text-gray-500">creados</p>
+                    <div className="mt-2 text-sm text-gray-600">
+                        {tokens.filter(token => token.tipo === 'Procesado').map((token, index) => (
+                            <div key={index} className="mt-1">
+                                <p>Nombre: {token.nombre}</p>
+                                <p>Tipo: {token.tipo}</p>
+                                <p>EsReceta: {String(token.esReceta)}</p>
+                                <p>Atributos: {JSON.stringify(token.atributos)}</p>
+                                <hr className="my-2"/>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">
@@ -437,7 +531,7 @@ export default function FabricaDashboard() {
 
             {/* Contenido de la pestaña */}
             <div className="mt-6">
-                {renderContent()}
+                {renderTokens()}
             </div>
         </div>
     )
