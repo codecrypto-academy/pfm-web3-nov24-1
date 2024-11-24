@@ -7,7 +7,7 @@ import Header from '@/components/ui/Header'
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
-import { HomeIcon, ClockIcon, PlusIcon, TruckIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, ClockIcon, PlusIcon, TruckIcon, Bars3Icon, XMarkIcon, CogIcon } from '@heroicons/react/24/outline'
 import { CONTRACTS } from '@/constants/contracts'
 
 interface LayoutProps {
@@ -16,19 +16,21 @@ interface LayoutProps {
 
 export default function DashboardLayout({ children }: LayoutProps) {
     const [account, setAccount] = useState('')
-    const { role, isAuthenticated, isLoading, address } = useWeb3()
+    const { role, isAuthenticated, isLoading: authLoading, address } = useWeb3()
     const [pendingTransfers, setPendingTransfers] = useState(0)
     const [isMenuOpen, setIsMenuOpen] = useState(true)
+    const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
 
     // Función para cargar las transferencias pendientes para la fábrica
     const loadPendingTransfers = async () => {
-        if (!address || role !== 'fabrica') {
-            console.log('No loading transfers:', { address, role })
+        if (!address || role !== 'fabrica' || isLoading) {
+            console.log('No loading transfers:', { address, role, isLoading })
             return
         }
 
         try {
+            setIsLoading(true)
             console.log('Loading pending transfers for factory:', address)
             const provider = new ethers.BrowserProvider(window.ethereum)
             const tokensContract = new ethers.Contract(
@@ -44,28 +46,48 @@ export default function DashboardLayout({ children }: LayoutProps) {
             setPendingTransfers(pendingTransferIds.length)
         } catch (error) {
             console.error('Error al cargar transferencias pendientes:', error)
+        } finally {
+            setIsLoading(false)
         }
     }
 
     useEffect(() => {
-        if (address && role === 'fabrica') {
-            console.log('Setting up transfer monitoring for factory')
-            loadPendingTransfers()
-            
-            // Actualizar cada 30 segundos
-            const interval = setInterval(loadPendingTransfers, 30000)
-            return () => clearInterval(interval)
+        let isMounted = true
+        let intervalId: NodeJS.Timeout | null = null
+
+        const setupTransferMonitoring = async () => {
+            if (address && role === 'fabrica' && isMounted) {
+                console.log('Setting up transfer monitoring for factory')
+                await loadPendingTransfers()
+                
+                // Actualizar cada 5 segundos
+                intervalId = setInterval(async () => {
+                    if (isMounted && !isLoading) {
+                        await loadPendingTransfers()
+                    }
+                }, 5000)
+            }
+        }
+
+        setupTransferMonitoring()
+
+        // Cleanup function
+        return () => {
+            isMounted = false
+            if (intervalId) {
+                clearInterval(intervalId)
+            }
         }
     }, [address, role])
 
     useEffect(() => {
-        if (!isLoading && !isAuthenticated) {
+        if (!authLoading && !isAuthenticated) {
             router.push('/')
         }
-    }, [isLoading, isAuthenticated, router])
+    }, [authLoading, isAuthenticated, router])
 
     // Mostrar un estado de carga mientras se verifica la autenticación
-    if (isLoading) {
+    if (authLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-olive-600"></div>
@@ -161,38 +183,61 @@ export default function DashboardLayout({ children }: LayoutProps) {
             case 'fabrica':
                 return (
                     <nav className="p-6">
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold text-olive-800">Panel de Fábrica</h2>
-                            <p className="text-sm text-olive-600">Procesamiento de Aceite</p>
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-bold text-olive-800 tracking-tight">
+                                Panel de Fábrica
+                            </h2>
+                            <p className="text-sm text-olive-600/80 mt-1">Procesamiento de Aceite</p>
                         </div>
-                        <ul className="space-y-2">
-                            {commonNavItems.map((item) => (
-                                <li key={item.name}>
-                                    <Link
-                                        href={item.href}
-                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                    >
-                                        <item.icon className="w-5 h-5" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </Link>
-                                </li>
-                            ))}
-                            <div className="border-t border-olive-200 my-4 opacity-50" />
-                            <li>
-                                <Link
-                                    href="/dashboard/fabrica/transferencias"
-                                    className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                >
-                                    <TruckIcon className="w-5 h-5" />
-                                    <span className="font-medium">Transferencias</span>
-                                    {pendingTransfers > 0 && (
-                                        <span className="ml-auto bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium">
-                                            {pendingTransfers}
-                                        </span>
-                                    )}
-                                </Link>
-                            </li>
-                        </ul>
+                        <div className="space-y-2">
+                            <div className="mb-2">
+                                <p className="text-sm font-medium text-olive-600 mb-2 px-3">General</p>
+                                <ul className="space-y-1">
+                                    {commonNavItems.map((item) => (
+                                        <li key={item.name}>
+                                            <Link
+                                                href={item.href}
+                                                className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
+                                            >
+                                                <item.icon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110" />
+                                                <span className="font-medium">{item.name}</span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            
+                            <div className="border-t border-olive-200 my-4"></div>
+                            
+                            <div>
+                                <p className="text-sm font-medium text-olive-600 mb-2 px-3">Gestión de Productos</p>
+                                <ul className="space-y-1">
+                                    <li>
+                                        <Link
+                                            href="/dashboard/fabrica/procesar"
+                                            className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
+                                        >
+                                            <CogIcon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110 group-hover:rotate-45" />
+                                            <span className="font-medium">Procesar Productos</span>
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link
+                                            href="/dashboard/fabrica/transferencias"
+                                            className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
+                                        >
+                                            <TruckIcon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110 group-hover:-translate-x-1" />
+                                            <span className="font-medium">Transferencias</span>
+                                            {pendingTransfers > 0 && (
+                                                <span className="ml-auto bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-semibold min-w-[24px] text-center shadow-sm">
+                                                    {pendingTransfers}
+                                                </span>
+                                            )}
+                                        </Link>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </nav>
                 )
             case 'minorista':
