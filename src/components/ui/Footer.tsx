@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import { AiOutlineMail, AiOutlinePhone, AiOutlineEnvironment } from 'react-icons/ai'; // Iconos de contacto
-import { FaFacebook, FaInstagram, FaLinkedin, FaXTwitter } from 'react-icons/fa'; // Iconos de redes sociales
+import { FaFacebook, FaInstagram, FaLinkedin } from 'react-icons/fa'; // Iconos de redes sociales
+import { FaTwitter } from 'react-icons/fa6'; // X (Twitter) icon
 
 export default function Footer() {
     return (
@@ -18,7 +19,7 @@ export default function Footer() {
                         className="object-contain mb-4"
                     />
                     <p className="text-sm text-center lg:text-left text-olive-400">
-                        Trazabilidad de Aceite © {new Date().getFullYear()}
+                        Trazabilidad de Aceite {new Date().getFullYear()}
                     </p>
                 </div>
 
@@ -78,7 +79,7 @@ export default function Footer() {
                             aria-label="X (Twitter)"
                             className="hover:scale-110 transition-transform"
                         >
-                            <FaXTwitter className="w-6 h-6" />
+                            <FaTwitter className="w-6 h-6" />
                         </a>
                         <a
                             href="https://instagram.com"
