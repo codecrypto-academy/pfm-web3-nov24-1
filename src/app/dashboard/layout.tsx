@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode } from 'react'
 import { ethers } from 'ethers'
 import BubbleBackground from '@/components/ui/BubbleBackground'
 import Header from '@/components/ui/Header'
+import Footer from '@/components/ui/Footer'; 
 import Link from 'next/link'
 import { useWeb3 } from '@/context/Web3Context'
 import { useRouter } from 'next/navigation'
@@ -306,6 +307,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     )
 }
