@@ -37,10 +37,13 @@ export default function TransactionGroup({ transactions, address }: TransactionG
     }
     // Ordenar las transacciones dentro del grupo por timestamp
     groups.forEach(group => {
-      group.transactions.sort((a, b) => a.timestamp - b.timestamp)
+      group.transactions.sort((a, b) => b.timestamp - a.timestamp) // Más recientes primero
     })
     return groups
   }, [])
+
+  // Ordenar los grupos por ID de transferencia (más recientes primero)
+  transferGroups.sort((a, b) => b.transferId - a.transferId)
 
   const toggleGroup = (transferId: number) => {
     setExpandedGroups(prev => ({
@@ -60,114 +63,91 @@ export default function TransactionGroup({ transactions, address }: TransactionG
         </p>
       </div>
       
-      <div className="space-y-8">
+      <div className="space-y-4">
         {transferGroups.map((group) => {
           const isExpanded = expandedGroups[group.transferId] || false
+          const lastTransaction = group.transactions[group.transactions.length - 1]
+          const estado = lastTransaction.estado
           
           return (
-            <div key={`transfer-${group.transferId}`} className="relative">
+            <div key={`transfer-${group.transferId}`} 
+                 className={`border rounded-lg transition-all duration-200 ${
+                   isExpanded ? 'bg-gray-50' : 'bg-white'
+                 }`}>
               <div 
                 onClick={() => toggleGroup(group.transferId)}
-                className="mb-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-4">
                   <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
                     ▶
                   </span>
-                  <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
-                    Transferencia #{group.transferId}
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">
+                      Transferencia #{group.transferId}
+                    </span>
+                    <span className={`ml-3 px-2 py-1 text-xs font-medium rounded-full ${
+                      estado === EstadoTransferencia.EN_TRANSITO
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : estado === EstadoTransferencia.COMPLETADA
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {estado === EstadoTransferencia.EN_TRANSITO
+                        ? 'En Tránsito'
+                        : estado === EstadoTransferencia.COMPLETADA
+                        ? 'Completada'
+                        : 'Cancelada'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-500">
+                    {format(new Date(lastTransaction.timestamp * 1000), "d 'de' MMMM, yyyy", { locale: es })}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedTransferForQR({
+                        tokenId: lastTransaction.tokenId,
+                        transferId: lastTransaction.transferId,
+                        timestamp: lastTransaction.timestamp
+                      })
+                    }}
+                    className="text-sm text-olive-600 hover:text-olive-800 flex items-center space-x-1"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
+                    </svg>
+                    <span>QR</span>
+                  </button>
                 </div>
               </div>
 
               {isExpanded && (
-                <div className="relative pl-8 border-l-2 border-olive-200">
-                  {group.transactions.map((transaction, index) => {
-                    const userAddress = address?.toLowerCase() || '';
-                    const fromAddress = transaction.from.address.toLowerCase();
-                    const toAddress = transaction.to.address.toLowerCase();
-                    
-                    // Determinar si es la transacción de envío o de recepción
-                    // La primera transacción del grupo es siempre el envío
-                    const isFirstTransaction = index === 0;
-                    
-                    let action = '';
-                    let colorClass = '';
-                    let datePrefix = '';
-                    
-                    if (isFirstTransaction) {
-                      // Primera transacción - siempre es envío
-                      action = 'Envío';
-                      colorClass = 'bg-olive-100 text-olive-800';
-                      datePrefix = 'Envío';
-                    } else {
-                      // Segunda transacción - siempre es recepción
-                      action = 'Recibido';
-                      colorClass = 'bg-blue-100 text-blue-800';
-                      datePrefix = 'Recibido';
-                    }
-
-                    return (
-                      <div key={`transaction-${transaction.id}`} className="mb-6 relative">
-                        <div className={`absolute -left-[25px] w-4 h-4 rounded-full border-2 ${
-                          transaction.estado === EstadoTransferencia.EN_TRANSITO
-                            ? 'bg-yellow-100 border-yellow-500' 
-                            : transaction.estado === EstadoTransferencia.COMPLETADA
-                            ? 'bg-green-100 border-green-500'
-                            : 'bg-red-100 border-red-500'
-                        }`} />
-                        
-                        <div className="text-sm text-gray-500 mb-2">
-                          {`${datePrefix} el ${format(new Date(transaction.timestamp * 1000), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}`}
-                        </div>
-                        
-                        <div className="flex flex-col gap-2">
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">Estado:</span>
-                                <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                                  transaction.estado === EstadoTransferencia.EN_TRANSITO
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : transaction.estado === EstadoTransferencia.COMPLETADA
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {EstadoTransferencia[transaction.estado]}
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">Acción:</span>
-                                <span className={`text-sm font-medium px-2 py-1 rounded-full ${colorClass}`}>
-                                  {action}
-                                </span>
-                              </div>
-
-                              <div className="col-span-2 flex justify-end">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedTransferForQR({
-                                      tokenId: transaction.tokenId,
-                                      transferId: transaction.transferId,
-                                      timestamp: transaction.timestamp
-                                    });
-                                  }}
-                                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                                >
-                                  Ver QR
-                                </button>
-                              </div>
-                            </div>
+                <div className="border-t px-4 py-3">
+                  <div className="space-y-4">
+                    {group.transactions.map((transaction, index) => (
+                      <div key={transaction.id} className="bg-white rounded-lg shadow-sm p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              index === 0 ? 'bg-olive-100 text-olive-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {index === 0 ? 'Envío' : 'Recepción'}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              {format(new Date(transaction.timestamp * 1000), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
+                            </span>
                           </div>
-
-                          {/* Detalles de la transacción con tabs */}
-                          <TransactionDetails transaction={transaction} />
                         </div>
+                        <TransactionDetails 
+                          transaction={transaction}
+                          showTokenId={false}
+                        />
                       </div>
-                    )
-                  })}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -175,13 +155,15 @@ export default function TransactionGroup({ transactions, address }: TransactionG
         })}
       </div>
 
-      <TransferQRModal
-        isOpen={selectedTransferForQR !== null}
-        onClose={() => setSelectedTransferForQR(null)}
-        tokenId={selectedTransferForQR?.tokenId || 0}
-        transferId={selectedTransferForQR?.transferId || 0}
-        timestamp={selectedTransferForQR?.timestamp || 0}
-      />
+      {selectedTransferForQR && (
+        <TransferQRModal
+          isOpen={selectedTransferForQR !== null}
+          tokenId={selectedTransferForQR.tokenId}
+          transferId={selectedTransferForQR.transferId}
+          timestamp={selectedTransferForQR.timestamp}
+          onClose={() => setSelectedTransferForQR(null)}
+        />
+      )}
     </div>
   )
 }
