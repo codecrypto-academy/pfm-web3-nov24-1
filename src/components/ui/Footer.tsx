@@ -11,21 +11,22 @@ export default function Footer() {
             <div className="max-w-[2000px] mx-auto px-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
                     {/* Logo y copyright */}
-                    <div className="flex flex-col items-center lg:items-start">
-                        <div className="group relative">
+                    <div className="flex flex-col items-center">
+                        <div className="group relative flex justify-center w-full">
                             <Image
                                 src="/assets/logohd.png"
                                 alt="Logo de la empresa"
                                 width={200}
                                 height={200}
                                 className="object-contain mb-4 transition-transform duration-300 group-hover:scale-105"
+                                style={{ margin: '0 auto' }}
                             />
                             <div className="absolute inset-0 bg-olive-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-lg"></div>
                         </div>
-                        <p className="text-sm text-center lg:text-left text-olive-300">
+                        <p className="text-sm text-center text-olive-300">
                             &copy; Trazabilidad de Aceite {new Date().getFullYear()}
                         </p>
-                        <p className="text-sm text-center lg:text-left text-olive-300 mt-2">
+                        <p className="text-sm text-center text-olive-300 mt-2">
                             Creado por Presen, Sergi, Javi, Joaquin
                         </p>
                     </div>
