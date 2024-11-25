@@ -2,7 +2,7 @@
 
 import { FC, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { TransferModalProps } from '../../types'
+import { TransferModalProps } from '@/types/types'
 
 const TransferModal: FC<TransferModalProps> = ({
     isOpen,

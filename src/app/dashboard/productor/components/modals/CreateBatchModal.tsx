@@ -2,7 +2,7 @@
 
 import { FC, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CreateBatchModalProps, TokenAttribute } from '../../types'
+import { CreateBatchModalProps, TokenAttribute } from '@/types/types'
 
 const CreateBatchModal: FC<CreateBatchModalProps> = ({
     isOpen,
@@ -27,6 +27,14 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
                 return {
                     nombre,
                     valor: selectedValue || attr.valor,
+                    timestamp: Date.now()
+                };
+            }
+            // Para el atributo EsRemesa, siempre true en remesas
+            if (nombre === 'EsRemesa') {
+                return {
+                    nombre,
+                    valor: 'true',
                     timestamp: Date.now()
                 };
             }

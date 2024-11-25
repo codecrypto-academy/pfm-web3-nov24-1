@@ -98,6 +98,10 @@ const CreateProduct: FC<CreateProductProps> = ({ role }) => {
                 {
                     nombre: 'Tipo_Producto',
                     valor: 'Prima'  // Por defecto es "Prima" al crear
+                },
+                {
+                    nombre: 'EsRemesa',
+                    valor: 'false'
                 }
             ]
 

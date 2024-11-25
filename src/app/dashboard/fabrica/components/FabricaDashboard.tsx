@@ -209,48 +209,11 @@ export default function FabricaDashboard() {
     const handleProcessToken = async (token: Token, quantity: string) => {
         try {
             setLoading(true);
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const signer = await provider.getSigner();
-            const contract = new ethers.Contract(
-                CONTRACTS.Tokens.address,
-                CONTRACTS.Tokens.abi,
-                signer
-            );
-
-            console.log('Procesando token:', {
-                tokenId: token.id,
-                quantity,
-                atributos: token.atributos
-            });
-
-            // Actualizar los atributos
-            const nombresAtributos = ['Tipo_Producto', 'EsReceta'];
-            const valoresAtributos = ['Procesado', 'false'];
-
-            console.log('Enviando atributos:', {
-                nombresAtributos,
-                valoresAtributos
-            });
-
-            // Esperar a que se complete la transacción
-            const tx = await contract.procesarToken(
-                token.id,
-                quantity,
-                nombresAtributos,
-                valoresAtributos,
-                { gasLimit: 500000 }
-            );
-
-            console.log('Transacción enviada:', tx.hash);
-            const receipt = await tx.wait();
-            console.log('Transacción confirmada:', receipt);
-
-            // Recargar los tokens
+            // Recargar los tokens después del procesamiento
             await loadTokens();
-            
         } catch (error: any) {
-            console.error('Error al procesar el token:', error);
-            setError(error.message || 'Error al procesar el token');
+            console.error('Error al actualizar los tokens:', error);
+            setError(error.message || 'Error al actualizar los tokens');
         } finally {
             setLoading(false);
         }
@@ -390,15 +353,6 @@ export default function FabricaDashboard() {
                                     </div>
 
                                     <div className="mt-4">
-                                        <p className="font-semibold text-sm text-gray-700">Atributos:</p>
-                                        {Object.entries(token.atributos).map(([key, value]) => (
-                                            <p key={key} className="text-sm text-gray-600">
-                                                {key}: {String(value)}
-                                            </p>
-                                        ))}
-                                    </div>
-
-                                    <div className="mt-4">
                                         <h4 className="text-sm font-medium text-gray-900 mb-2">Desglose de Remesas:</h4>
                                         <div className="space-y-2 max-h-40 overflow-y-auto">
                                             {token.remesas.map((remesa, index) => {
@@ -483,17 +437,6 @@ export default function FabricaDashboard() {
                         {tokens.filter(token => token.tipo === 'Procesado' && !token.esReceta).length}
                     </p>
                     <p className="text-gray-500">creados</p>
-                    <div className="mt-2 text-sm text-gray-600">
-                        {tokens.filter(token => token.tipo === 'Procesado').map((token, index) => (
-                            <div key={index} className="mt-1">
-                                <p>Nombre: {token.nombre}</p>
-                                <p>Tipo: {token.tipo}</p>
-                                <p>EsReceta: {String(token.esReceta)}</p>
-                                <p>Atributos: {JSON.stringify(token.atributos)}</p>
-                                <hr className="my-2"/>
-                            </div>
-                        ))}
-                    </div>
                 </div>
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">
