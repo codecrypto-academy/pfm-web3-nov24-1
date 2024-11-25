@@ -40,10 +40,16 @@ interface TransactionGroup {
   transactions: DetailedTransaction[];
 }
 
+interface ProductGroup {
+  product: string;
+  transactions: DetailedTransaction[];
+}
+
 export default function ClientTransactions({ role }: { role: string }) {
   const [transactions, setTransactions] = useState<DetailedTransaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [groupedByProduct, setGroupedByProduct] = useState<ProductGroup[]>([])
   const { address, isAuthenticated, isLoading: isAuthLoading, role: userRole } = useWeb3()
   const router = useRouter()
   const urlRole = role
@@ -392,17 +398,21 @@ export default function ClientTransactions({ role }: { role: string }) {
         (tx): tx is DetailedTransaction => tx !== null
       )
 
-      const groupedTransactions = validTransactions.reduce<TransactionGroup[]>((acc, transaction) => {
-        const existingGroup = acc.find((group) => group.tokenId === transaction.tokenId);
+      const groupedTransactions = validTransactions.reduce<ProductGroup[]>((acc, transaction) => {
+        const existingGroup = acc.find((group) => group.product === transaction.product);
         if (existingGroup) {
           existingGroup.transactions.push(transaction);
         } else {
-          acc.push({ tokenId: transaction.tokenId, transactions: [transaction] });
+          acc.push({ product: transaction.product, transactions: [transaction] });
         }
         return acc;
       }, []);
 
+      // Ordenar los grupos por nombre de producto
+      groupedTransactions.sort((a, b) => a.product.localeCompare(b.product));
+
       setTransactions(validTransactions)
+      setGroupedByProduct(groupedTransactions)
       setLoading(false)
     } catch (error) {
       console.error('Error al cargar transacciones:', error)
@@ -435,16 +445,6 @@ export default function ClientTransactions({ role }: { role: string }) {
     return <div className="text-gray-600 p-4">No hay transacciones disponibles</div>
   }
 
-  const groupedTransactions = transactions.reduce<TransactionGroup[]>((acc, transaction) => {
-    const existingGroup = acc.find((group) => group.tokenId === transaction.tokenId);
-    if (existingGroup) {
-      existingGroup.transactions.push(transaction);
-    } else {
-      acc.push({ tokenId: transaction.tokenId, transactions: [transaction] });
-    }
-    return acc;
-  }, []);
-
   return (
     <div>
       {loading ? (
@@ -453,9 +453,9 @@ export default function ClientTransactions({ role }: { role: string }) {
         <div className="text-center">No hay transacciones para mostrar</div>
       ) : (
         <div className="space-y-6">
-          {groupedTransactions.map((group) => (
+          {groupedByProduct.map((group) => (
             <TransactionGroup 
-              key={`${group.tokenId}`} 
+              key={`${group.product}`} 
               transactions={group.transactions}
               address={address || ''}
             />
