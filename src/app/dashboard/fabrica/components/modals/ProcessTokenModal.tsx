@@ -213,7 +213,7 @@ const ProcessTokenModal: FC<ProcessTokenModalProps> = ({
                 return
             }
 
-            // Convertir kg a tokens (multiplicar por 1000)
+            // Siempre convertir kg a tokens (multiplicar por 1000)
             const tokenQuantity = String(Math.floor(quantityInKg * 1000))
 
             // Obtener el contrato
@@ -225,22 +225,28 @@ const ProcessTokenModal: FC<ProcessTokenModalProps> = ({
                 signer
             )
 
-            // Preparar atributos
+            // Preparar arrays para múltiples tokens
+            let tokenIds: number[] = []
+            let cantidades: number[] = []
             const nombresAtributos = ['Tipo_Producto']
             const valoresAtributos = ['Procesado']
 
-            // Si es una receta, añadir los ingredientes y sus remesas
+            // Si es una receta, añadir todos los ingredientes
             if (token.esReceta) {
                 for (const ing of ingredientes) {
-                    nombresAtributos.push(`Ingrediente_${ing.nombre}_Remesa`)
-                    valoresAtributos.push(ing.remesaSeleccionada!.toString())
+                    tokenIds.push(ing.remesaSeleccionada!)
+                    cantidades.push(ing.cantidad * 1000) // Convertir a tokens
                 }
+            } else {
+                // Si no es receta, solo procesar el token seleccionado
+                tokenIds.push(selectedRemesaId)
+                cantidades.push(Number(tokenQuantity))
             }
 
-            // Procesar el token
+            // Procesar los tokens
             const tx = await contract.procesarToken(
-                selectedRemesaId!,
-                tokenQuantity,
+                tokenIds,
+                cantidades,
                 nombresAtributos,
                 valoresAtributos,
                 { gasLimit: 500000 }

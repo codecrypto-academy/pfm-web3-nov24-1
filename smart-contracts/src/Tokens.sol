@@ -239,4 +239,105 @@ contract Tokens {
             CondicionesTransporte(0, 0, "")
         );
     }
+
+    // Función para procesar tokens y crear uno nuevo
+    function procesarToken(
+        uint256[] memory _tokenIds,
+        uint256[] memory _cantidades,
+        string[] memory _nombresAtributos,
+        string[] memory _valoresAtributos
+    ) public returns (uint256) {
+        require(_tokenIds.length == _cantidades.length, "Arrays de tokens y cantidades deben tener misma longitud");
+        require(_nombresAtributos.length == _valoresAtributos.length, "Arrays de atributos deben tener misma longitud");
+        
+        // Verificar saldos y quemar tokens
+        for(uint i = 0; i < _tokenIds.length; i++) {
+            require(_cantidades[i] > 0, "Cantidad debe ser mayor que 0");
+            require(tokens[_tokenIds[i]].balances[msg.sender] >= _cantidades[i], "Saldo insuficiente");
+            
+            // Quemar los tokens
+            tokens[_tokenIds[i]].balances[msg.sender] -= _cantidades[i];
+            tokens[_tokenIds[i]].cantidad -= _cantidades[i];
+        }
+
+        // Preparar arrays de atributos incluyendo Tipo_Producto y Token_Origen
+        string[] memory nombresCompletos = new string[](_nombresAtributos.length + _tokenIds.length + 1);
+        string[] memory valoresCompletos = new string[](_valoresAtributos.length + _tokenIds.length + 1);
+        
+        // Copiar atributos existentes
+        for(uint i = 0; i < _nombresAtributos.length; i++) {
+            nombresCompletos[i] = _nombresAtributos[i];
+            valoresCompletos[i] = _valoresAtributos[i];
+        }
+        
+        // Añadir Tipo_Producto
+        uint256 index = _nombresAtributos.length;
+        nombresCompletos[index] = "Tipo_Producto";
+        valoresCompletos[index] = "Procesado";
+        
+        // Añadir Token_Origen para cada token usado
+        for(uint i = 0; i < _tokenIds.length; i++) {
+            nombresCompletos[index + 1 + i] = string(abi.encodePacked("Token_Origen_", uint2str(i + 1)));
+            valoresCompletos[index + 1 + i] = string(abi.encodePacked(
+                tokens[_tokenIds[i]].nombre,
+                " ID:",
+                uint2str(_tokenIds[i]),
+                " Cantidad:",
+                uint2str(_cantidades[i])
+            ));
+        }
+
+        // Calcular cantidad total del nuevo token
+        uint256 cantidadTotal = 0;
+        for(uint i = 0; i < _cantidades.length; i++) {
+            cantidadTotal += _cantidades[i];
+        }
+
+        // Crear el nuevo token procesado
+        return crearToken(
+            "Producto Procesado",
+            cantidadTotal,
+            "Producto procesado de multiples tokens",
+            nombresCompletos,
+            valoresCompletos
+        );
+    }
+
+    // Función auxiliar para convertir uint a string
+    function uint2str(uint256 _i) internal pure returns (string memory str) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        j = _i;
+        while (j != 0) {
+            k = k-1;
+            uint8 temp = uint8(48 + j % 10);
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            j /= 10;
+        }
+        str = string(bstr);
+    }
+
+    // Función auxiliar para convertir address a string
+    function addressToString(address _addr) internal pure returns (string memory) {
+        bytes memory data = abi.encodePacked(_addr);
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(42);
+        str[0] = "0";
+        str[1] = "x";
+        for (uint256 i = 0; i < 20; i++) {
+            str[2+i*2] = alphabet[uint8(data[i] >> 4)];
+            str[3+i*2] = alphabet[uint8(data[i] & 0x0f)];
+        }
+        return string(str);
+    }
 }
