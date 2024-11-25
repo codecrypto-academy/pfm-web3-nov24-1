@@ -671,13 +671,13 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                 <React.Fragment key={token.id}>
                                                     <tr>
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="flex items-center">
-                                                                <button 
-                                                                    onClick={() => toggleRow(token.id)}
-                                                                    className="text-indigo-600 hover:text-indigo-900"
-                                                                >
+                                                            <div 
+                                                                onClick={() => toggleRow(token.id)}
+                                                                className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors duration-150"
+                                                            >
+                                                                <div className="text-indigo-600">
                                                                     {expandedRows.includes(token.id) ? '-' : '+'}
-                                                                </button>
+                                                                </div>
                                                                 {token.relatedTokens && token.relatedTokens.length > 0 && (
                                                                     <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                                                                         {token.relatedTokens.length} remesa{token.relatedTokens.length !== 1 ? 's' : ''}
@@ -717,8 +717,8 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                     {expandedRows.includes(token.id) && token.relatedTokens && token.relatedTokens.length > 0 && (
                                                         <tr>
                                                             <td colSpan={6}>
-                                                                <div className="bg-gray-50 p-4">
-                                                                    <h4 className="text-sm font-medium text-gray-900 mb-2">Remesas disponibles:</h4>
+                                                                <div className="bg-gray-50 p-4 rounded-lg mx-2 my-2">
+                                                                    <h4 className="text-sm font-medium text-gray-900 mb-2 pl-2 border-l-4 border-indigo-500">Remesas disponibles:</h4>
                                                                     <table className="min-w-full divide-y divide-gray-200">
                                                                         <thead className="bg-gray-100">
                                                                             <tr>
@@ -732,14 +732,14 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                                         <tbody>
                                                                             {token.relatedTokens.map((remesa, idx) => (
                                                                                 <React.Fragment key={remesa.id}>
-                                                                                    <tr>
+                                                                                    <tr key={remesa.id} 
+                                                                                        onClick={() => toggleRemesaDetails(remesa.id)}
+                                                                                        className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} 
+                                                                                        hover:bg-gray-100/50 transition-colors duration-150 cursor-pointer`}>
                                                                                         <td className="px-4 py-2">
-                                                                                            <button 
-                                                                                                onClick={() => toggleRemesaDetails(remesa.id)}
-                                                                                                className="text-indigo-600 hover:text-indigo-900"
-                                                                                            >
+                                                                                            <div className="text-indigo-600">
                                                                                                 {expandedRemesas.includes(remesa.id.toString()) ? '-' : '+'}
-                                                                                            </button>
+                                                                                            </div>
                                                                                         </td>
                                                                                         <td className="px-4 py-2">
                                                                                             <div className="text-sm text-gray-900">{remesa.id}</div>
@@ -752,7 +752,8 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                                                         </td>
                                                                                         <td className="px-4 py-2 text-center">
                                                                                             <button
-                                                                                                onClick={() => {
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation(); // Evita que el click del botón active el toggle de la fila
                                                                                                     setSelectedToken({
                                                                                                         ...token,
                                                                                                         cantidad: remesa.cantidad,
