@@ -10,7 +10,7 @@ forge build
 pkill anvil
 
 # Iniciar anvil en segundo plano
-anvil &
+anvil --fork-url http://localhost:8545 --no-storage-caching &
 
 # Esperar a que anvil esté listo
 sleep 2
