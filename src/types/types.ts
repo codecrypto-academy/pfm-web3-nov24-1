@@ -31,6 +31,7 @@ export interface RelatedToken {
     blockNumber: number;
     transfers: TokenTransfer[];
     atributos: Record<string, { valor: string }>;  // Ya no es opcional
+    creador: string;
 }
 
 export interface Token {
@@ -103,10 +104,15 @@ export interface TransferModalProps {
     token: Token | null;
     onSubmit: () => Promise<void>;
     factories: { direccion: string; nombre: string }[];
+    direccion: string;
+    nombre: string;
     selectedFactory: string;
     setSelectedFactory: (value: string) => void;
     quantity: string;
     setQuantity: (value: string) => void;
     factoryBalance: string;
     onFactorySelect: (tokenId: number, factoryAddress: string) => Promise<void>;
+    transferCompleted?: boolean;
+    transferId?: number;
+    transferTimestamp?: number;
 }

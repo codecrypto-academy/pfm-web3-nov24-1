@@ -34,6 +34,37 @@ const ProductorDashboard: FC = (): React.ReactElement => {
     const [selectedRemesaInfo, setSelectedRemesaInfo] = useState<any>(null);
     const [expandedRemesas, setExpandedRemesas] = useState<string[]>([]);
     const [selectedTab, setSelectedTab] = useState<string>('general');
+    const [ownerNames, setOwnerNames] = useState<{[key: string]: string}>({});
+    const [transferId, setTransferId] = useState<number | undefined>(undefined);
+    const [transferTimestamp, setTransferTimestamp] = useState<number | undefined>(undefined);
+
+    useEffect(() => {
+        const loadOwnerName = async () => {
+            if (address) {
+                try {
+                    const provider = new ethers.BrowserProvider(window.ethereum)
+                    const contract = new ethers.Contract(
+                        CONTRACTS.Usuarios.address,
+                        CONTRACTS.Usuarios.abi,
+                        provider
+                    )
+                    const users = await contract.getUsuarios()
+                    const user = users.find((u: any) => u.direccion.toLowerCase() === address.toLowerCase())
+                    setOwnerNames(prev => ({
+                        ...prev,
+                        [address.toLowerCase()]: user ? user.nombre : 'Desconocido'
+                    }))
+                } catch (error) {
+                    console.error('Error al obtener el nombre del usuario:', error)
+                    setOwnerNames(prev => ({
+                        ...prev,
+                        [address.toLowerCase()]: 'Desconocido'
+                    }))
+                }
+            }
+        };
+        loadOwnerName();
+    }, [address]);
 
     useEffect(() => {
         if (isAuthLoading) return
@@ -179,7 +210,8 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                         transactionHash: '',  // Se actualizará con el evento
                         blockNumber: 0,       // Se actualizará con el evento
                         transfers: [],        // Se actualizará después
-                        atributos: {}         // Se actualizará después
+                        atributos: {},        // Se actualizará después
+                        creador: tokenData[2] // Asumiendo que tokenData[2] es el creador, ajusta el índice según corresponda
                     };
 
                     // Obtener el evento de creación para este token
@@ -234,7 +266,8 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                     atributos: remesa.atributos,
                     transactionHash: remesa.transactionHash,
                     blockNumber: remesa.blockNumber,
-                    transfers: remesa.transfers
+                    transfers: remesa.transfers,
+                    creador: remesa.creador // Agregar la propiedad creador a cada remesa
                 }));
 
                 return {
@@ -545,8 +578,35 @@ const ProductorDashboard: FC = (): React.ReactElement => {
             )
 
             console.log('Esperando confirmación de la transacción...');
-            await tx.wait()
-            console.log('Transacción confirmada');
+            const receipt = await tx.wait()
+            console.log('Receipt completo:', receipt);
+
+            // Buscar el evento TokenTransferido
+            const transferEvent = receipt.logs.find(
+                (log: any) => {
+                    console.log('Revisando log:', log);
+                    if (log instanceof EventLog) {
+                        console.log('Es un EventLog con nombre:', log.eventName);
+                        return log.eventName === 'TokenTransferido';
+                    }
+                    return false;
+                }
+            );
+
+            console.log('Evento encontrado:', transferEvent);
+
+            if (transferEvent && transferEvent instanceof EventLog) {
+                console.log('Args del evento:', transferEvent.args);
+                const transferId = Number(transferEvent.args[0]); // El primer argumento es el transferId
+                const timestamp = Math.floor(Date.now() / 1000); // Usamos el timestamp actual
+                console.log('Datos capturados:', { transferId, timestamp });
+                
+                setTransferId(transferId);
+                setTransferTimestamp(timestamp);
+                setIsTransferModalOpen(true);
+            } else {
+                console.error('No se encontró el evento TokenTransferido o no es del tipo esperado');
+            }
 
             // Actualizar el estado
             setLastUpdate(Date.now())
@@ -597,6 +657,24 @@ const ProductorDashboard: FC = (): React.ReactElement => {
             reloadTokens()
         } catch (error) {
             console.error('Error en la transferencia:', error)
+        }
+    }
+
+    // Función para obtener el nombre del usuario
+    const getUserName = async (userAddress: string) => {
+        try {
+            const provider = new ethers.BrowserProvider(window.ethereum)
+            const contract = new ethers.Contract(
+                CONTRACTS.Usuarios.address,
+                CONTRACTS.Usuarios.abi,
+                provider
+            )
+            const users = await contract.getUsuarios()
+            const user = users.find((u: any) => u.direccion.toLowerCase() === userAddress.toLowerCase())
+            return user ? user.nombre : 'Desconocido'
+        } catch (error) {
+            console.error('Error al obtener el nombre del usuario:', error)
+            return 'Desconocido'
         }
     }
 
@@ -725,7 +803,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Info</th>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Token ID</th>
                                                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
-                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                                                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Fecha de Recolección</th>
                                                                                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Transferir</th>
                                                                             </tr>
                                                                         </thead>
@@ -770,7 +848,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
 
                                                                                     {expandedRemesas.includes(remesa.id.toString()) && (
                                                                                         <tr>
-                                                                                            <td colSpan={5} className="px-4 py-2 bg-gray-50">
+                                                                                            <td colSpan={5}>
                                                                                                 <div className="border rounded-lg overflow-hidden">
                                                                                                     {/* Tabs */}
                                                                                                     <div className="border-b">
@@ -814,8 +892,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                                                                             <div className="space-y-2">
                                                                                                                 <p><span className="font-medium">Token ID:</span> {remesa.id}</p>
                                                                                                                 <p><span className="font-medium">Cantidad en kg:</span> {remesa.cantidad / 1000} kg</p>
-                                                                                                                <p><span className="font-medium">Cantidad en tokens:</span> {remesa.cantidad} tokens</p>
-                                                                                                                <p><span className="font-medium">Fecha:</span> {new Date(remesa.timestamp * 1000).toLocaleString()}</p>
+                                                                                                                <p><span className="font-medium">Fecha de Recolección:</span> {new Date(remesa.timestamp * 1000).toLocaleString()}</p>
                                                                                                             </div>
                                                                                                         )}
 
@@ -833,7 +910,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                                                                                             <div className="space-y-2">
                                                                                                                 <p><span className="font-medium">Token ID:</span> {remesa.id}</p>
                                                                                                                 <p><span className="font-medium">Smart Contract:</span> {CONTRACTS.Tokens.address}</p>
-                                                                                                                <p><span className="font-medium">Propietario Actual:</span> {address}</p>
+                                                                                                                <p><span className="font-medium">Propietario Actual:</span> <span className="font-mono">{address}</span> ({address === remesa.creador ? 'Creador' : ownerNames[address.toLowerCase()] || 'Cargando...'})</p>
                                                                                                                 <p><span className="font-medium">Cantidad:</span> {remesa.cantidad} tokens</p>
                                                                                                                 <p><span className="font-medium">Fecha de Creación:</span> {new Date(remesa.timestamp * 1000).toLocaleString()}</p>
                                                                                                                 <p><span className="font-medium">Hash de Transacción:</span> {remesa.transactionHash || 'No disponible'}</p>
@@ -923,10 +1000,11 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 isOpen={isTransferModalOpen}
                 onClose={() => {
                     setIsTransferModalOpen(false)
-                    setSelectedToken(null)
                     setSelectedFactory('')
                     setTransferQuantity('')
                     setFactoryBalance('')
+                    setTransferId(undefined)
+                    setTransferTimestamp(undefined)
                 }}
                 token={selectedToken}
                 onSubmit={handleTransfer}
@@ -937,6 +1015,10 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 setQuantity={setTransferQuantity}
                 factoryBalance={factoryBalance}
                 onFactorySelect={checkFactoryBalance}
+                direccion={address || ''}
+                nombre={ownerNames[address || ''] || ''}
+                transferId={transferId}
+                transferTimestamp={transferTimestamp}
             />
 
             {/* Modal de Información Detallada de Remesa */}
@@ -957,9 +1039,9 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                                 <div>
                                     <h4 className="font-medium text-gray-700">Información Básica</h4>
                                     <div className="mt-2 space-y-2">
-                                        <p><span className="font-medium">ID:</span> {selectedRemesaInfo.id}</p>
-                                        <p><span className="font-medium">Cantidad:</span> {selectedRemesaInfo.cantidad / 1000} kg</p>
-                                        <p><span className="font-medium">Fecha:</span> {new Date(selectedRemesaInfo.timestamp * 1000).toLocaleString()}</p>
+                                        <p><span className="font-medium">Token ID:</span> {selectedRemesaInfo.id}</p>
+                                        <p><span className="font-medium">Cantidad en kg:</span> {selectedRemesaInfo.cantidad / 1000} kg</p>
+                                        <p><span className="font-medium">Fecha de Recolección:</span> {new Date(selectedRemesaInfo.timestamp * 1000).toLocaleString()}</p>
                                     </div>
                                 </div>
                                 <div>

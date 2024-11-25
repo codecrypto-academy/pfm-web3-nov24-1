@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useState } from 'react'
 import TransactionDetails from './TransactionDetails'
+import TransferQRModal from './TransferQRModal'
 
 interface TransactionGroupProps {
   transactions: DetailedTransaction[]
@@ -16,6 +17,7 @@ interface TransferGroup {
 
 export default function TransactionGroup({ transactions, address }: TransactionGroupProps) {
   const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({});
+  const [selectedTransferForQR, setSelectedTransferForQR] = useState<{ tokenId: number, transferId: number, timestamp: number } | null>(null);
 
   if (!transactions.length) return null
 
@@ -141,6 +143,22 @@ export default function TransactionGroup({ transactions, address }: TransactionG
                                   {action}
                                 </span>
                               </div>
+
+                              <div className="col-span-2 flex justify-end">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedTransferForQR({
+                                      tokenId: transaction.tokenId,
+                                      transferId: transaction.transferId,
+                                      timestamp: transaction.timestamp
+                                    });
+                                  }}
+                                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                                >
+                                  Ver QR
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -156,6 +174,14 @@ export default function TransactionGroup({ transactions, address }: TransactionG
           )
         })}
       </div>
+
+      <TransferQRModal
+        isOpen={selectedTransferForQR !== null}
+        onClose={() => setSelectedTransferForQR(null)}
+        tokenId={selectedTransferForQR?.tokenId || 0}
+        transferId={selectedTransferForQR?.transferId || 0}
+        timestamp={selectedTransferForQR?.timestamp || 0}
+      />
     </div>
   )
 }
