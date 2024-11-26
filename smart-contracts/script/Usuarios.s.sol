@@ -27,6 +27,13 @@ contract UsuariosDeploy is Script {
             "42.043863584358185, 3.1300091754146946", // Coordenadas de ejemplo en Córdoba
             "fabrica"
         );
+
+        usuarios.nuevoUsuario(
+            0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc,
+            "Minorista 1",
+            "42.04127961829128, 3.1331613699486227", // Coordenadas de ejemplo en Córdoba
+            "minorista"
+        );
         
         console2.log("DEPLOY_ADDRESS:", address(usuarios));
 

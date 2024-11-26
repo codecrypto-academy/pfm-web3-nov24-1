@@ -7,6 +7,8 @@ import { CONTRACTS } from '@/constants/contracts'
 import { useRouter } from 'next/navigation'
 import ClientTransactions from '@/components/shared/ClientTransactions'
 import PendingTransfers from '@/components/TransferenciasPendientes'
+import { toast } from 'react-toastify'
+import { formatAttributeName } from '@/utils/attributeLabels'
 
 interface Token {
     id: number
@@ -27,6 +29,12 @@ interface Token {
         creador: string
     }[]
     numRemesas: number
+    tokensPadres?: {
+        id: number
+        cantidad: number
+        nombre: string
+        transferId?: number // ID de la transferencia
+    }[]
 }
 
 interface TokenAttribute {
@@ -41,6 +49,32 @@ interface RelatedToken {
     timestamp: number
 }
 
+interface Usuario {
+    direccion: string;
+    nombre: string;
+    gps: string;
+    rol: string;
+    activo: boolean;
+}
+
+interface BlockchainInfo {
+    token: Token & {
+        tokensPadres: {
+            id: number
+            cantidad: number
+            nombre: string
+            transferId?: number // ID de la transferencia
+        }[]
+    }
+    remesa: {
+        id: number
+        cantidad: number
+        timestamp: number
+        atributos: { [key: string]: any }
+        creador: string
+    }
+}
+
 export default function FabricaDashboard() {
     const { address, isAuthenticated, isLoading: isAuthLoading, role: userRole } = useWeb3()
     const [tokens, setTokens] = useState<Token[]>([])
@@ -51,6 +85,20 @@ export default function FabricaDashboard() {
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 12
     const router = useRouter()
+
+    // Estados para el modal de transferencia
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+    const [transferQuantity, setTransferQuantity] = useState('');
+    const [transferDestination, setTransferDestination] = useState('');
+    const [selectedRemesa, setSelectedRemesa] = useState<number | null>(null);
+
+    // Estados para el modal de información blockchain
+    const [showBlockchainModal, setShowBlockchainModal] = useState(false);
+    const [selectedBlockchainInfo, setSelectedBlockchainInfo] = useState<BlockchainInfo | null>(null);
+
+    // Estado para almacenar las direcciones de minoristas
+    const [minoristas, setMinoristas] = useState<{ address: string; label: string }[]>([]);
 
     // Efecto para manejar la redirección basada en el rol
     useEffect(() => {
@@ -132,25 +180,32 @@ export default function FabricaDashboard() {
                 try {
                     const balance = await tokensContract.getBalance(tokenId, address)
                     const tokenData = await tokensContract.tokens(tokenId)
+                    console.log('Token Data para ID', tokenId, ':', tokenData);
+                    
                     const nombresAtributos = await tokensContract.getNombresAtributos(tokenId)
+                    console.log('Nombres de atributos:', nombresAtributos);
                     
                     const atributos: { [key: string]: any } = {}
                     for (const nombre of nombresAtributos) {
                         const attr = await tokensContract.getAtributo(tokenId, nombre)
                         atributos[nombre] = attr[1]
+                        if (nombre.toLowerCase().includes('fecha') || nombre.toLowerCase().includes('time')) {
+                            console.log('Atributo de fecha encontrado:', nombre, attr[1]);
+                        }
                     }
 
                     // Incluir el token si tiene balance > 0 o si es una receta
                     const esReceta = atributos['EsReceta'] === true || atributos['EsReceta'] === 'true'
                     if (Number(balance) > 0 || esReceta) {
-                        const nombre = tokenData[1];
+                        // Usar el atributo Nombre si está disponible, si no usar tokenData[1]
+                        const nombre = atributos['Nombre'] || tokenData[1];
                         const tipo = esReceta ? 'Receta' : (atributos['Tipo_Producto'] || 'Prima');
                         const key = `${nombre}-${tipo}`;
 
                         const remesa = {
                             id: tokenId,
                             cantidad: Number(balance),
-                            timestamp: Number(tokenData[4]),
+                            timestamp: Number(tokenData[5]),
                             atributos,
                             creador: tokenData[2]
                         };
@@ -162,7 +217,7 @@ export default function FabricaDashboard() {
                                 tipo,
                                 creador: tokenData[2],
                                 cantidadTotal: Number(balance),
-                                timestamp: Number(tokenData[4]),
+                                timestamp: Number(tokenData[5]),
                                 atributos,
                                 nombresAtributos,
                                 atributosJSON: JSON.stringify(atributos),
@@ -176,8 +231,8 @@ export default function FabricaDashboard() {
                             existing.remesas.push(remesa);
                             existing.numRemesas += 1;
                             // Mantenemos el timestamp más reciente
-                            if (Number(tokenData[4]) > existing.timestamp) {
-                                existing.timestamp = Number(tokenData[4]);
+                            if (Number(tokenData[5]) > existing.timestamp) {
+                                existing.timestamp = Number(tokenData[5]);
                             }
                         }
                     }
@@ -200,11 +255,111 @@ export default function FabricaDashboard() {
         }
     }
 
+    // Función para cargar las direcciones de minoristas
+    const loadMinoristas = async () => {
+        try {
+            console.log('Cargando minoristas...');
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const usuariosContract = new ethers.Contract(
+                CONTRACTS.Usuarios.address,
+                CONTRACTS.Usuarios.abi,
+                provider
+            );
+
+            // Obtener todos los usuarios
+            const usuarios = await usuariosContract.getUsuarios() as Usuario[];
+            console.log('Usuarios encontrados:', usuarios.length);
+
+            // Filtrar solo los minoristas activos
+            const minoristasList = usuarios
+                .filter((usuario: Usuario) => 
+                    usuario.rol.toLowerCase() === 'minorista' && 
+                    usuario.activo
+                )
+                .map((usuario: Usuario) => ({
+                    address: usuario.direccion.toLowerCase(),
+                    label: `${usuario.nombre} (${usuario.direccion})`
+                }));
+
+            console.log('Minoristas filtrados:', minoristasList);
+            setMinoristas(minoristasList);
+        } catch (error) {
+            console.error('Error cargando minoristas:', error);
+        }
+    };
+
     useEffect(() => {
         if (address && isAuthenticated) {
             loadTokens()
+            loadMinoristas();
         }
     }, [address, isAuthenticated])
+
+    // Función para validar si una dirección es minorista
+    const esMinorista = (direccion: string): boolean => {
+        return minoristas.some(minorista => minorista.address === direccion.toLowerCase());
+    };
+
+    // Función para convertir entre KG y tokens (1:1 en este caso)
+    const kgToTokens = (kg: number): number => {
+        return kg;
+    };
+
+    const tokensToKg = (tokens: number): number => {
+        return tokens;
+    };
+
+    // Función para manejar la transferencia de tokens
+    const handleTransferToken = async (token: Token, quantityInKg: number, destinatario: string, remesaId: number) => {
+        try {
+            // Verificar que el token sea un producto procesado
+            if (token.tipo !== 'Procesado' || token.esReceta) {
+                throw new Error('Solo se pueden transferir productos procesados');
+            }
+
+            // Verificar que el destinatario sea un minorista
+            if (!esMinorista(destinatario)) {
+                throw new Error('Solo se puede transferir a direcciones de minoristas');
+            }
+
+            setLoading(true);
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const tokensContract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                signer
+            );
+
+            // Verificar que la cantidad no exceda el balance disponible
+            if (quantityInKg > tokensToKg(token.cantidadTotal)) {
+                throw new Error('La cantidad excede el balance disponible');
+            }
+
+            // Convertir KG a tokens para la transferencia
+            const quantityInTokens = kgToTokens(quantityInKg);
+
+            // Iniciar la transferencia
+            const tx = await tokensContract.transferirToken(
+                token.id,
+                destinatario,
+                quantityInTokens,
+                remesaId
+            );
+
+            await tx.wait();
+            
+            // Recargar los tokens después de la transferencia
+            await loadTokens();
+            
+        } catch (error: any) {
+            console.error('Error en la transferencia:', error);
+            setError(error.message || 'Error al transferir tokens');
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleProcessToken = async (token: Token, quantity: string) => {
         try {
@@ -256,6 +411,141 @@ export default function FabricaDashboard() {
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
+
+    // Funciones para manejar el modal de transferencia
+    const handleOpenTransferModal = (token: Token) => {
+        setSelectedToken(token);
+        setShowTransferModal(true);
+        setTransferQuantity('');
+        setTransferDestination('');
+        setSelectedRemesa(null);
+    };
+
+    const handleCloseTransferModal = () => {
+        setShowTransferModal(false);
+        setSelectedToken(null);
+        setTransferQuantity('');
+        setTransferDestination('');
+        setSelectedRemesa(null);
+    };
+
+    const handleTransferSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedToken || !transferQuantity || !transferDestination || selectedRemesa === null) return;
+
+        try {
+            const quantity = parseInt(transferQuantity);
+            if (isNaN(quantity) || quantity <= 0) {
+                throw new Error('La cantidad debe ser un número positivo');
+            }
+
+            const remesa = selectedToken.remesas.find(r => r.id === selectedRemesa);
+            if (!remesa) {
+                throw new Error('Remesa no encontrada');
+            }
+
+            if (quantity > remesa.cantidad) {
+                throw new Error('La cantidad excede el balance disponible en la remesa');
+            }
+
+            await handleTransferToken(selectedToken, quantity, transferDestination, selectedRemesa);
+            handleCloseTransferModal();
+        } catch (error: any) {
+            setError(error.message || 'Error al procesar la transferencia');
+        }
+    };
+
+    // Función para formatear fechas
+    const formatDate = (timestamp: number): string => {
+        if (!timestamp || timestamp === 0) {
+            return 'Fecha no disponible';
+        }
+        return new Date(timestamp * 1000).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric'
+        });
+    };
+
+    // Función para mostrar información blockchain
+    const handleShowBlockchainInfo = async (remesa: any, token: Token) => {
+        try {
+            const provider = new ethers.BrowserProvider(window.ethereum)
+            const contract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                provider
+            )
+
+            // Obtener información adicional del token
+            const tokenData = await contract.tokens(remesa.id)
+            const nombresAtributos = await contract.getNombresAtributos(remesa.id)
+            
+            // Obtener atributos
+            const atributos: { [key: string]: any } = {}
+            for (const nombre of nombresAtributos) {
+                const attr = await contract.getAtributo(remesa.id, nombre)
+                atributos[nombre] = attr[1]
+            }
+
+            // Si es un token procesado, buscar los tokens padres en los atributos
+            let tokensPadres = []
+            if (token.tipo === 'Procesado') {
+                // Los tokens padres están en atributos que empiezan con "Ingrediente_"
+                const atributosTokensPadres = nombresAtributos.filter((nombre: string) => 
+                    nombre.startsWith('Ingrediente_')
+                )
+
+                for (const nombre of atributosTokensPadres) {
+                    const attr = await contract.getAtributo(remesa.id, nombre)
+                    const nombreIngrediente = nombre.replace('Ingrediente_', '')
+                    const cantidad = Number(attr[1])
+
+                    // Obtener el ID del token padre usando el nombre
+                    try {
+                        const tokenId = await contract.getTokenIdByName(nombreIngrediente)
+                        const tokenPadre = await contract.tokens(tokenId)
+                        
+                        // Obtener el ID de transferencia del evento de transferencia
+                        const transferFilter = contract.filters.TokenTransferido(null, tokenId)
+                        const transferEvents = await contract.queryFilter(transferFilter)
+                        const lastTransferEvent = transferEvents[transferEvents.length - 1]
+                        const transferId = lastTransferEvent && lastTransferEvent instanceof ethers.EventLog ? 
+                            lastTransferEvent.args[0] : null
+                        
+                        tokensPadres.push({
+                            id: Number(tokenId),
+                            nombre: nombreIngrediente,
+                            cantidad: cantidad / 1000, // Convertir de tokens a KG
+                            transferId: transferId ? Number(transferId) : undefined
+                        })
+                    } catch (error) {
+                        console.error(`Error al obtener token padre ${nombreIngrediente}:`, error)
+                    }
+                }
+            }
+
+            setSelectedBlockchainInfo({
+                token: {
+                    ...token,
+                    tokensPadres
+                },
+                remesa: {
+                    ...remesa,
+                    atributos
+                }
+            })
+            setShowBlockchainModal(true)
+        } catch (error) {
+            console.error('Error al obtener información de blockchain:', error)
+            toast.error('Error al obtener información de blockchain')
+        }
+    };
+
+    const handleCloseBlockchainModal = () => {
+        setShowBlockchainModal(false);
+        setSelectedBlockchainInfo(null);
+    };
 
     if (loading) {
         return (
@@ -323,9 +613,9 @@ export default function FabricaDashboard() {
                         return (
                             <div
                                 key={`${token.nombre}-${token.tipo}`}
-                                className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
+                                className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200 flex flex-col"
                             >
-                                <div className="p-5">
+                                <div className="p-5 flex-grow">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <h3 className="text-lg font-semibold text-gray-900">
@@ -364,22 +654,42 @@ export default function FabricaDashboard() {
                                                     >
                                                         <div className="flex justify-between">
                                                             <span>Remesa #{index + 1}</span>
-                                                            <span>{new Date(remesa.timestamp * 1000).toLocaleDateString()}</span>
+                                                            <span>{formatDate(remesa.timestamp)}</span>
                                                         </div>
                                                         <div className="flex justify-between text-gray-600">
-                                                            <span>Tokens:</span>
-                                                            <span>{remesa.cantidad.toLocaleString()}</span>
+                                                            <span>Cantidad:</span>
+                                                            <span>{remesa.cantidad.toLocaleString()} KG</span>
                                                         </div>
-                                                        <div className="flex justify-between text-gray-600">
-                                                            <span>KG:</span>
-                                                            <span>{remesaKg.toLocaleString()} kg</span>
-                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleShowBlockchainInfo(remesa, token);
+                                                            }}
+                                                            className="mt-2 w-full text-sm text-olive-600 hover:text-olive-700 flex items-center justify-center gap-1"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            Info Blockchain
+                                                        </button>
                                                     </div>
                                                 );
                                             })}
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Solo mostrar el botón de transferencia para productos procesados que no sean recetas */}
+                                {token.tipo === 'Procesado' && !token.esReceta && (
+                                    <div className="px-5 py-4 bg-gray-50 border-t border-gray-100">
+                                        <button
+                                            onClick={() => handleOpenTransferModal(token)}
+                                            className="w-full bg-olive-600 text-white py-2 px-4 rounded hover:bg-olive-700 transition-colors duration-200"
+                                        >
+                                            Transferir
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -476,6 +786,194 @@ export default function FabricaDashboard() {
             <div className="mt-6">
                 {renderTokens()}
             </div>
+
+            {/* Modal de Transferencia */}
+            {showTransferModal && selectedToken && (
+                <div 
+                    className="fixed z-50 flex items-center justify-center"
+                    style={{
+                        top: `${window.scrollY}px`,
+                        left: '0',
+                        right: '0',
+                        bottom: '0',
+                        height: '100vh'
+                    }}
+                >
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-50"
+                        onClick={handleCloseTransferModal}
+                    ></div>
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative z-10">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold">Transferir {selectedToken.nombre}</h2>
+                            <button
+                                onClick={handleCloseTransferModal}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleTransferSubmit}>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Seleccionar Remesa
+                                </label>
+                                <select
+                                    value={selectedRemesa || ''}
+                                    onChange={(e) => setSelectedRemesa(e.target.value ? parseInt(e.target.value) : null)}
+                                    className="w-full p-2 border rounded-md bg-white mb-4"
+                                    required
+                                >
+                                    <option value="">Seleccione una remesa</option>
+                                    {selectedToken.remesas.map((remesa, index) => (
+                                        <option key={remesa.id} value={remesa.id}>
+                                            Remesa #{index + 1} - {remesa.cantidad} KG - {formatDate(remesa.timestamp)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Cantidad (KG)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={transferQuantity}
+                                    onChange={(e) => setTransferQuantity(e.target.value)}
+                                    className="w-full p-2 border rounded-md"
+                                    max={selectedRemesa !== null ? selectedToken.remesas.find(r => r.id === selectedRemesa)?.cantidad || 0 : 0}
+                                    min="1"
+                                    required
+                                />
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Máximo disponible: {selectedRemesa !== null ? 
+                                        (selectedToken.remesas.find(r => r.id === selectedRemesa)?.cantidad || 0) : 0} KG
+                                </p>
+                            </div>
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Seleccionar Minorista
+                                </label>
+                                <select
+                                    value={transferDestination}
+                                    onChange={(e) => setTransferDestination(e.target.value)}
+                                    className="w-full p-2 border rounded-md bg-white"
+                                    required
+                                >
+                                    <option value="">Seleccione un minorista</option>
+                                    {minoristas.length > 0 ? (
+                                        minoristas.map((minorista) => (
+                                            <option key={minorista.address} value={minorista.address}>
+                                                {minorista.label}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option disabled>No hay minoristas disponibles</option>
+                                    )}
+                                </select>
+                                {minoristas.length === 0 && (
+                                    <p className="text-sm text-red-500 mt-1">
+                                        No se encontraron minoristas registrados
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex justify-end space-x-4">
+                                <button
+                                    type="button"
+                                    onClick={handleCloseTransferModal}
+                                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-olive-600 text-white rounded-md hover:bg-olive-700"
+                                    disabled={!transferDestination || minoristas.length === 0}
+                                >
+                                    Confirmar Transferencia
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Información Blockchain */}
+            {showBlockchainModal && selectedBlockchainInfo && (
+                <div 
+                    className="fixed z-50 flex items-center justify-center"
+                    style={{
+                        top: `${window.scrollY}px`,
+                        left: '0',
+                        right: '0',
+                        bottom: '0',
+                        height: '100vh'
+                    }}
+                >
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-50"
+                        onClick={handleCloseBlockchainModal}
+                    ></div>
+                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 relative z-10 max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold">Información Blockchain</h2>
+                            <button
+                                onClick={handleCloseBlockchainModal}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="font-medium text-lg mb-2">Información General</h3>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <span className="font-medium">Nombre:</span>
+                                        <span className="ml-2">{selectedBlockchainInfo.token.nombre}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Tipo:</span>
+                                        <span className="ml-2">{selectedBlockchainInfo.token.tipo}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Cantidad:</span>
+                                        <span className="ml-2">{selectedBlockchainInfo.remesa.cantidad} KG</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Fecha:</span>
+                                        <span className="ml-2">{formatDate(selectedBlockchainInfo.remesa.timestamp)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Creador:</span>
+                                        <span className="ml-2">{selectedBlockchainInfo.remesa.creador}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Atributos */}
+                            {Object.keys(selectedBlockchainInfo.remesa.atributos).length > 0 && (
+                                <div>
+                                    <h3 className="font-medium text-lg mb-2">Atributos</h3>
+                                    <div className="space-y-2">
+                                        {Object.entries(selectedBlockchainInfo.remesa.atributos).map(([key, value]) => (
+                                            <div key={key}>
+                                                <span className="font-medium">{formatAttributeName(key)}:</span>
+                                                <span className="ml-2">{value.toString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

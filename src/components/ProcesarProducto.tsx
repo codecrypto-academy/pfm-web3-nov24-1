@@ -371,6 +371,18 @@ export default function ProcessProduct() {
             return
         }
 
+        // Validar que no se excedan las cantidades disponibles
+        const excedeLimite = selectedIngredients.some(ing => {
+            const totalKg = ing.quantity * unitsToCreate;
+            const disponibleKg = ing.token.cantidadTotal / 1000;
+            return totalKg > disponibleKg;
+        });
+
+        if (excedeLimite) {
+            setError('Uno o más ingredientes exceden la cantidad disponible')
+            return
+        }
+
         try {
             setLoading(true)
             setError('')
@@ -411,6 +423,16 @@ export default function ProcessProduct() {
             // Marcar si es una receta
             nombresAtributos.push("EsReceta")
             valoresAtributos.push(isRecipeMode ? "true" : "false")
+
+            // Añadir tipo de producto
+            nombresAtributos.push("Tipo_Producto")
+            valoresAtributos.push(isRecipeMode ? "Receta" : "Procesado")
+
+            // Añadir ingredientes como atributos
+            selectedIngredients.forEach((ing, index) => {
+                nombresAtributos.push(`Ingrediente_${ing.token.nombre}`)
+                valoresAtributos.push(ing.quantity.toString())
+            })
 
             // Toast inicial con detalles
             const toastId = toast.info(
@@ -1161,43 +1183,78 @@ export default function ProcessProduct() {
 
                 {/* Lista de Ingredientes Seleccionados */}
                 {selectedIngredients.length > 0 && (
-                    <div className="mt-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                            Ingredientes Seleccionados
-                        </h3>
-                        <div className="space-y-4">
-                            {selectedIngredients.map((ingredient, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2 border-b">
-                                    <div>
-                                        <p className="font-semibold">{ingredient.token.nombre}</p>
-                                        <p className="text-sm text-gray-600">
-                                            Por unidad: {ingredient.quantity} kg
-                                            {!isRecipeMode && ` (${ingredient.quantity * 1000} tokens)`}
-                                        </p>
-                                        <p className="text-sm text-gray-600">
-                                            Total para {unitsToCreate} unidades: {ingredient.quantity * unitsToCreate} kg
-                                            {!isRecipeMode && ` (${ingredient.quantity * unitsToCreate * 1000} tokens)`}
-                                        </p>
-                                        <p className="text-xs text-gray-500">ID: {ingredient.token.remesas[0]?.id}</p>
+                    <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Ingredientes Seleccionados:</h4>
+                        <div className="space-y-3">
+                            {selectedIngredients.map((ingredient, index) => {
+                                const totalKg = ingredient.quantity * unitsToCreate;
+                                const totalTokens = totalKg * 1000;
+                                const disponibleKg = ingredient.token.cantidadTotal / 1000;
+                                const excedeLimite = totalKg > disponibleKg;
+
+                                return (
+                                    <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${excedeLimite ? 'bg-red-50' : 'bg-gray-50'}`}>
+                                        <div className="flex-grow">
+                                            <div className="font-medium text-gray-800">{ingredient.token.nombre}</div>
+                                            <div className="text-sm text-gray-500">
+                                                Disponible: {disponibleKg.toFixed(3)} kg
+                                            </div>
+                                            <div className="text-sm mt-1">
+                                                <span className={`${excedeLimite ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                                    Total para {unitsToCreate} unidad(es): {totalKg.toFixed(3)} kg ({totalTokens.toFixed(0)} tokens)
+                                                </span>
+                                            </div>
+                                            {excedeLimite && (
+                                                <div className="text-red-600 text-sm mt-1">
+                                                    ⚠️ Excede la cantidad disponible
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-32">
+                                                <input
+                                                    type="number"
+                                                    value={ingredient.quantity || ''}
+                                                    onChange={(e) => updateIngredientQuantity(ingredient.token.nombre, Number(e.target.value))}
+                                                    className={`w-full px-2 py-1 border rounded focus:outline-none focus:ring-1 ${
+                                                        excedeLimite 
+                                                            ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                                                            : 'border-gray-300 focus:ring-olive-500'
+                                                    }`}
+                                                    placeholder="KG por unidad"
+                                                    min="0"
+                                                    max={disponibleKg / unitsToCreate}
+                                                    step="0.001"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => removeIngredient(ingredient.token.nombre)}
+                                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => removeIngredient(ingredient.token.nombre)}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            ))}
-                            {!isRecipeMode && (
-                                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                                    <p className="text-sm text-blue-700">
-                                        <strong>Total a procesar:</strong> {selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate), 0)} kg
-                                        {` (${selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate * 1000), 0)} tokens)`}
+                                );
+                            })}
+
+                            {/* Resumen total */}
+                            <div className="mt-4 p-4 bg-olive-50 rounded-lg">
+                                <h5 className="font-medium text-olive-800 mb-2">Resumen Total</h5>
+                                <div className="space-y-2">
+                                    <p className="text-sm text-olive-700">
+                                        <span className="font-medium">Unidades a producir:</span> {unitsToCreate}
+                                    </p>
+                                    <p className="text-sm text-olive-700">
+                                        <span className="font-medium">Total KG:</span> {selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate), 0).toFixed(3)} kg
+                                    </p>
+                                    <p className="text-sm text-olive-700">
+                                        <span className="font-medium">Total Tokens:</span> {selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate * 1000), 0).toFixed(0)}
                                     </p>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 )}
