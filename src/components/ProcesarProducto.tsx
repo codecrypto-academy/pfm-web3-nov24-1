@@ -1,10 +1,21 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from '@/context/Web3Context'
 import { CONTRACTS } from '@/constants/contracts'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+
+function debounce<T extends (...args: any[]) => any>(
+    func: T,
+    wait: number
+): (...args: Parameters<T>) => void {
+    let timeout: NodeJS.Timeout | null = null;
+    return (...args: Parameters<T>) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}
 
 interface Remesa {
     id: number
@@ -48,6 +59,25 @@ export default function ProcessProduct() {
     const [isRecipeMode, setIsRecipeMode] = useState(false)
     const [selectedRecipe, setSelectedRecipe] = useState<Token | null>(null)
     const [unitsToCreate, setUnitsToCreate] = useState(1)
+    const [searchTerm, setSearchTerm] = useState('')
+    const [expandedSection, setExpandedSection] = useState<'rawMaterials' | 'processedProducts' | null>('rawMaterials')
+    const [showSearchResults, setShowSearchResults] = useState(false)
+    const [selectedResultIndex, setSelectedResultIndex] = useState(-1)
+    const searchRef = useRef<HTMLDivElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    // Filtrar materias primas y productos procesados según el término de búsqueda
+    const filteredRawMaterials = rawMaterials.filter(material =>
+        material.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        material.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    const filteredProcessedProducts = processedProducts.filter(product =>
+        product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    const totalResults = filteredRawMaterials.length + filteredProcessedProducts.length
 
     // Cargar tokens disponibles
     useEffect(() => {
@@ -548,6 +578,71 @@ export default function ProcessProduct() {
         }
     }
 
+    // Función para resaltar el texto buscado
+    const highlightText = (text: string, highlight: string) => {
+        if (!highlight.trim()) return text
+        const parts = text.split(new RegExp(`(${highlight})`, 'gi'))
+        return parts.map((part, i) => 
+            part.toLowerCase() === highlight.toLowerCase() ? 
+                <span key={i} className="bg-yellow-200">{part}</span> : part
+        )
+    }
+
+    // Función debounce para la búsqueda
+    const debouncedSearch = useCallback(
+        debounce((value: string) => {
+            setSearchTerm(value)
+        }, 300),
+        []
+    )
+
+    // Manejar navegación con teclado
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        const allResults = [...filteredRawMaterials, ...filteredProcessedProducts]
+        
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                setSelectedResultIndex(prev => 
+                    prev < allResults.length - 1 ? prev + 1 : prev
+                )
+                break
+            case 'ArrowUp':
+                e.preventDefault()
+                setSelectedResultIndex(prev => prev > 0 ? prev - 1 : prev)
+                break
+            case 'Enter':
+                e.preventDefault()
+                if (selectedResultIndex >= 0 && selectedResultIndex < allResults.length) {
+                    const selectedItem = allResults[selectedResultIndex]
+                    const isRawMaterial = filteredRawMaterials.includes(selectedItem)
+                    setExpandedSection(isRawMaterial ? 'rawMaterials' : 'processedProducts')
+                    setExpandedToken(selectedItem.nombre)
+                    setShowSearchResults(false)
+                    setSearchTerm('')
+                    setSelectedResultIndex(-1)
+                }
+                break
+            case 'Escape':
+                setShowSearchResults(false)
+                setSelectedResultIndex(-1)
+                break
+        }
+    }
+
+    // Cerrar el desplegable cuando se hace clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowSearchResults(false)
+                setSelectedResultIndex(-1)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
     return (
         <div className="space-y-8">
             {/* Switch de modo receta */}
@@ -658,345 +753,453 @@ export default function ProcessProduct() {
                     Selección de Ingredientes (Por unidad a producir)
                 </h3>
                 
-                {rawMaterials.length === 0 && processedProducts.length === 0 ? (
-                    <div className="text-center py-8">
-                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                {/* Barra de búsqueda con resultados desplegables */}
+                <div className="mb-6 relative">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            className="w-full px-4 py-2 pl-10 pr-4 border border-olive-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-olive-500"
+                            placeholder="Buscar por nombre o descripción..."
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value)
+                                setShowSearchResults(true)
+                            }}
+                            onFocus={() => setShowSearchResults(true)}
+                            onKeyDown={handleKeyDown}
+                        />
+                        <svg
+                            className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
                         </svg>
-                        <p className="mt-4 text-gray-500">No hay materias primas ni productos procesados disponibles.</p>
+                        {searchTerm && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                                {totalResults} resultado{totalResults !== 1 ? 's' : ''}
+                            </span>
+                        )}
                     </div>
-                ) : (
-                    <>
-                        {/* Materias Primas */}
-                        <div className="mb-8">
-                            <h4 className="text-lg font-medium mb-4 text-olive-700 border-b pb-2">Materias Primas Disponibles</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {rawMaterials.map(token => (
-                                    <div key={token.nombre} className="border rounded-xl p-5 bg-gray-50 hover:shadow-lg transition-all duration-200 relative overflow-hidden">
-                                        <div className="flex justify-between items-start">
-                                            <div className="space-y-2">
-                                                <h4 className="text-lg font-semibold text-gray-800">{token.nombre}</h4>
-                                                <p className="text-sm text-gray-600">{token.descripcion}</p>
-                                                <div className="flex flex-wrap gap-3">
-                                                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-green-50 text-green-700 text-sm font-medium">
-                                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
-                                                        </svg>
-                                                        {token.cantidadTotal / 1000} kg
-                                                    </span>
-                                                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
-                                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
-                                                        </svg>
-                                                        {token.numRemesas} remesas
-                                                    </span>
-                                                </div>
-                                            </div>
 
-                                            {/* Controles de ingrediente */}
-                                            {selectedIngredients.some(ing => ing.token.nombre === token.nombre) ? (
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="relative">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.001"
-                                                            value={selectedIngredients.find(ing => ing.token.nombre === token.nombre)?.quantity || 0}
-                                                            onChange={(e) => updateIngredientQuantity(token.nombre, Number(e.target.value))}
-                                                            className="w-28 px-3 py-2 border border-olive-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
-                                                            placeholder="Cantidad"
-                                                        />
-                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-                                                            kg
-                                                        </span>
+                    {/* Resultados de búsqueda desplegables */}
+                    {showSearchResults && searchTerm && (
+                        <div ref={searchRef} className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto">
+                            {totalResults === 0 ? (
+                                <div className="p-4 text-center text-gray-500">
+                                    No se encontraron resultados
+                                </div>
+                            ) : (
+                                <>
+                                    {filteredRawMaterials.length > 0 && (
+                                        <div className="p-2">
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase px-2 mb-2">
+                                                Materias Primas ({filteredRawMaterials.length})
+                                            </h4>
+                                            {filteredRawMaterials.map((material, index) => (
+                                                <button
+                                                    key={material.nombre}
+                                                    className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg transition-colors duration-150 flex items-center justify-between ${
+                                                        selectedResultIndex === index
+                                                            ? 'bg-gray-100 text-gray-800'
+                                                            : 'text-gray-600'
+                                                    }`}
+                                                    onClick={() => {
+                                                        setExpandedSection('rawMaterials')
+                                                        setExpandedToken(material.nombre)
+                                                        setShowSearchResults(false)
+                                                        setSearchTerm('')
+                                                        setSelectedResultIndex(-1)
+                                                    }}
+                                                >
+                                                    <div>
+                                                        <div className="font-medium text-gray-800">
+                                                            {highlightText(material.nombre, searchTerm)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500">
+                                                            {highlightText(material.descripcion, searchTerm)}
+                                                        </div>
                                                     </div>
-                                                    <button
-                                                        onClick={() => removeIngredient(token.nombre)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                                        title="Eliminar ingrediente"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                        </svg>
-                                                    </button>
-                                                </div>
+                                                    <span className="text-sm text-olive-600">
+                                                        {material.cantidadTotal / 1000} kg
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {filteredProcessedProducts.length > 0 && (
+                                        <div className="p-2 border-t">
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase px-2 mb-2">
+                                                Productos Procesados ({filteredProcessedProducts.length})
+                                            </h4>
+                                            {filteredProcessedProducts.map((product, index) => (
+                                                <button
+                                                    key={product.nombre}
+                                                    className={`w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg transition-colors duration-150 flex items-center justify-between ${
+                                                        selectedResultIndex === index + filteredRawMaterials.length
+                                                            ? 'bg-gray-100 text-gray-800'
+                                                            : 'text-gray-600'
+                                                    }`}
+                                                    onClick={() => {
+                                                        setExpandedSection('processedProducts')
+                                                        setExpandedToken(product.nombre)
+                                                        setShowSearchResults(false)
+                                                        setSearchTerm('')
+                                                        setSelectedResultIndex(-1)
+                                                    }}
+                                                >
+                                                    <div>
+                                                        <div className="font-medium text-gray-800">
+                                                            {highlightText(product.nombre, searchTerm)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500">
+                                                            {highlightText(product.descripcion, searchTerm)}
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-sm text-olive-600">
+                                                        {product.cantidadTotal / 1000} kg
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Materias Primas */}
+                <div className="mb-8">
+                    <button
+                        onClick={() => setExpandedSection(expandedSection === 'rawMaterials' ? null : 'rawMaterials')}
+                        className="w-full flex justify-between items-center text-lg font-medium mb-4 text-olive-700 border-b pb-2 hover:text-olive-800"
+                    >
+                        <span>Materias Primas Disponibles</span>
+                        <svg
+                            className={`h-6 w-6 transform transition-transform ${expandedSection === 'rawMaterials' ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSection === 'rawMaterials' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {filteredRawMaterials.map(token => (
+                                <div key={token.nombre} className="border rounded-xl p-5 bg-gray-50 hover:shadow-lg transition-all duration-200 relative overflow-hidden">
+                                    <div className="flex justify-between items-start">
+                                        <div className="space-y-2">
+                                            <h4 className="text-lg font-semibold text-gray-800">{token.nombre}</h4>
+                                            <p className="text-sm text-gray-600">{token.descripcion}</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg bg-green-50 text-green-700 text-sm font-medium">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+                                                    </svg>
+                                                    {token.cantidadTotal / 1000} kg
+                                                </span>
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                                    </svg>
+                                                    {token.numRemesas} remesas
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
+                                            className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
+                                                expandedToken === token.nombre
+                                                    ? 'bg-olive-200 text-olive-800 shadow-inner'
+                                                    : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
+                                            }`}
+                                        >
+                                            {expandedToken === token.nombre ? (
+                                                <>
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
+                                                    </svg>
+                                                    Ocultar
+                                                </>
                                             ) : (
-                                                <div>
-                                                    {isRecipeMode ? (
-                                                        // Botón simple para agregar a receta
-                                                        <button
-                                                            onClick={() => addIngredient(token)}
-                                                            className="text-sm px-4 py-2 rounded-lg bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                                            </svg>
-                                                            Agregar a Receta
-                                                        </button>
-                                                    ) : (
-                                                        // Botón para ver remesas en modo normal
-                                                        <button
-                                                            onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
-                                                            className="text-sm px-4 py-2 rounded-lg bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                {expandedToken === token.nombre ? (
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
-                                                                ) : (
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-                                                                )}
-                                                            </svg>
-                                                            {expandedToken === token.nombre ? 'Ocultar Remesas' : 'Ver Remesas'}
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                <>
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                    Ver Remesas
+                                                </>
                                             )}
-                                        </div>
-
-                                        {/* Lista de remesas (solo visible en modo normal) */}
-                                        {!isRecipeMode && expandedToken === token.nombre && (
-                                            <div className="mt-4 border-t pt-4">
-                                                <h5 className="text-sm font-semibold text-gray-700 mb-3">Remesas Disponibles:</h5>
-                                                <div className="space-y-3">
-                                                    {token.remesas.map(remesa => (
-                                                        <div key={remesa.id} 
-                                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
-                                                            <div className="space-y-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-medium text-gray-800">Remesa #{remesa.id}</span>
-                                                                    <span className="text-sm px-2 py-0.5 bg-green-100 text-green-700 rounded-md">
-                                                                        {remesa.cantidad / 1000} kg
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-xs text-gray-500 flex items-center gap-1">
-                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                                                    </svg>
-                                                                    {new Date(remesa.timestamp * 1000).toLocaleDateString('es-ES', {
-                                                                        year: 'numeric',
-                                                                        month: 'long',
-                                                                        day: 'numeric'
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const tokenWithSingleRemesa = {
-                                                                        ...token,
-                                                                        remesas: [remesa],
-                                                                        cantidadTotal: remesa.cantidad
-                                                                    }
-                                                                    addIngredient(tokenWithSingleRemesa, remesa)
-                                                                    setExpandedToken(null)
-                                                                }}
-                                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
-                                                                    ${selectedIngredients.some(ing => 
-                                                                        ing.token.remesas.some(r => r.id === remesa.id)
-                                                                    )
-                                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                                        : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm'
-                                                                    }`}
-                                                                disabled={selectedIngredients.some(ing => 
-                                                                    ing.token.remesas.some(r => r.id === remesa.id)
-                                                                )}
-                                                            >
-                                                                {selectedIngredients.some(ing => 
-                                                                    ing.token.remesas.some(r => r.id === remesa.id)
-                                                                ) ? (
-                                                                    <>
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
-                                                                        </svg>
-                                                                        Agregada
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                                                        </svg>
-                                                                        Agregar
-                                                                    </>
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                        </button>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
 
-                        {/* Productos Procesados */}
-                        <div className="mb-8">
-                            <h4 className="text-lg font-medium mb-4 text-olive-700 border-b pb-2">Productos Procesados Disponibles</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {processedProducts.map(token => (
-                                    <div key={token.nombre} className="border rounded-xl p-5 bg-gray-50 hover:shadow-lg transition-all duration-200 relative overflow-hidden">
-                                        <div className="flex justify-between items-start">
-                                            <div className="space-y-2">
-                                                <h4 className="text-lg font-semibold text-gray-800">{token.nombre}</h4>
-                                                <p className="text-sm text-gray-600">{token.descripcion}</p>
-                                                <div className="flex flex-wrap gap-3">
-                                                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-green-50 text-green-700 text-sm font-medium">
-                                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
-                                                        </svg>
-                                                        {token.cantidadTotal / 1000} kg
-                                                    </span>
-                                                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
-                                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
-                                                        </svg>
-                                                        {token.numRemesas} remesas
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
-                                                className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                                                    expandedToken === token.nombre
-                                                        ? 'bg-olive-200 text-olive-800 shadow-inner'
-                                                        : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
-                                                }`}
-                                            >
-                                                {expandedToken === token.nombre ? (
-                                                    <>
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
-                                                        </svg>
-                                                        Ocultar
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-                                                        </svg>
-                                                        Ver Remesas
-                                                    </>
-                                                )}
-                                            </button>
-                                        </div>
-                                        
-                                        {/* Desplegable de Remesas */}
-                                        {expandedToken === token.nombre && (
-                                            <div className="mt-4 border-t pt-4">
-                                                <h5 className="text-sm font-semibold text-gray-700 mb-3">Remesas Disponibles:</h5>
-                                                <div className="space-y-3">
-                                                    {token.remesas.map(remesa => (
-                                                        <div key={remesa.id} 
-                                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
-                                                            <div className="space-y-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-medium text-gray-800">Remesa #{remesa.id}</span>
-                                                                    <span className="text-sm px-2 py-0.5 bg-green-100 text-green-700 rounded-md">
-                                                                        {remesa.cantidad / 1000} kg
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-xs text-gray-500 flex items-center gap-1">
-                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                                                    </svg>
-                                                                    {new Date(remesa.timestamp * 1000).toLocaleDateString('es-ES', {
-                                                                        year: 'numeric',
-                                                                        month: 'long',
-                                                                        day: 'numeric'
-                                                                    })}
-                                                                </div>
+                                    {/* Lista de remesas (solo visible en modo normal) */}
+                                    {!isRecipeMode && expandedToken === token.nombre && (
+                                        <div className="mt-4 border-t pt-4">
+                                            <h5 className="text-sm font-semibold text-gray-700 mb-3">Remesas Disponibles:</h5>
+                                            <div className="space-y-3">
+                                                {token.remesas.map(remesa => (
+                                                    <div key={remesa.id} 
+                                                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-gray-800">Remesa #{remesa.id}</span>
+                                                                <span className="text-sm px-2 py-0.5 bg-green-100 text-green-700 rounded-md">
+                                                                    {remesa.cantidad / 1000} kg
+                                                                </span>
                                                             </div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    const tokenWithSingleRemesa = {
-                                                                        ...token,
-                                                                        remesas: [remesa],
-                                                                        cantidadTotal: remesa.cantidad
-                                                                    }
-                                                                    addIngredient(tokenWithSingleRemesa, remesa)
-                                                                    setExpandedToken(null)
-                                                                }}
-                                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
-                                                                    ${selectedIngredients.some(ing => 
-                                                                        ing.token.remesas.some(r => r.id === remesa.id)
-                                                                    )
-                                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                                        : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm'
-                                                                    }`}
-                                                                disabled={selectedIngredients.some(ing => 
-                                                                    ing.token.remesas.some(r => r.id === remesa.id)
-                                                                )}
-                                                            >
-                                                                {selectedIngredients.some(ing => 
-                                                                    ing.token.remesas.some(r => r.id === remesa.id)
-                                                                ) ? (
-                                                                    <>
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
-                                                                        </svg>
-                                                                        Agregada
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                                                        </svg>
-                                                                        Agregar
-                                                                    </>
-                                                                )}
-                                                            </button>
+                                                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                                </svg>
+                                                                {new Date(remesa.timestamp * 1000).toLocaleDateString('es-ES', {
+                                                                    year: 'numeric',
+                                                                    month: 'long',
+                                                                    day: 'numeric'
+                                                                })}
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                const tokenWithSingleRemesa = {
+                                                                    ...token,
+                                                                    remesas: [remesa],
+                                                                    cantidadTotal: remesa.cantidad
+                                                                }
+                                                                addIngredient(tokenWithSingleRemesa, remesa)
+                                                                setExpandedToken(null)
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
+                                                                ${selectedIngredients.some(ing => 
+                                                                    ing.token.remesas.some(r => r.id === remesa.id)
+                                                                )
+                                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                    : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm'
+                                                                }`}
+                                                            disabled={selectedIngredients.some(ing => 
+                                                                ing.token.remesas.some(r => r.id === remesa.id)
+                                                            )}
+                                                        >
+                                                            {selectedIngredients.some(ing => 
+                                                                ing.token.remesas.some(r => r.id === remesa.id)
+                                                            ) ? (
+                                                                <>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
+                                                                    </svg>
+                                                                    Agregada
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                                                    </svg>
+                                                                    Agregar
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Lista de Ingredientes Seleccionados */}
-                        {selectedIngredients.length > 0 && (
-                            <div className="mt-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                                    Ingredientes Seleccionados
-                                </h3>
-                                <div className="space-y-4">
-                                    {selectedIngredients.map((ingredient, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-2 border-b">
-                                            <div>
-                                                <p className="font-semibold">{ingredient.token.nombre}</p>
-                                                <p className="text-sm text-gray-600">
-                                                    Por unidad: {ingredient.quantity} kg
-                                                    {!isRecipeMode && ` (${ingredient.quantity * 1000} tokens)`}
-                                                </p>
-                                                <p className="text-sm text-gray-600">
-                                                    Total para {unitsToCreate} unidades: {ingredient.quantity * unitsToCreate} kg
-                                                    {!isRecipeMode && ` (${ingredient.quantity * unitsToCreate * 1000} tokens)`}
-                                                </p>
-                                                <p className="text-xs text-gray-500">ID: {ingredient.token.remesas[0]?.id}</p>
-                                            </div>
-                                            <button
-                                                onClick={() => removeIngredient(ingredient.token.nombre)}
-                                                className="text-red-500 hover:text-red-700"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {!isRecipeMode && (
-                                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                                            <p className="text-sm text-blue-700">
-                                                <strong>Total a procesar:</strong> {selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate), 0)} kg
-                                                {` (${selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate * 1000), 0)} tokens)`}
-                                            </p>
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                        )}
-                    </>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Productos Procesados */}
+                <div className="mb-8">
+                    <button
+                        onClick={() => setExpandedSection(expandedSection === 'processedProducts' ? null : 'processedProducts')}
+                        className="w-full flex justify-between items-center text-lg font-medium mb-4 text-olive-700 border-b pb-2 hover:text-olive-800"
+                    >
+                        <span>Productos Procesados Disponibles</span>
+                        <svg
+                            className={`h-6 w-6 transform transition-transform ${expandedSection === 'processedProducts' ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSection === 'processedProducts' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {filteredProcessedProducts.map(token => (
+                                <div key={token.nombre} className="border rounded-xl p-5 bg-gray-50 hover:shadow-lg transition-all duration-200 relative overflow-hidden">
+                                    <div className="flex justify-between items-start">
+                                        <div className="space-y-2">
+                                            <h4 className="text-lg font-semibold text-gray-800">{token.nombre}</h4>
+                                            <p className="text-sm text-gray-600">{token.descripcion}</p>
+                                            <div className="flex flex-wrap gap-3">
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg bg-green-50 text-green-700 text-sm font-medium">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+                                                    </svg>
+                                                    {token.cantidadTotal / 1000} kg
+                                                </span>
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                                    </svg>
+                                                    {token.numRemesas} remesas
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
+                                            className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
+                                                expandedToken === token.nombre
+                                                    ? 'bg-olive-200 text-olive-800 shadow-inner'
+                                                    : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
+                                            }`}
+                                        >
+                                            {expandedToken === token.nombre ? (
+                                                <>
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
+                                                    </svg>
+                                                    Ocultar
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                    Ver Remesas
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Desplegable de Remesas */}
+                                    {expandedToken === token.nombre && (
+                                        <div className="mt-4 border-t pt-4">
+                                            <h5 className="text-sm font-semibold text-gray-700 mb-3">Remesas Disponibles:</h5>
+                                            <div className="space-y-3">
+                                                {token.remesas.map(remesa => (
+                                                    <div key={remesa.id} 
+                                                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-gray-800">Remesa #{remesa.id}</span>
+                                                                <span className="text-sm px-2 py-0.5 bg-green-100 text-green-700 rounded-md">
+                                                                    {remesa.cantidad / 1000} kg
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                                </svg>
+                                                                {new Date(remesa.timestamp * 1000).toLocaleDateString('es-ES', {
+                                                                    year: 'numeric',
+                                                                    month: 'long',
+                                                                    day: 'numeric'
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                const tokenWithSingleRemesa = {
+                                                                    ...token,
+                                                                    remesas: [remesa],
+                                                                    cantidadTotal: remesa.cantidad
+                                                                }
+                                                                addIngredient(tokenWithSingleRemesa, remesa)
+                                                                setExpandedToken(null)
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
+                                                                ${selectedIngredients.some(ing => 
+                                                                    ing.token.remesas.some(r => r.id === remesa.id)
+                                                                )
+                                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                                    : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow-sm'
+                                                                }`}
+                                                            disabled={selectedIngredients.some(ing => 
+                                                                ing.token.remesas.some(r => r.id === remesa.id)
+                                                            )}
+                                                        >
+                                                            {selectedIngredients.some(ing => 
+                                                                ing.token.remesas.some(r => r.id === remesa.id)
+                                                            ) ? (
+                                                                <>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
+                                                                    </svg>
+                                                                    Agregada
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                                                    </svg>
+                                                                    Agregar
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Lista de Ingredientes Seleccionados */}
+                {selectedIngredients.length > 0 && (
+                    <div className="mt-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                            Ingredientes Seleccionados
+                        </h3>
+                        <div className="space-y-4">
+                            {selectedIngredients.map((ingredient, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2 border-b">
+                                    <div>
+                                        <p className="font-semibold">{ingredient.token.nombre}</p>
+                                        <p className="text-sm text-gray-600">
+                                            Por unidad: {ingredient.quantity} kg
+                                            {!isRecipeMode && ` (${ingredient.quantity * 1000} tokens)`}
+                                        </p>
+                                        <p className="text-sm text-gray-600">
+                                            Total para {unitsToCreate} unidades: {ingredient.quantity * unitsToCreate} kg
+                                            {!isRecipeMode && ` (${ingredient.quantity * unitsToCreate * 1000} tokens)`}
+                                        </p>
+                                        <p className="text-xs text-gray-500">ID: {ingredient.token.remesas[0]?.id}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => removeIngredient(ingredient.token.nombre)}
+                                        className="text-red-500 hover:text-red-700"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            ))}
+                            {!isRecipeMode && (
+                                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                    <p className="text-sm text-blue-700">
+                                        <strong>Total a procesar:</strong> {selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate), 0)} kg
+                                        {` (${selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate * 1000), 0)} tokens)`}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 )}
             </div>
 
