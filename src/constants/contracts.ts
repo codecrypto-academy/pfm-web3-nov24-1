@@ -485,6 +485,40 @@ export const CONTRACTS = {
   },
   {
     "type": "function",
+    "name": "procesarToken",
+    "inputs": [
+      {
+        "name": "_tokenIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_cantidades",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_nombresAtributos",
+        "type": "string[]",
+        "internalType": "string[]"
+      },
+      {
+        "name": "_valoresAtributos",
+        "type": "string[]",
+        "internalType": "string[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "rechazarTransferencia",
     "inputs": [
       {
@@ -1360,6 +1394,40 @@ export const TOKENS_ABI = [
       }
     ],
     "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "procesarToken",
+    "inputs": [
+      {
+        "name": "_tokenIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_cantidades",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "_nombresAtributos",
+        "type": "string[]",
+        "internalType": "string[]"
+      },
+      {
+        "name": "_valoresAtributos",
+        "type": "string[]",
+        "internalType": "string[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
