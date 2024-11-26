@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from '@/context/Web3Context'
 import { CONTRACTS } from '@/constants/contracts'
+import { toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 interface Remesa {
     id: number
@@ -45,7 +47,7 @@ export default function ProcessProduct() {
     const [attributes, setAttributes] = useState<Attribute[]>([])
     const [isRecipeMode, setIsRecipeMode] = useState(false)
     const [selectedRecipe, setSelectedRecipe] = useState<Token | null>(null)
-    const [productQuantity, setProductQuantity] = useState(1)
+    const [unitsToCreate, setUnitsToCreate] = useState(1)
 
     // Cargar tokens disponibles
     useEffect(() => {
@@ -351,6 +353,13 @@ export default function ProcessProduct() {
                 signer
             )
 
+            // Preparar arrays para procesarToken
+            const tokenIds = selectedIngredients.map(ing => ing.token.remesas[0].id)
+            // En modo receta no convertimos a tokens porque no se quemarán
+            const cantidades = selectedIngredients.map(ing => 
+                isRecipeMode ? ing.quantity : ing.quantity * 1000 * unitsToCreate
+            )
+
             // Preparar atributos
             const nombresAtributos = []
             const valoresAtributos = []
@@ -363,31 +372,81 @@ export default function ProcessProduct() {
                 }
             }
 
-            // Añadir ingredientes como atributos
-            for (const ing of selectedIngredients) {
-                nombresAtributos.push(`Ingrediente_${ing.token.nombre}`)
-                valoresAtributos.push(ing.quantity.toString())
-            }
-
-            // Marcar como receta o producto procesado
+            // Añadir nombre y descripción como atributos
+            nombresAtributos.push("Nombre")
+            valoresAtributos.push(newProductName)
+            nombresAtributos.push("Descripcion")
+            valoresAtributos.push(newProductDescription)
+            
+            // Marcar si es una receta
             nombresAtributos.push("EsReceta")
             valoresAtributos.push(isRecipeMode ? "true" : "false")
 
-            // Establecer el tipo de producto
-            nombresAtributos.push("Tipo_Producto")
-            valoresAtributos.push("Procesado")
+            // Toast inicial con detalles
+            const toastId = toast.info(
+                <div>
+                    <h3 className="font-bold mb-2">
+                        {isRecipeMode ? "Creando Receta" : "Procesando Producto"}:
+                    </h3>
+                    <p><strong>Nombre:</strong> {newProductName}</p>
+                    {selectedIngredients.length > 0 && (
+                        <div>
+                            <p className="font-bold mt-2">Ingredientes:</p>
+                            {selectedIngredients.map((ing, index) => (
+                                <p key={index}>
+                                    - {ing.token.nombre}: {ing.quantity * unitsToCreate} kg 
+                                    {!isRecipeMode && `(${ing.quantity * unitsToCreate * 1000} tokens)`}
+                                    (ID: {ing.token.remesas[0]?.id})
+                                </p>
+                            ))}
+                        </div>
+                    )}
+                </div>,
+                {
+                    position: "top-right",
+                    autoClose: false,
+                    closeOnClick: false,
+                }
+            );
 
-            // Crear el token
-            const cantidad = isRecipeMode ? 0 : productQuantity // Cantidad 0 para recetas
-            const tx = await contract.crearToken(
-                newProductName,
-                cantidad,
-                newProductDescription,
+            // Procesar el token
+            const tx = await contract.procesarToken(
+                tokenIds,
+                cantidades,
                 nombresAtributos,
                 valoresAtributos
             )
 
-            await tx.wait()
+            const receipt = await tx.wait()
+
+            // Toast de éxito con todos los detalles
+            toast.dismiss(toastId);
+            toast.success(
+                <div>
+                    <h3 className="font-bold mb-2">
+                        ¡{isRecipeMode ? "Receta Creada" : "Producto Procesado"}!
+                    </h3>
+                    <p><strong>Nombre:</strong> {newProductName}</p>
+                    {selectedIngredients.length > 0 && (
+                        <div>
+                            <p className="font-bold mt-2">Ingredientes:</p>
+                            {selectedIngredients.map((ing, index) => (
+                                <p key={index}>
+                                    - {ing.token.nombre}: {ing.quantity * unitsToCreate} kg 
+                                    {!isRecipeMode && `(${ing.quantity * unitsToCreate * 1000} tokens)`}
+                                    (ID: {ing.token.remesas[0]?.id})
+                                </p>
+                            ))}
+                        </div>
+                    )}
+                    <p className="mt-2"><strong>Hash de transacción:</strong></p>
+                    <p className="text-xs break-all">{receipt.hash}</p>
+                </div>,
+                {
+                    position: "top-right",
+                    autoClose: 8000,
+                }
+            );
 
             // Limpiar el formulario
             setNewProductName('')
@@ -402,6 +461,17 @@ export default function ProcessProduct() {
 
         } catch (error: any) {
             console.error('Error creating token:', error)
+            toast.error(
+                <div>
+                    <h3 className="font-bold mb-2">Error al crear el producto</h3>
+                    <p><strong>Nombre:</strong> {newProductName}</p>
+                    <p><strong>Error:</strong> {(error as Error).message}</p>
+                </div>,
+                {
+                    position: "top-right",
+                    autoClose: 5000,
+                }
+            );
             setError(error.message || 'Error al crear el token')
         } finally {
             setLoading(false)
@@ -566,15 +636,15 @@ export default function ProcessProduct() {
                     {!isRecipeMode && (
                         <div>
                             <label className="block text-sm font-medium text-olive-700 mb-1">
-                                Cantidad a Producir
+                                Cantidad de Unidades a Producir
                             </label>
                             <input
                                 type="number"
                                 className="w-full px-3 py-2 border border-olive-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
                                 placeholder="Cantidad"
                                 min="1"
-                                value={productQuantity}
-                                onChange={(e) => setProductQuantity(Number(e.target.value))}
+                                value={unitsToCreate}
+                                onChange={(e) => setUnitsToCreate(Math.max(1, parseInt(e.target.value) || 1))}
                             />
                         </div>
                     )}
@@ -585,7 +655,7 @@ export default function ProcessProduct() {
             <div className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-olive-100 text-olive-600 text-sm font-bold">2</span>
-                    Selección de Ingredientes
+                    Selección de Ingredientes (Por unidad a producir)
                 </h3>
                 
                 {rawMaterials.length === 0 && processedProducts.length === 0 ? (
@@ -616,7 +686,7 @@ export default function ProcessProduct() {
                                                     </span>
                                                     <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
                                                         <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                                                         </svg>
                                                         {token.numRemesas} remesas
                                                     </span>
@@ -777,7 +847,7 @@ export default function ProcessProduct() {
                                                     </span>
                                                     <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
                                                         <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                                                         </svg>
                                                         {token.numRemesas} remesas
                                                     </span>
@@ -886,55 +956,44 @@ export default function ProcessProduct() {
 
                         {/* Lista de Ingredientes Seleccionados */}
                         {selectedIngredients.length > 0 && (
-                            <div className="mt-6 space-y-4">
-                                <h4 className="font-medium text-gray-700">Ingredientes Seleccionados:</h4>
-                                {selectedIngredients.map((ing, index) => (
-                                    <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                        <div className="flex justify-between items-start">
-                                            <div className="space-y-1">
-                                                <h4 className="font-medium">{ing.token.nombre}</h4>
-                                                {!isRecipeMode && ing.token.remesas[0] && (
-                                                    <span className="px-2.5 py-1 bg-olive-50 text-olive-700 rounded-lg text-sm font-medium">
-                                                        Remesa #{ing.token.remesas[0].id}
-                                                    </span>
-                                                )}
+                            <div className="mt-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                    Ingredientes Seleccionados
+                                </h3>
+                                <div className="space-y-4">
+                                    {selectedIngredients.map((ingredient, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-2 border-b">
+                                            <div>
+                                                <p className="font-semibold">{ingredient.token.nombre}</p>
+                                                <p className="text-sm text-gray-600">
+                                                    Por unidad: {ingredient.quantity} kg
+                                                    {!isRecipeMode && ` (${ingredient.quantity * 1000} tokens)`}
+                                                </p>
+                                                <p className="text-sm text-gray-600">
+                                                    Total para {unitsToCreate} unidades: {ingredient.quantity * unitsToCreate} kg
+                                                    {!isRecipeMode && ` (${ingredient.quantity * unitsToCreate * 1000} tokens)`}
+                                                </p>
+                                                <p className="text-xs text-gray-500">ID: {ingredient.token.remesas[0]?.id}</p>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="relative">
-                                                    <input
-                                                        type="number"
-                                                        value={ing.quantity}
-                                                        onChange={(e) => updateIngredientQuantity(ing.token.nombre, Number(e.target.value))}
-                                                        className="w-28 rounded-lg border-gray-300 pr-12 py-2 focus:ring-olive-500 focus:border-olive-500"
-                                                        placeholder="0"
-                                                        min="0"
-                                                        step="0.001"
-                                                    />
-                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">
-                                                        kg
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    onClick={() => removeIngredient(ing.token.nombre)}
-                                                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                                    title="Eliminar ingrediente"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {!isRecipeMode && ing.token.remesas[0] && (
-                                            <div className="text-xs text-gray-500 flex items-center gap-1 mt-2">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                            <button
+                                                onClick={() => removeIngredient(ingredient.token.nombre)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                 </svg>
-                                                {new Date(ing.token.remesas[0].timestamp * 1000).toLocaleDateString()}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {!isRecipeMode && (
+                                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                            <p className="text-sm text-blue-700">
+                                                <strong>Total a procesar:</strong> {selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate), 0)} kg
+                                                {` (${selectedIngredients.reduce((acc, ing) => acc + (ing.quantity * unitsToCreate * 1000), 0)} tokens)`}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </>
