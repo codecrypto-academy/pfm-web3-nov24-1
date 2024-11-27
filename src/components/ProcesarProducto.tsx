@@ -121,7 +121,7 @@ export default function ProcessProduct() {
                 try {
                     // Obtener el nombre del evento desde el topic
                     const eventName = contract.interface.getEvent(event.topics[0])?.name;
-                    let tokenId;
+                    let tokenId: number | undefined;
 
                     if (eventName === 'TokenTransferido' || eventName === 'TokenCreado') {
                         const parsedLog = contract.interface.parseLog({
