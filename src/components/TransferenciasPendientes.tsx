@@ -228,7 +228,7 @@ export default function PendingTransfers() {
                             </p>
                             <div className="mt-4 space-y-2">
                                 <p className="text-sm text-gray-600">
-                                    <span className="font-medium">Cantidad:</span> {transfer.cantidad}
+                                    <span className="font-medium">Cantidad:</span> {transfer.cantidad} tokens ({transfer.cantidad / 1000} KG)
                                 </p>
                                 <p className="text-sm text-gray-600">
                                     <span className="font-medium">Origen:</span>{' '}
