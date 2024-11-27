@@ -705,27 +705,6 @@ export default function FabricaDashboard() {
         console.log('Token clicked:', token);
     };
 
-    // Función para formatear nombres de atributos
-    const formatAttributeName = (key: string): string => {
-        // Casos especiales
-        if (key === 'MetodoRecoleccion') {
-            return 'Método de Recolección';
-        }
-
-        // Eliminar prefijos comunes
-        let formatted = key.replace(/^Ingrediente_/, '');
-        
-        // Reemplazar guiones bajos por espacios
-        formatted = formatted.replace(/_/g, ' ');
-        
-        // Capitalizar cada palabra
-        formatted = formatted.split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' ');
-        
-        return formatted;
-    };
-
     return (
         <div className="container mx-auto p-8">
             {/* Resumen */}
@@ -903,75 +882,106 @@ export default function FabricaDashboard() {
             {/* Modal de Información Blockchain */}
             {showBlockchainModal && selectedBlockchainInfo && (
                 <div 
-                    className="fixed z-50 flex items-center justify-center"
-                    style={{
-                        top: `${window.scrollY}px`,
-                        left: '0',
-                        right: '0',
-                        bottom: '0',
-                        height: '100vh'
-                    }}
+                    className="fixed inset-0 z-50 overflow-y-auto"
+                    aria-labelledby="modal-title"
+                    role="dialog"
+                    aria-modal="true"
                 >
-                    <div 
-                        className="fixed inset-0 bg-black bg-opacity-50"
-                        onClick={handleCloseBlockchainModal}
-                    ></div>
-                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 relative z-10 max-h-[80vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold">Información Blockchain</h2>
-                            <button
-                                onClick={handleCloseBlockchainModal}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <div>
-                                <h3 className="font-medium text-lg mb-2">Información General</h3>
-                                <div className="grid grid-cols-1 gap-2">
-                                    <div>
-                                        <span className="font-medium">Nombre:</span>
-                                        <span className="ml-2">{selectedBlockchainInfo.token.nombre}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Tipo:</span>
-                                        <span className="ml-2">{selectedBlockchainInfo.token.tipo}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Cantidad:</span>
-                                        <span className="ml-2">{selectedBlockchainInfo.remesa.cantidad} KG</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Fecha:</span>
-                                        <span className="ml-2">{formatDate(selectedBlockchainInfo.remesa.timestamp)}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Creador:</span>
-                                        <span className="ml-2">{selectedBlockchainInfo.remesa.creador}</span>
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div 
+                            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+                            aria-hidden="true"
+                            onClick={handleCloseBlockchainModal}
+                        ></div>
 
-                            {/* Atributos */}
-                            <div>
-                                <h3 className="font-medium text-lg mb-2">Atributos</h3>
-                                <div className="grid grid-cols-1 gap-2">
-                                    {Object.entries(selectedBlockchainInfo.remesa.atributos).map(([key, value]) => (
-                                        <div key={key}>
-                                            <span className="font-medium">{formatAttributeName(key)}:</span>
-                                            <span className="ml-2">{value.toString()}</span>
+                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 max-h-[80vh] overflow-y-auto">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-semibold" id="modal-title">Información Blockchain</h2>
+                                    <button
+                                        onClick={handleCloseBlockchainModal}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <h3 className="font-medium text-lg mb-2">Información General</h3>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <div>
+                                                <span className="font-medium">Nombre:</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.token.nombre}</span>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium">Tipo:</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.token.tipo}</span>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium">Cantidad:</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.remesa.cantidad} KG</span>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium">Fecha:</span>
+                                                <span className="ml-2">{formatDate(selectedBlockchainInfo.remesa.timestamp)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium">Creador:</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.remesa.creador}</span>
+                                            </div>
                                         </div>
-                                    ))}
-                                    {selectedBlockchainInfo.token.tokensPadres?.map((padre, index) => (
-                                        <div key={`token-${index}`}>
-                                            <span className="font-medium">Token Origen {index + 1}:</span>
-                                            <span className="ml-2">{padre.nombre} ID:{padre.id} Cantidad:{padre.cantidad}{padre.transferId ? ` ID Transferencia:${padre.transferId}` : ''}adf</span>
+                                    </div>
+
+                                    {/* Atributos */}
+                                    <div>
+                                        <h3 className="font-medium text-lg mb-2">Atributos</h3>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {Object.entries(selectedBlockchainInfo.remesa.atributos).map(([key, value]) => (
+                                                <div key={key}>
+                                                    <span className="font-medium">{formatAttributeName(key)}:</span>
+                                                    <span className="ml-2">{value.toString()}</span>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    </div>
+
+                                    {/* Tokens Padres */}
+                                    {selectedBlockchainInfo.token.tokensPadres && selectedBlockchainInfo.token.tokensPadres.length > 0 && (
+                                        <div>
+                                            <h3 className="font-medium text-lg mb-2">Tokens Padres</h3>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                {selectedBlockchainInfo.token.tokensPadres.map((tokenPadre, index) => (
+                                                    <div key={index} className="bg-gray-50 p-3 rounded-md">
+                                                        <div className="grid grid-cols-1 gap-1">
+                                                            <div>
+                                                                <span className="font-medium">Token ID:</span>
+                                                                <span className="ml-2">{tokenPadre.id}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-medium">Nombre:</span>
+                                                                <span className="ml-2">{tokenPadre.nombre}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-medium">Cantidad:</span>
+                                                                <span className="ml-2">{tokenPadre.cantidad} KG</span>
+                                                            </div>
+                                                            {tokenPadre.transferId && (
+                                                                <div>
+                                                                    <span className="font-medium">ID Transferencia:</span>
+                                                                    <span className="ml-2">{tokenPadre.transferId}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
