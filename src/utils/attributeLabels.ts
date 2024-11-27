@@ -13,6 +13,8 @@ export const attributeLabels: { [key: string]: string } = {
     'Ingrediente_Aceituna_Negra': 'Aceituna Negra',
     'Ingrediente_Aceite': 'Aceite',
     'Esreceta': 'Es Receta',
+    'temperatura': 'Temperatura',
+    'color': 'Color',
     // Añadir más mapeos según sea necesario
 };
 

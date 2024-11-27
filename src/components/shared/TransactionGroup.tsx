@@ -50,17 +50,22 @@ export default function TransactionGroup({ transactions, address }: TransactionG
 
     transferGroup.transactions.push(transaction)
 
-    // Ordenar las transacciones dentro del grupo por timestamp (más recientes primero)
-    transferGroup.transactions.sort((a, b) => b.timestamp - a.timestamp)
+    // Ordenar las transacciones dentro del grupo por número de bloque
+    transferGroup.transactions.sort((a, b) => a.blockNumber - b.blockNumber)
 
     return acc
   }, [])
 
   // Ordenar remesas por tokenId (más recientes primero)
   remesaGroups.sort((a, b) => b.tokenId - a.tokenId)
-  // Para cada remesa, ordenar transferencias por ID (más recientes primero)
+  
+  // Para cada remesa, ordenar transferencias por el número de bloque de la última transacción
   remesaGroups.forEach(remesa => {
-    remesa.transferGroups.sort((a, b) => b.transferId - a.transferId)
+    remesa.transferGroups.sort((a, b) => {
+      const lastTransactionA = a.transactions[a.transactions.length - 1]
+      const lastTransactionB = b.transactions[b.transactions.length - 1]
+      return lastTransactionA.blockNumber - lastTransactionB.blockNumber
+    })
   })
 
   const toggleGroup = (groupId: string) => {

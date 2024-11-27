@@ -35,6 +35,12 @@ interface Token {
         nombre: string
         transferId?: number // ID de la transferencia
     }[]
+    transferInfo?: {
+        timestamp: number | null
+        from: string
+        to: string
+        transferId: string
+    }
 }
 
 interface TokenAttribute {
@@ -460,10 +466,13 @@ export default function FabricaDashboard() {
         if (!timestamp || timestamp === 0) {
             return 'Fecha no disponible';
         }
-        return new Date(timestamp * 1000).toLocaleDateString('es-ES', {
+        return new Date(timestamp * 1000).toLocaleString('es-ES', {
             year: 'numeric',
             month: 'numeric',
-            day: 'numeric'
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
         });
     };
 
@@ -488,6 +497,26 @@ export default function FabricaDashboard() {
                 atributos[nombre] = attr[1]
             }
 
+            // Obtener información de transferencia
+            const transferFilter = contract.filters.TokenTransferido()
+            const transferEvents = await contract.queryFilter(transferFilter)
+            const transferEvent = transferEvents.find(event => 
+                event instanceof ethers.EventLog && 
+                event.args && 
+                event.args[1].toString() === remesa.id.toString()
+            )
+
+            let transferInfo = undefined
+            if (transferEvent && transferEvent instanceof ethers.EventLog) {
+                const block = await provider.getBlock(transferEvent.blockNumber)
+                transferInfo = {
+                    timestamp: block ? block.timestamp : null,
+                    from: transferEvent.args[2],
+                    to: transferEvent.args[3],
+                    transferId: transferEvent.args[0].toString() // Añadimos el ID de la transferencia
+                }
+            }
+
             // Si es un token procesado, buscar los tokens padres en los atributos
             let tokensPadres = []
             if (token.tipo === 'Procesado') {
@@ -506,18 +535,10 @@ export default function FabricaDashboard() {
                         const tokenId = await contract.getTokenIdByName(nombreIngrediente)
                         const tokenPadre = await contract.tokens(tokenId)
                         
-                        // Obtener el ID de transferencia del evento de transferencia
-                        const transferFilter = contract.filters.TokenTransferido(null, tokenId)
-                        const transferEvents = await contract.queryFilter(transferFilter)
-                        const lastTransferEvent = transferEvents[transferEvents.length - 1]
-                        const transferId = lastTransferEvent && lastTransferEvent instanceof ethers.EventLog ? 
-                            lastTransferEvent.args[0] : null
-                        
                         tokensPadres.push({
                             id: Number(tokenId),
                             nombre: nombreIngrediente,
                             cantidad: cantidad / 1000, // Convertir de tokens a KG
-                            transferId: transferId ? Number(transferId) : undefined
                         })
                     } catch (error) {
                         console.error(`Error al obtener token padre ${nombreIngrediente}:`, error)
@@ -528,7 +549,8 @@ export default function FabricaDashboard() {
             setSelectedBlockchainInfo({
                 token: {
                     ...token,
-                    tokensPadres
+                    tokensPadres,
+                    transferInfo
                 },
                 remesa: {
                     ...remesa,
@@ -910,72 +932,79 @@ export default function FabricaDashboard() {
                                     </button>
                                 </div>
                                 
-                                <div className="space-y-4">
-                                    <div>
-                                        <h3 className="font-medium text-lg mb-2">Información General</h3>
-                                        <div className="grid grid-cols-1 gap-2">
+                                <div className="space-y-6">
+                                    {/* Información General */}
+                                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                                        <h3 className="font-semibold text-lg mb-3 text-olive-800">Información General</h3>
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <span className="font-medium">Nombre:</span>
+                                                <span className="font-medium text-gray-600">Nombre:</span>
                                                 <span className="ml-2">{selectedBlockchainInfo.token.nombre}</span>
                                             </div>
                                             <div>
-                                                <span className="font-medium">Tipo:</span>
+                                                <span className="font-medium text-gray-600">Tipo:</span>
                                                 <span className="ml-2">{selectedBlockchainInfo.token.tipo}</span>
                                             </div>
                                             <div>
-                                                <span className="font-medium">Cantidad:</span>
+                                                <span className="font-medium text-gray-600">Cantidad:</span>
                                                 <span className="ml-2">{selectedBlockchainInfo.remesa.cantidad} KG</span>
                                             </div>
                                             <div>
-                                                <span className="font-medium">Fecha:</span>
+                                                <span className="font-medium text-gray-600">Fecha de Creación:</span>
                                                 <span className="ml-2">{formatDate(selectedBlockchainInfo.remesa.timestamp)}</span>
                                             </div>
+                                            {selectedBlockchainInfo.token.transferInfo?.timestamp && (
+                                                <div>
+                                                    <span className="font-medium text-gray-600">Fecha de Transferencia:</span>
+                                                    <span className="ml-2">{formatDate(selectedBlockchainInfo.token.transferInfo.timestamp)}</span>
+                                                </div>
+                                            )}
                                             <div>
-                                                <span className="font-medium">Creador:</span>
-                                                <span className="ml-2">{selectedBlockchainInfo.remesa.creador}</span>
+                                                <span className="font-medium text-gray-600">ID de Transferencia:</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.token.transferInfo?.transferId}</span>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <span className="font-medium text-gray-600">Creador:</span>
+                                                <span className="ml-2 font-mono text-sm">{selectedBlockchainInfo.remesa.creador}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Atributos */}
-                                    <div>
-                                        <h3 className="font-medium text-lg mb-2">Atributos</h3>
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {Object.entries(selectedBlockchainInfo.remesa.atributos).map(([key, value]) => (
-                                                <div key={key}>
-                                                    <span className="font-medium">{formatAttributeName(key)}:</span>
-                                                    <span className="ml-2">{value.toString()}</span>
-                                                </div>
+                                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                                        <h3 className="font-semibold text-lg mb-3 text-olive-800">Atributos del Lote</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {Object.entries(selectedBlockchainInfo.remesa.atributos)
+                                                .sort(([a], [b]) => a.localeCompare(b))
+                                                .map(([key, value]) => (
+                                                    <div key={key} className="bg-gray-50 p-2 rounded">
+                                                        <span className="font-medium text-gray-600">{formatAttributeName(key)}:</span>
+                                                        <span className="ml-2">{value.toString()}</span>
+                                                    </div>
                                             ))}
                                         </div>
                                     </div>
 
-                                    {/* Tokens Padres */}
+                                    {/* Tokens Padres (Trazabilidad) */}
                                     {selectedBlockchainInfo.token.tokensPadres && selectedBlockchainInfo.token.tokensPadres.length > 0 && (
-                                        <div>
-                                            <h3 className="font-medium text-lg mb-2">Tokens Padres</h3>
-                                            <div className="grid grid-cols-1 gap-3">
+                                        <div className="bg-white p-4 rounded-lg shadow-sm">
+                                            <h3 className="font-semibold text-lg mb-3 text-olive-800">Trazabilidad</h3>
+                                            <div className="space-y-3">
                                                 {selectedBlockchainInfo.token.tokensPadres.map((tokenPadre, index) => (
-                                                    <div key={index} className="bg-gray-50 p-3 rounded-md">
-                                                        <div className="grid grid-cols-1 gap-1">
+                                                    <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                        <div className="grid grid-cols-2 gap-2">
                                                             <div>
-                                                                <span className="font-medium">Token ID:</span>
-                                                                <span className="ml-2">{tokenPadre.id}</span>
+                                                                <span className="font-medium text-gray-600">Token ID:</span>
+                                                                <span className="ml-2 font-mono">{tokenPadre.id}</span>
                                                             </div>
                                                             <div>
-                                                                <span className="font-medium">Nombre:</span>
+                                                                <span className="font-medium text-gray-600">Nombre:</span>
                                                                 <span className="ml-2">{tokenPadre.nombre}</span>
                                                             </div>
                                                             <div>
-                                                                <span className="font-medium">Cantidad:</span>
+                                                                <span className="font-medium text-gray-600">Cantidad:</span>
                                                                 <span className="ml-2">{tokenPadre.cantidad} KG</span>
                                                             </div>
-                                                            {tokenPadre.transferId && (
-                                                                <div>
-                                                                    <span className="font-medium">ID Transferencia:</span>
-                                                                    <span className="ml-2">{tokenPadre.transferId}</span>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}

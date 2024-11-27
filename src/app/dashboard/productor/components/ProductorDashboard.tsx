@@ -102,8 +102,30 @@ const ProductorDashboard: FC = (): React.ReactElement => {
 
     // Función para manejar el clic en crear lote
     const handleCreateBatchClick = (token: Token) => {
-        setSelectedToken(token)
-        setIsModalOpen(true)
+        // Inicializar los atributos con los valores del token base
+        const initialAttributes = Object.entries(token.atributos)
+            .filter(([nombre]) => !['EsRemesa', 'Tipo_Producto'].includes(nombre))
+            .map(([nombre, attr]) => ({
+                nombre,
+                valor: attr.valor,
+                timestamp: Date.now()
+            }));
+
+        // Añadir atributos adicionales si no existen
+        const additionalAttributes = [
+            { nombre: 'temperatura', valor: '', timestamp: Date.now() }
+        ];
+
+        // Solo añadir los atributos adicionales que no existan ya
+        additionalAttributes.forEach(attr => {
+            if (!initialAttributes.some(existing => existing.nombre === attr.nombre)) {
+                initialAttributes.push(attr);
+            }
+        });
+
+        setNewAttributes(initialAttributes);
+        setSelectedToken(token);
+        setIsModalOpen(true);
     }
 
     // Función para manejar el clic en transferir
@@ -366,7 +388,7 @@ const ProductorDashboard: FC = (): React.ReactElement => {
             if (token.atributos) {
                 const requiredAttributes = ['metodoRecoleccion'];
                 const missingAttributes = requiredAttributes.filter(attr => 
-                    !newAttributes.find(newAttr => newAttr.nombre === attr)
+                    !newAttributes.find(newAttr => newAttr.nombre === attr && newAttr.valor)
                 );
                 
                 if (missingAttributes.length > 0) {
@@ -375,29 +397,25 @@ const ProductorDashboard: FC = (): React.ReactElement => {
                 }
             }
 
-            // Heredar los atributos del token base y combinarlos con los seleccionados
-            const allAttributes = Object.entries(token.atributos).map(([nombre, attr]) => {
-                // Si es un atributo que requiere selección, usar el valor seleccionado
-                if (nombre === 'metodoRecoleccion') {
-                    const selectedAttr = newAttributes.find(a => a.nombre === nombre);
-                    return {
-                        nombre,
-                        valor: selectedAttr ? selectedAttr.valor : attr.valor
-                    };
-                }
-                // Para EsRemesa, siempre true en remesas
-                if (nombre === 'EsRemesa') {
-                    return {
-                        nombre,
-                        valor: 'true'
-                    };
-                }
-                // Para otros atributos (como Tipo_Producto), mantener el valor original
-                return {
-                    nombre,
-                    valor: attr.valor
-                };
-            });
+            // Combinar todos los atributos
+            const allAttributes = [
+                // Atributos del sistema
+                {
+                    nombre: 'EsRemesa',
+                    valor: 'true'
+                },
+                {
+                    nombre: 'Tipo_Producto',
+                    valor: token.atributos['Tipo_Producto']?.valor || 'Prima'
+                },
+                // Atributos heredados y nuevos
+                ...newAttributes.map(attr => ({
+                    nombre: attr.nombre,
+                    valor: attr.valor || ''  // Asegurarnos de que nunca sea undefined
+                }))
+            ];
+
+            console.log('Atributos a enviar:', allAttributes);
 
             // Separar los atributos en dos arrays
             const nombresAtributos = allAttributes.map(attr => attr.nombre);

@@ -20,7 +20,7 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
     if (!isOpen || !token) return null
 
     const handleSubmit = async () => {
-        // Asegurarnos de que heredamos los atributos del token base
+        // Combinar los atributos heredados con los nuevos atributos
         const baseAttributes = Object.entries(token.atributos).map(([nombre, attr]) => {
             // Si es un atributo del sistema
             if (nombre === 'EsRemesa') {
@@ -46,7 +46,13 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
             };
         });
 
-        setAttributes(baseAttributes);
+        // Añadir los atributos adicionales que no estaban en el token original
+        const additionalAttributes = attributes.filter(attr => 
+            !Object.keys(token.atributos).includes(attr.nombre)
+        );
+
+        const allAttributes = [...baseAttributes, ...additionalAttributes];
+        setAttributes(allAttributes);
         await onSubmit(token, quantity);
         onClose();
     }
@@ -124,20 +130,27 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
                                                     onChange={(e) => {
                                                         const updatedAttrs = [...attributes];
                                                         const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
+                                                        const newValue = e.target.value;
                                                         
                                                         if (existingIndex >= 0) {
                                                             updatedAttrs[existingIndex] = {
                                                                 nombre: atributo,
-                                                                valor: e.target.value,
+                                                                valor: newValue,
                                                                 timestamp: Date.now()
                                                             };
                                                         } else {
                                                             updatedAttrs.push({
                                                                 nombre: atributo,
-                                                                valor: e.target.value,
+                                                                valor: newValue,
                                                                 timestamp: Date.now()
                                                             });
                                                         }
+                                                        
+                                                        console.log('Actualizando atributo:', {
+                                                            atributo,
+                                                            valor: newValue,
+                                                            attributes: updatedAttrs
+                                                        });
                                                         
                                                         setAttributes(updatedAttrs);
                                                     }}
