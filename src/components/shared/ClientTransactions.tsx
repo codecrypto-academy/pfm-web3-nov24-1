@@ -153,7 +153,7 @@ export default function ClientTransactions({ role }: { role: string }) {
 
           const isRelevant = role === 'productor' 
             ? (from === userAddress || to === userAddress)
-            : (role === 'fabrica' ? to === userAddress : false)
+            : (role === 'fabrica' || role === 'minorista') ? to === userAddress : false
 
           console.log('Evaluando evento:', {
             from,
