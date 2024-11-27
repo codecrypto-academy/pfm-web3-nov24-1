@@ -346,11 +346,10 @@ export default function FabricaDashboard() {
             const quantityInTokens = kgToTokens(quantityInKg);
 
             // Iniciar la transferencia
-            const tx = await tokensContract.transferirToken(
+            const tx = await tokensContract.iniciarTransferencia(
                 token.id,
                 destinatario,
-                quantityInTokens,
-                remesaId
+                quantityInTokens
             );
 
             await tx.wait();

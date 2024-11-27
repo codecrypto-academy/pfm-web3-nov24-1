@@ -396,11 +396,14 @@ export default function ProcessProduct() {
             )
 
             // Preparar arrays para procesarToken
-            const tokenIds = selectedIngredients.map(ing => ing.token.remesas[0].id)
-            // En modo receta no convertimos a tokens porque no se quemarán
-            const cantidades = selectedIngredients.map(ing => 
-                isRecipeMode ? ing.quantity : ing.quantity * 1000 * unitsToCreate
+            const tokenIds = selectedIngredients.map(ing => 
+                isRecipeMode ? 0 : ing.token.remesas[0].id
             )
+            const cantidades = selectedIngredients.map(ing => {
+                const cantidad = ing.quantity > 0 ? ing.quantity : 1
+                // En modo receta, solo enviamos 1 token por ingrediente
+                return isRecipeMode ? 1 : cantidad * 1000 * unitsToCreate
+            })
 
             // Preparar atributos
             const nombresAtributos = []
@@ -688,11 +691,6 @@ export default function ProcessProduct() {
                         Modo Receta
                     </span>
                 </div>
-                {isRecipeMode && (
-                    <span className="text-sm text-olive-600">
-                        Las recetas se guardan con cantidad 0
-                    </span>
-                )}
             </div>
 
             {/* Sección de recetas disponibles */}
@@ -930,38 +928,70 @@ export default function ProcessProduct() {
                                                     </svg>
                                                     {token.cantidadTotal / 1000} kg
                                                 </span>
-                                                <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
-                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
-                                                    </svg>
-                                                    {token.numRemesas} remesas
-                                                </span>
+                                                {!isRecipeMode && (
+                                                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
+                                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                                        </svg>
+                                                        {token.numRemesas} remesas
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
-                                            className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
-                                                expandedToken === token.nombre
-                                                    ? 'bg-olive-200 text-olive-800 shadow-inner'
-                                                    : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
-                                            }`}
-                                        >
-                                            {expandedToken === token.nombre ? (
-                                                <>
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
-                                                    </svg>
-                                                    Ocultar
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-                                                    </svg>
-                                                    Ver Remesas
-                                                </>
-                                            )}
-                                        </button>
+                                        {isRecipeMode ? (
+                                            <button
+                                                onClick={() => {
+                                                    addIngredient(token)
+                                                }}
+                                                className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
+                                                    selectedIngredients.some(ing => ing.token.nombre === token.nombre)
+                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                        : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
+                                                }`}
+                                                disabled={selectedIngredients.some(ing => ing.token.nombre === token.nombre)}
+                                            >
+                                                {selectedIngredients.some(ing => ing.token.nombre === token.nombre) ? (
+                                                    <>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                        Agregado
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                                        </svg>
+                                                        Añadir
+                                                    </>
+                                                )}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => setExpandedToken(expandedToken === token.nombre ? null : token.nombre)}
+                                                className={`text-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${
+                                                    expandedToken === token.nombre
+                                                        ? 'bg-olive-200 text-olive-800 shadow-inner'
+                                                        : 'bg-olive-100 text-olive-700 hover:bg-olive-200 hover:shadow'
+                                                }`}
+                                            >
+                                                {expandedToken === token.nombre ? (
+                                                    <>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"/>
+                                                        </svg>
+                                                        Ocultar
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                                                        </svg>
+                                                        Ver Remesas
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Lista de remesas (solo visible en modo normal) */}
@@ -1195,8 +1225,7 @@ export default function ProcessProduct() {
                                 return (
                                     <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${excedeLimite ? 'bg-red-50' : 'bg-gray-50'}`}>
                                         <div className="flex-grow">
-                                            <div className="font-medium text-gray-800">{ingredient.token.nombre}</div>
-                                            <div className="text-sm text-gray-500">
+                                            <div className="font-medium text-gray-800">{ingredient.token.nombre}</div>                                            <div className="text-sm text-gray-500">
                                                 Disponible: {disponibleKg.toFixed(3)} kg
                                             </div>
                                             <div className="text-sm mt-1">

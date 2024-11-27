@@ -239,23 +239,47 @@ export default function DashboardLayout({ children }: LayoutProps) {
             case 'minorista':
                 return (
                     <nav className="p-6">
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold text-olive-800">Panel de Minorista</h2>
-                            <p className="text-sm text-olive-600">Venta al Público</p>
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-bold text-olive-800 tracking-tight">
+                                Panel de Minorista
+                            </h2>
+                            <p className="text-sm text-olive-600/80 mt-1">Venta al Público</p>
                         </div>
-                        <ul className="space-y-2">
-                            {commonNavItems.map((item) => (
-                                <li key={item.name}>
-                                    <Link
-                                        href={item.href}
-                                        className="flex items-center text-olive-700 hover:bg-olive-100 rounded-lg p-3 transition-colors duration-200 gap-2"
-                                    >
-                                        <item.icon className="w-5 h-5" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
+                        <div className="space-y-2">
+                            <div className="mb-2">
+                                <p className="text-sm font-medium text-olive-600 mb-2 px-3">General</p>
+                                <ul className="space-y-1">
+                                    {commonNavItems.map((item) => (
+                                        <li key={item.name}>
+                                            <Link
+                                                href={item.href}
+                                                className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
+                                            >
+                                                <item.icon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110" />
+                                                <span className="font-medium">{item.name}</span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            
+                            <div className="border-t border-olive-200 my-4"></div>
+                            
+                            <div>
+                                <p className="text-sm font-medium text-olive-600 mb-2 px-3">Gestión de Productos</p>
+                                <ul className="space-y-1">
+                                    <li>
+                                        <Link
+                                            href="/dashboard/minorista/transferencias"
+                                            className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
+                                        >
+                                            <TruckIcon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110 group-hover:-translate-x-1" />
+                                            <span className="font-medium">Transferencias Pendientes</span>
+                                        </Link>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </nav>
                 )
         }

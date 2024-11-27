@@ -4,8 +4,8 @@ const fs = require('fs');
 
 // Configuración
 const PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-const RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/MQpQhdkmS3gWeR-PdRk-M3h0JeejjbAX';
-
+//const RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/MQpQhdkmS3gWeR-PdRk-M3h0JeejjbAX';
+const RPC_URL = 'localhost:8545';
 // Función para verificar si anvil está corriendo
 function checkAnvil() {
     return new Promise((resolve, reject) => {

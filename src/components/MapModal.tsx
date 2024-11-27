@@ -52,7 +52,7 @@ const MapModal: React.FC<MapModalProps> = ({
         <div className="p-4 border-t flex justify-end gap-2">
           {!readOnly && onConfirm && (
             <button
-              onClick={() => onConfirm(initialCoordinates)}
+              onClick={() => onConfirm({ lat: initialCoordinates[0], lng: initialCoordinates[1] })}
               className="px-4 py-2 bg-olive-600 text-white rounded hover:bg-olive-700 transition-colors"
             >
               Confirmar Ubicación

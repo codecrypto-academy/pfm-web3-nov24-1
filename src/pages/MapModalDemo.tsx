@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic'; // For server-side rendering
-import { saveCoordinatesToBlockchain } from '../utils/blockchainUtils';
+import { ethers } from 'ethers';
 
 // Dynamically import MapModal (to avoid SSR issues with Leaflet)
 const MapModal = dynamic(() => import('../components/MapModal'), { ssr: false });
@@ -12,7 +12,7 @@ const MapModalDemo: React.FC = () => {
     console.log('Coordinates confirmed:', coordinates);
 
     // Example Ethereum Interaction
-    const contractAddress = '0xYourContractAddress';
+    const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Replace with your actual contract address
     const abi = [
       {
         inputs: [
@@ -25,23 +25,23 @@ const MapModalDemo: React.FC = () => {
         type: 'function',
       },
     ]; // Replace with your contract's ABI
-    const provider = window.ethereum
-      ? new ethers.providers.Web3Provider(window.ethereum)
-      : null;
-
-    if (!provider) {
-      alert('Ethereum provider not found. Please install MetaMask.');
-      return;
-    }
 
     try {
-      await saveCoordinatesToBlockchain(
-        coordinates.lat,
-        coordinates.lng,
-        contractAddress,
-        abi,
-        provider
-      );
+      // Create a new provider
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      // Create contract instance
+      const contract = new ethers.Contract(contractAddress, abi, signer);
+      
+      // Convert coordinates to the format expected by the contract
+      const latInt = Math.floor(coordinates.lat * 1e6);
+      const lngInt = Math.floor(coordinates.lng * 1e6);
+      
+      // Call the contract function
+      const tx = await contract.setCoordinates(latInt, lngInt);
+      await tx.wait();
+      
       alert('Coordinates saved successfully!');
     } catch (error) {
       console.error('Error saving coordinates:', error);
