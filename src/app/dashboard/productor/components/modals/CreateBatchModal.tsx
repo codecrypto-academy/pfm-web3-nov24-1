@@ -3,6 +3,7 @@
 import { FC, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CreateBatchModalProps, TokenAttribute } from '@/types/types'
+import { formatAttributeName } from '@/utils/attributeLabels'
 
 const CreateBatchModal: FC<CreateBatchModalProps> = ({
     isOpen,
@@ -21,16 +22,7 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
     const handleSubmit = async () => {
         // Asegurarnos de que heredamos los atributos del token base
         const baseAttributes = Object.entries(token.atributos).map(([nombre, attr]) => {
-            // Si es un atributo que requiere selección y tenemos un valor seleccionado
-            if (nombre === 'metodoRecoleccion') {
-                const selectedValue = attributes.find(a => a.nombre === nombre)?.valor;
-                return {
-                    nombre,
-                    valor: selectedValue || attr.valor,
-                    timestamp: Date.now()
-                };
-            }
-            // Para el atributo EsRemesa, siempre true en remesas
+            // Si es un atributo del sistema
             if (nombre === 'EsRemesa') {
                 return {
                     nombre,
@@ -38,17 +30,23 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
                     timestamp: Date.now()
                 };
             }
-            // Para otros atributos (como Tipo_Producto), mantener el valor original
+            if (nombre === 'Tipo_Producto') {
+                return {
+                    nombre,
+                    valor: attr.valor,
+                    timestamp: Date.now()
+                };
+            }
+            // Para todos los demás atributos, usar el valor seleccionado o ingresado
+            const selectedAttr = attributes.find(a => a.nombre === nombre);
             return {
                 nombre,
-                valor: attr.valor,
+                valor: selectedAttr?.valor || attr.valor,
                 timestamp: Date.now()
             };
         });
 
-        // Actualizar los atributos con los valores heredados
         setAttributes(baseAttributes);
-        
         await onSubmit(token, quantity);
         onClose();
     }
@@ -94,8 +92,8 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
                         <div className="space-y-4">
                             {Object.entries(token.atributos)
                                 .filter(([nombre]) => {
-                                    // Solo mostrar atributos que necesitan selección
-                                    return nombre === 'metodoRecoleccion';
+                                    // No mostrar atributos del sistema
+                                    return !['EsRemesa', 'Tipo_Producto'].includes(nombre);
                                 })
                                 .map(([atributo, valor], index) => {
                                     // Intentar parsear el valor como JSON
@@ -106,52 +104,80 @@ const CreateBatchModal: FC<CreateBatchModalProps> = ({
                                             opciones = parsed;
                                         }
                                     } catch {
-                                        // Si no es JSON, intentar split por comas (compatibilidad)
-                                        opciones = valor.valor.split(',').map(v => v.trim());
+                                        // Si no es JSON, usar el valor como está
+                                        opciones = [];
                                     }
 
-                                    // Formatear el nombre para mostrar
-                                    const nombreMostrar = atributo === 'metodoRecoleccion' ? 'Método de Recolección' :
-                                                        atributo === 'Tipo_Producto' ? 'Tipo de Producto' :
-                                                        atributo;
+                                    // Formatear el nombre para mostrar usando el utilitario
+                                    const nombreMostrar = formatAttributeName(atributo);
 
                                     return (
                                         <div key={index} className="flex flex-col space-y-2">
                                             <label className="text-sm font-medium text-gray-600">
                                                 {nombreMostrar}
                                             </label>
-                                            <select
-                                                value={attributes.find(attr => attr.nombre === atributo)?.valor || ''}
-                                                onChange={(e) => {
-                                                    const updatedAttrs = [...attributes];
-                                                    const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
-                                                    
-                                                    if (existingIndex >= 0) {
-                                                        updatedAttrs[existingIndex] = {
-                                                            nombre: atributo,
-                                                            valor: e.target.value,
-                                                            timestamp: Date.now()
-                                                        };
-                                                    } else {
-                                                        updatedAttrs.push({
-                                                            nombre: atributo,
-                                                            valor: e.target.value,
-                                                            timestamp: Date.now()
-                                                        });
-                                                    }
-                                                    
-                                                    setAttributes(updatedAttrs);
-                                                }}
-                                                className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
-                                                required
-                                            >
-                                                <option value="">Seleccionar {nombreMostrar}</option>
-                                                {opciones.map((opcion, idx) => (
-                                                    <option key={idx} value={opcion}>
-                                                        {opcion}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            {/* Si es un atributo de tipo texto */}
+                                            {!opciones.length ? (
+                                                <input
+                                                    type="text"
+                                                    value={attributes.find(attr => attr.nombre === atributo)?.valor || ''}
+                                                    onChange={(e) => {
+                                                        const updatedAttrs = [...attributes];
+                                                        const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
+                                                        
+                                                        if (existingIndex >= 0) {
+                                                            updatedAttrs[existingIndex] = {
+                                                                nombre: atributo,
+                                                                valor: e.target.value,
+                                                                timestamp: Date.now()
+                                                            };
+                                                        } else {
+                                                            updatedAttrs.push({
+                                                                nombre: atributo,
+                                                                valor: e.target.value,
+                                                                timestamp: Date.now()
+                                                            });
+                                                        }
+                                                        
+                                                        setAttributes(updatedAttrs);
+                                                    }}
+                                                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
+                                                    placeholder={`Ingrese ${nombreMostrar}`}
+                                                />
+                                            ) : (
+                                                <select
+                                                    value={attributes.find(attr => attr.nombre === atributo)?.valor || ''}
+                                                    onChange={(e) => {
+                                                        const updatedAttrs = [...attributes];
+                                                        const existingIndex = updatedAttrs.findIndex(attr => attr.nombre === atributo);
+                                                        
+                                                        if (existingIndex >= 0) {
+                                                            updatedAttrs[existingIndex] = {
+                                                                nombre: atributo,
+                                                                valor: e.target.value,
+                                                                timestamp: Date.now()
+                                                            };
+                                                        } else {
+                                                            updatedAttrs.push({
+                                                                nombre: atributo,
+                                                                valor: e.target.value,
+                                                                timestamp: Date.now()
+                                                            });
+                                                        }
+                                                        
+                                                        setAttributes(updatedAttrs);
+                                                    }}
+                                                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-olive-500 focus:border-olive-500 shadow-sm"
+                                                    required
+                                                >
+                                                    <option value="">Seleccionar {nombreMostrar}</option>
+                                                    {opciones.map((opcion, idx) => (
+                                                        <option key={idx} value={opcion}>
+                                                            {opcion}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </div>
                                     );
                                 })}

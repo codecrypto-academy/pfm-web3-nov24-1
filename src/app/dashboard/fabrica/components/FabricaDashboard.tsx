@@ -932,7 +932,7 @@ export default function FabricaDashboard() {
                         <div className="space-y-4">
                             <div>
                                 <h3 className="font-medium text-lg mb-2">Información General</h3>
-                                <div className="grid grid-cols-1 gap-4">
+                                <div className="grid grid-cols-1 gap-2">
                                     <div>
                                         <span className="font-medium">Nombre:</span>
                                         <span className="ml-2">{selectedBlockchainInfo.token.nombre}</span>
@@ -957,19 +957,23 @@ export default function FabricaDashboard() {
                             </div>
 
                             {/* Atributos */}
-                            {Object.keys(selectedBlockchainInfo.remesa.atributos).length > 0 && (
-                                <div>
-                                    <h3 className="font-medium text-lg mb-2">Atributos</h3>
-                                    <div className="space-y-2">
-                                        {Object.entries(selectedBlockchainInfo.remesa.atributos).map(([key, value]) => (
-                                            <div key={key}>
-                                                <span className="font-medium">{formatAttributeName(key)}:</span>
-                                                <span className="ml-2">{value.toString()}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                            <div>
+                                <h3 className="font-medium text-lg mb-2">Atributos</h3>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {Object.entries(selectedBlockchainInfo.remesa.atributos).map(([key, value]) => (
+                                        <div key={key}>
+                                            <span className="font-medium">{formatAttributeName(key)}:</span>
+                                            <span className="ml-2">{value.toString()}</span>
+                                        </div>
+                                    ))}
+                                    {selectedBlockchainInfo.token.tokensPadres?.map((padre, index) => (
+                                        <div key={`token-${index}`}>
+                                            <span className="font-medium">Token Origen {index + 1}:</span>
+                                            <span className="ml-2">{padre.nombre} ID:{padre.id} Cantidad:{padre.cantidad}{padre.transferId ? ` ID Transferencia:${padre.transferId}` : ''}adf</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 </div>
