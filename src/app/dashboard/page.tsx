@@ -4,6 +4,14 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWeb3 } from '@/context/Web3Context'
 
+// Declaración de tipos para window.ethereum
+declare global {
+    interface Window {
+        ethereum?: any;
+    }
+}
+
+
 export default function DashboardPage() {
     const router = useRouter()
     const { role } = useWeb3()

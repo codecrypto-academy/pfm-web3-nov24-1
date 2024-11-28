@@ -946,51 +946,22 @@ export default function FabricaDashboard() {
                                             </div>
                                             <div>
                                                 <span className="font-medium text-gray-600">Cantidad:</span>
-                                                <span className="ml-2">{selectedBlockchainInfo.remesa.cantidad} KG</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.remesa.cantidad} Tokens</span>
                                             </div>
                                             <div>
                                                 <span className="font-medium text-gray-600">Fecha de Creación:</span>
                                                 <span className="ml-2">{formatDate(selectedBlockchainInfo.remesa.timestamp)}</span>
                                             </div>
-                                            {selectedBlockchainInfo.token.transferInfo?.timestamp && (
-                                                <div>
-                                                    <span className="font-medium text-gray-600">Fecha de Transferencia:</span>
-                                                    <span className="ml-2">{formatDate(selectedBlockchainInfo.token.transferInfo.timestamp)}</span>
-                                                </div>
-                                            )}
-                                            <div>
-                                                <span className="font-medium text-gray-600">ID de Transferencia:</span>
-                                                <span className="ml-2">{selectedBlockchainInfo.token.transferInfo?.transferId}</span>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <span className="font-medium text-gray-600">Creador:</span>
-                                                <span className="ml-2 font-mono text-sm">{selectedBlockchainInfo.remesa.creador}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Atributos */}
-                                    <div className="bg-white p-4 rounded-lg shadow-sm">
-                                        <h3 className="font-semibold text-lg mb-3 text-olive-800">Atributos del Lote</h3>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {Object.entries(selectedBlockchainInfo.remesa.atributos)
-                                                .sort(([a], [b]) => a.localeCompare(b))
-                                                .map(([key, value]) => (
-                                                    <div key={key} className="bg-gray-50 p-2 rounded">
-                                                        <span className="font-medium text-gray-600">{formatAttributeName(key)}:</span>
-                                                        <span className="ml-2">{value.toString()}</span>
-                                                    </div>
-                                            ))}
                                         </div>
                                     </div>
 
                                     {/* Tokens Padres (Trazabilidad) */}
                                     {selectedBlockchainInfo.token.tokensPadres && selectedBlockchainInfo.token.tokensPadres.length > 0 && (
-                                        <div className="bg-white p-4 rounded-lg shadow-sm">
-                                            <h3 className="font-semibold text-lg mb-3 text-olive-800">Trazabilidad</h3>
+                                        <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                            <h3 className="font-semibold text-lg mb-3 text-olive-800">Tokens Utilizados</h3>
                                             <div className="space-y-3">
                                                 {selectedBlockchainInfo.token.tokensPadres.map((tokenPadre, index) => (
-                                                    <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                    <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div>
                                                                 <span className="font-medium text-gray-600">Token ID:</span>
@@ -1002,11 +973,109 @@ export default function FabricaDashboard() {
                                                             </div>
                                                             <div>
                                                                 <span className="font-medium text-gray-600">Cantidad:</span>
-                                                                <span className="ml-2">{tokenPadre.cantidad} KG</span>
+                                                                <span className="ml-2">{tokenPadre.cantidad} Tokens</span>
                                                             </div>
+                                                            {tokenPadre.transferId && (
+                                                                <div>
+                                                                    <span className="font-medium text-gray-600">ID Transferencia:</span>
+                                                                    <span className="ml-2">{tokenPadre.transferId}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Atributos */}
+                                    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                        <h3 className="font-semibold text-lg mb-3 text-olive-800">Atributos del Lote</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {Object.entries(selectedBlockchainInfo.remesa.atributos)
+                                                .filter(([key]) => !key.startsWith('Token Origen'))
+                                                .sort(([a], [b]) => a.localeCompare(b))
+                                                .map(([key, value]) => (
+                                                    <div key={key} className="bg-white p-2 rounded">
+                                                        <span className="font-medium text-gray-600">{formatAttributeName(key)}:</span>
+                                                        <span className="ml-2">{value.toString()}</span>
+                                                    </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    
+
+                                    {/* Información Blockchain */}
+                                    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                        <h3 className="font-semibold text-lg mb-3 text-olive-800">Información Blockchain</h3>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <span className="font-medium text-gray-600">Smart Contract:</span>
+                                                <a 
+                                                    href={`https://sepolia.etherscan.io/address/${CONTRACTS.Tokens.address}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="ml-2 text-blue-600 hover:text-blue-800 break-all"
+                                                >
+                                                    {CONTRACTS.Tokens.address}
+                                                </a>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium text-gray-600">Creador:</span>
+                                                <a 
+                                                    href={`https://sepolia.etherscan.io/address/${selectedBlockchainInfo.remesa.creador}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="ml-2 text-blue-600 hover:text-blue-800 break-all"
+                                                >
+                                                    {selectedBlockchainInfo.remesa.creador}
+                                                </a>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium text-gray-600">Token ID:</span>
+                                                <span className="ml-2">{selectedBlockchainInfo.token.id}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Información de Transferencia */}
+                                    {selectedBlockchainInfo.token.transferInfo && (
+                                        <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                                            <h3 className="font-semibold text-lg mb-3 text-olive-800">Información de Transferencia</h3>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <span className="font-medium text-gray-600">ID de Transferencia:</span>
+                                                    <span className="ml-2">{selectedBlockchainInfo.token.transferInfo.transferId}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-medium text-gray-600">Desde:</span>
+                                                    <a 
+                                                        href={`https://sepolia.etherscan.io/address/${selectedBlockchainInfo.token.transferInfo.from}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="ml-2 text-blue-600 hover:text-blue-800 break-all"
+                                                    >
+                                                        {selectedBlockchainInfo.token.transferInfo.from}
+                                                    </a>
+                                                </div>
+                                                <div>
+                                                    <span className="font-medium text-gray-600">Hacia:</span>
+                                                    <a 
+                                                        href={`https://sepolia.etherscan.io/address/${selectedBlockchainInfo.token.transferInfo.to}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="ml-2 text-blue-600 hover:text-blue-800 break-all"
+                                                    >
+                                                        {selectedBlockchainInfo.token.transferInfo.to}
+                                                    </a>
+                                                </div>
+                                                {selectedBlockchainInfo.token.transferInfo.timestamp && (
+                                                    <div>
+                                                        <span className="font-medium text-gray-600">Fecha de Transferencia:</span>
+                                                        <span className="ml-2">{formatDate(selectedBlockchainInfo.token.transferInfo.timestamp)}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}

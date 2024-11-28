@@ -372,7 +372,7 @@ export default function ProcessProduct() {
         }
 
         // Validar que no se excedan las cantidades disponibles
-        const excedeLimite = selectedIngredients.some(ing => {
+        const excedeLimite = !isRecipeMode && selectedIngredients.some(ing => {
             const totalKg = ing.quantity * unitsToCreate;
             const disponibleKg = ing.token.cantidadTotal / 1000;
             return totalKg > disponibleKg;
@@ -394,16 +394,6 @@ export default function ProcessProduct() {
                 CONTRACTS.Tokens.abi,
                 signer
             )
-
-            // Preparar arrays para procesarToken
-            const tokenIds = selectedIngredients.map(ing => 
-                isRecipeMode ? 0 : ing.token.remesas[0].id
-            )
-            const cantidades = selectedIngredients.map(ing => {
-                const cantidad = ing.quantity > 0 ? ing.quantity : 1
-                // En modo receta, solo enviamos 1 token por ingrediente
-                return isRecipeMode ? 1 : cantidad * 1000 * unitsToCreate
-            })
 
             // Preparar atributos
             const nombresAtributos = []
@@ -437,45 +427,32 @@ export default function ProcessProduct() {
                 valoresAtributos.push(ing.quantity.toString())
             })
 
-            // Toast inicial con detalles
-            const toastId = toast.info(
-                <div>
-                    <h3 className="font-bold mb-2">
-                        {isRecipeMode ? "Creando Receta" : "Procesando Producto"}:
-                    </h3>
-                    <p><strong>Nombre:</strong> {newProductName}</p>
-                    {selectedIngredients.length > 0 && (
-                        <div>
-                            <p className="font-bold mt-2">Ingredientes:</p>
-                            {selectedIngredients.map((ing, index) => (
-                                <p key={index}>
-                                    - {ing.token.nombre}: {ing.quantity * unitsToCreate} kg 
-                                    {!isRecipeMode && `(${ing.quantity * unitsToCreate * 1000} tokens)`}
-                                    (ID: {ing.token.remesas[0]?.id})
-                                </p>
-                            ))}
-                        </div>
-                    )}
-                </div>,
-                {
-                    position: "top-right",
-                    autoClose: false,
-                    closeOnClick: false,
-                }
-            );
-
-            // Procesar el token
-            const tx = await contract.procesarToken(
-                tokenIds,
-                cantidades,
-                nombresAtributos,
-                valoresAtributos
-            )
+            let tx;
+            if (isRecipeMode) {
+                // En modo receta, usamos crearToken
+                tx = await contract.crearToken(
+                    newProductName,
+                    0, // cantidad 0 para recetas
+                    newProductDescription,
+                    nombresAtributos,
+                    valoresAtributos
+                );
+            } else {
+                // En modo producción, usamos procesarToken
+                const tokenIds = selectedIngredients.map(ing => ing.token.remesas[0].id);
+                const cantidades = selectedIngredients.map(ing => ing.quantity * 1000 * unitsToCreate);
+                
+                tx = await contract.procesarToken(
+                    tokenIds,
+                    cantidades,
+                    nombresAtributos,
+                    valoresAtributos
+                );
+            }
 
             const receipt = await tx.wait()
 
             // Toast de éxito con todos los detalles
-            toast.dismiss(toastId);
             toast.success(
                 <div>
                     <h3 className="font-bold mb-2">
@@ -932,9 +909,9 @@ export default function ProcessProduct() {
                                                     <span className="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
                                                         <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
-                                                        </svg>
-                                                        {token.numRemesas} remesas
-                                                    </span>
+                                                    </svg>
+                                                    {token.numRemesas} remesas
+                                                </span>
                                                 )}
                                             </div>
                                         </div>
@@ -1226,8 +1203,9 @@ export default function ProcessProduct() {
                                     <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${excedeLimite ? 'bg-red-50' : 'bg-gray-50'}`}>
                                         <div className="flex-grow">
                                             <div className="font-medium text-gray-800">{ingredient.token.nombre}</div>                                            <div className="text-sm text-gray-500">
-                                                Disponible: {disponibleKg.toFixed(3)} kg
+                                                Disponible: {disponibleKg} KG ({disponibleKg.toFixed(3)} Tokens)
                                             </div>
+                                            
                                             <div className="text-sm mt-1">
                                                 <span className={`${excedeLimite ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
                                                     Total para {unitsToCreate} unidad(es): {totalKg.toFixed(3)} kg ({totalTokens.toFixed(0)} tokens)
