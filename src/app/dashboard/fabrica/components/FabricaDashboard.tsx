@@ -9,6 +9,7 @@ import ClientTransactions from '@/components/shared/ClientTransactions'
 import PendingTransfers from '@/components/TransferenciasPendientes'
 import { toast } from 'react-toastify'
 import { formatAttributeName } from '@/utils/attributeLabels'
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Token {
     id: number
@@ -102,6 +103,10 @@ export default function FabricaDashboard() {
     // Estados para el modal de información blockchain
     const [showBlockchainModal, setShowBlockchainModal] = useState(false);
     const [selectedBlockchainInfo, setSelectedBlockchainInfo] = useState<BlockchainInfo | null>(null);
+
+    // Estados para el modal de QR
+    const [showQRModal, setShowQRModal] = useState(false);
+    const [qrData, setQRData] = useState<string | null>(null);
 
     // Estado para almacenar las direcciones de minoristas
     const [minoristas, setMinoristas] = useState<{ address: string; label: string }[]>([]);
@@ -306,13 +311,13 @@ export default function FabricaDashboard() {
         return minoristas.some(minorista => minorista.address === direccion.toLowerCase());
     };
 
-    // Función para convertir entre KG y tokens (1:1 en este caso)
+    // Función para convertir entre KG y tokens
     const kgToTokens = (kg: number): number => {
-        return kg;
+        return kg * 1000; // 1 KG = 1000 tokens
     };
 
     const tokensToKg = (tokens: number): number => {
-        return tokens;
+        return tokens / 1000; // 1000 tokens = 1 KG
     };
 
     // Función para manejar la transferencia de tokens
@@ -338,22 +343,50 @@ export default function FabricaDashboard() {
             );
 
             // Verificar que la cantidad no exceda el balance disponible
-            if (quantityInKg > tokensToKg(token.cantidadTotal)) {
+            const remesa = token.remesas.find(r => r.id === remesaId);
+            if (!remesa) {
+                throw new Error('Remesa no encontrada');
+            }
+
+            const remesaKg = tokensToKg(remesa.cantidad);
+            if (quantityInKg > remesaKg) {
                 throw new Error('La cantidad excede el balance disponible');
             }
 
             // Convertir KG a tokens para la transferencia
             const quantityInTokens = kgToTokens(quantityInKg);
+            console.log('Transferencia:', {
+                tokenId: token.id,
+                destinatario,
+                cantidadKg: quantityInKg,
+                cantidadTokens: quantityInTokens,
+                remesaId,
+                remesaCantidad: remesa.cantidad
+            });
 
-            // Iniciar la transferencia
+            // Iniciar la transferencia con la cantidad en tokens
             const tx = await tokensContract.iniciarTransferencia(
                 token.id,
                 destinatario,
                 quantityInTokens
             );
 
-            await tx.wait();
+            const receipt = await tx.wait();
             
+            // Buscar el evento TokenTransferido en el recibo de la transacción
+            const transferEvent = receipt.logs
+                .filter((log: any) => log instanceof ethers.EventLog)
+                .find((log: any) => log.eventName === 'TokenTransferido');
+
+            if (transferEvent) {
+                // Crear datos para el QR
+                const qrData = `${token.id}-${transferEvent.args[0].toString()}-${Date.now()}`;
+                
+                // Mostrar el QR
+                setQRData(qrData);
+                setShowQRModal(true);
+            }
+
             // Recargar los tokens después de la transferencia
             await loadTokens();
             
@@ -439,8 +472,8 @@ export default function FabricaDashboard() {
         if (!selectedToken || !transferQuantity || !transferDestination || selectedRemesa === null) return;
 
         try {
-            const quantity = parseInt(transferQuantity);
-            if (isNaN(quantity) || quantity <= 0) {
+            const quantityInKg = parseFloat(transferQuantity);
+            if (isNaN(quantityInKg) || quantityInKg <= 0) {
                 throw new Error('La cantidad debe ser un número positivo');
             }
 
@@ -449,11 +482,12 @@ export default function FabricaDashboard() {
                 throw new Error('Remesa no encontrada');
             }
 
-            if (quantity > remesa.cantidad) {
+            const remesaKg = tokensToKg(remesa.cantidad);
+            if (quantityInKg > remesaKg) {
                 throw new Error('La cantidad excede el balance disponible en la remesa');
             }
 
-            await handleTransferToken(selectedToken, quantity, transferDestination, selectedRemesa);
+            await handleTransferToken(selectedToken, quantityInKg, transferDestination, selectedRemesa);
             handleCloseTransferModal();
         } catch (error: any) {
             setError(error.message || 'Error al procesar la transferencia');
@@ -666,36 +700,33 @@ export default function FabricaDashboard() {
                                     <div className="mt-4">
                                         <h4 className="text-sm font-medium text-gray-900 mb-2">Desglose de Remesas:</h4>
                                         <div className="space-y-2 max-h-40 overflow-y-auto">
-                                            {token.remesas.map((remesa, index) => {
-                                                const remesaKg = remesa.cantidad / 1000;
-                                                return (
-                                                    <div 
-                                                        key={remesa.id}
-                                                        className="p-2 bg-gray-50 rounded text-sm"
-                                                    >
-                                                        <div className="flex justify-between">
-                                                            <span>Remesa #{index + 1}</span>
-                                                            <span>{formatDate(remesa.timestamp)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-gray-600">
-                                                            <span>Cantidad:</span>
-                                                            <span>{remesa.cantidad.toLocaleString()} KG</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleShowBlockchainInfo(remesa, token);
-                                                            }}
-                                                            className="mt-2 w-full text-sm text-olive-600 hover:text-olive-700 flex items-center justify-center gap-1"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                            Info Blockchain
-                                                        </button>
+                                            {token.remesas.map((remesa, index) => (
+                                                <div 
+                                                    key={remesa.id}
+                                                    className="p-2 bg-gray-50 rounded text-sm"
+                                                >
+                                                    <div className="flex justify-between">
+                                                        <span>Remesa #{index + 1}</span>
+                                                        <span>{formatDate(remesa.timestamp)}</span>
                                                     </div>
-                                                );
-                                            })}
+                                                    <div className="flex justify-between text-gray-600">
+                                                        <span>Cantidad:</span>
+                                                        <span>{remesa.cantidad.toLocaleString()} KG</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleShowBlockchainInfo(remesa, token);
+                                                        }}
+                                                        className="mt-2 w-full text-sm text-olive-600 hover:text-olive-700 flex items-center justify-center gap-1"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Info Blockchain
+                                                    </button>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
@@ -843,13 +874,15 @@ export default function FabricaDashboard() {
                                     value={transferQuantity}
                                     onChange={(e) => setTransferQuantity(e.target.value)}
                                     className="w-full p-2 border rounded-md"
-                                    max={selectedRemesa !== null ? selectedToken.remesas.find(r => r.id === selectedRemesa)?.cantidad || 0 : 0}
-                                    min="1"
+                                    max={selectedRemesa !== null ? 
+                                        tokensToKg(selectedToken.remesas.find(r => r.id === selectedRemesa)?.cantidad || 0) : 0}
+                                    min="0.001"
+                                    step="0.001"
                                     required
                                 />
                                 <p className="text-sm text-gray-500 mt-1">
                                     Máximo disponible: {selectedRemesa !== null ? 
-                                        (selectedToken.remesas.find(r => r.id === selectedRemesa)?.cantidad || 0) : 0} KG
+                                        tokensToKg(selectedToken.remesas.find(r => r.id === selectedRemesa)?.cantidad || 0).toLocaleString() : 0} KG
                                 </p>
                             </div>
                             <div className="mb-6">
@@ -1080,6 +1113,48 @@ export default function FabricaDashboard() {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Modal de QR */}
+            {showQRModal && qrData && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+                        </div>
+                        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                <div className="sm:flex sm:items-start">
+                                    <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                                        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                                            Transferencia Exitosa
+                                        </h3>
+                                        <div className="flex justify-center">
+                                            <QRCodeSVG value={qrData} size={256} />
+                                        </div>
+                                        <div className="mt-4 text-center">
+                                            <p className="text-sm font-medium text-gray-700 mb-2">Código manual:</p>
+                                            <code className="bg-gray-100 p-2 rounded break-all text-sm">{qrData}</code>
+                                        </div>
+                                        <p className="mt-4 text-sm text-gray-500">
+                                            Este código QR contiene la información de la transferencia.
+                                            El minorista puede escanearlo para verificar la autenticidad del producto.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowQRModal(false)}
+                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-olive-600 text-base font-medium text-white hover:bg-olive-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500 sm:ml-3 sm:w-auto sm:text-sm"
+                                >
+                                    Cerrar
+                                </button>
                             </div>
                         </div>
                     </div>

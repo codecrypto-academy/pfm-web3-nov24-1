@@ -47,6 +47,9 @@ interface ProductGroup {
 
 export default function ClientTransactions({ role }: { role: string }) {
   const [transactions, setTransactions] = useState<DetailedTransaction[]>([])
+  const [receivedTransactions, setReceivedTransactions] = useState<DetailedTransaction[]>([])
+  const [sentTransactions, setSentTransactions] = useState<DetailedTransaction[]>([])
+  const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [groupedByProduct, setGroupedByProduct] = useState<ProductGroup[]>([])
@@ -153,7 +156,11 @@ export default function ClientTransactions({ role }: { role: string }) {
 
           const isRelevant = role === 'productor' 
             ? (from === userAddress || to === userAddress)
-            : (role === 'fabrica' || role === 'minorista') ? to === userAddress : false
+            : (role === 'fabrica') 
+              ? (from === userAddress || to === userAddress)
+              : (role === 'minorista') 
+                ? to === userAddress 
+                : false;
 
           console.log('Evaluando evento:', {
             from,
@@ -276,7 +283,7 @@ export default function ClientTransactions({ role }: { role: string }) {
               gasPrice: receipt.gasPrice?.toString() || '0',
               timestamp: Number(block.timestamp),
               estado,
-              product: token.nombre,
+              product: attributes.find(attr => attr.nombre === 'Nombre')?.valor || token.nombre,
               description: token.descripcion,
               quantity: Number(cantidad),
               attributes, // Asignar los atributos procesados
@@ -398,6 +405,11 @@ export default function ClientTransactions({ role }: { role: string }) {
         (tx): tx is DetailedTransaction => tx !== null
       )
 
+      // Separar transacciones recibidas y enviadas
+      const received = validTransactions.filter(tx => tx.to.address.toLowerCase() === address?.toLowerCase())
+      const sent = validTransactions.filter(tx => tx.from.address.toLowerCase() === address?.toLowerCase())
+
+      // Agrupar transacciones por producto
       const groupedTransactions = validTransactions.reduce<ProductGroup[]>((acc, transaction) => {
         const existingGroup = acc.find((group) => group.product === transaction.product);
         if (existingGroup) {
@@ -412,6 +424,8 @@ export default function ClientTransactions({ role }: { role: string }) {
       groupedTransactions.sort((a, b) => a.product.localeCompare(b.product));
 
       setTransactions(validTransactions)
+      setReceivedTransactions(received)
+      setSentTransactions(sent)
       setGroupedByProduct(groupedTransactions)
       setLoading(false)
     } catch (error) {
@@ -446,21 +460,83 @@ export default function ClientTransactions({ role }: { role: string }) {
   }
 
   return (
-    <div>
-      {loading ? (
-        <div className="text-center">Cargando transacciones...</div>
-      ) : transactions.length === 0 ? (
-        <div className="text-center">No hay transacciones para mostrar</div>
-      ) : (
-        <div className="space-y-6">
-          {groupedByProduct.map((group) => (
-            <TransactionGroup 
-              key={`${group.product}`} 
-              transactions={group.transactions}
-              address={address || ''}
-            />
-          ))}
+    <div className="container mx-auto px-4 py-8">
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
         </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-olive-600"></div>
+        </div>
+      ) : (
+        <>
+          {/* Tabs para cambiar entre transacciones recibidas y enviadas */}
+          {(role === 'fabrica' || role === 'productor') && (
+            <div className="mb-6">
+              <div className="border-b border-gray-200">
+                <nav className="-mb-px flex space-x-8">
+                  <button
+                    onClick={() => setActiveTab('received')}
+                    className={`${
+                      activeTab === 'received'
+                        ? 'border-olive-500 text-olive-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  >
+                    Transacciones Recibidas
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('sent')}
+                    className={`${
+                      activeTab === 'sent'
+                        ? 'border-olive-500 text-olive-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  >
+                    Transacciones Enviadas
+                  </button>
+                </nav>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de transacciones agrupadas por producto */}
+          <div className="space-y-6">
+            {activeTab === 'received' ? (
+              receivedTransactions.length > 0 ? (
+                groupedByProduct
+                  .filter(group => group.transactions.some(tx => tx.to.address.toLowerCase() === address?.toLowerCase()))
+                  .map((group) => (
+                    <TransactionGroup 
+                      key={`${group.product}-received`}
+                      transactions={group.transactions.filter(tx => tx.to.address.toLowerCase() === address?.toLowerCase())}
+                      address={address || ''}
+                    />
+                  ))
+              ) : (
+                <p className="text-gray-500 text-center py-8">No hay transacciones recibidas</p>
+              )
+            ) : (
+              sentTransactions.length > 0 ? (
+                groupedByProduct
+                  .filter(group => group.transactions.some(tx => tx.from.address.toLowerCase() === address?.toLowerCase()))
+                  .map((group) => (
+                    <TransactionGroup 
+                      key={`${group.product}-sent`}
+                      transactions={group.transactions.filter(tx => tx.from.address.toLowerCase() === address?.toLowerCase())}
+                      address={address || ''}
+                    />
+                  ))
+              ) : (
+                <p className="text-gray-500 text-center py-8">No hay transacciones enviadas</p>
+              )
+            )}
+          </div>
+        </>
       )}
     </div>
   );
