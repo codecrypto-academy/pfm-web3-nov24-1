@@ -793,6 +793,17 @@ export default function FabricaDashboard() {
             {/* Pestañas */}
             <div className="mb-8">
                 <div className="border-b border-gray-200">
+                    {/* Buscador */}
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full p-2 border rounded-md"
+                            placeholder="Buscar..."
+                        />
+                    </div>
+
                     <nav className="-mb-px flex space-x-8">
                         {tabs.map((tab) => (
                             <button

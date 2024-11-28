@@ -80,9 +80,23 @@ export default function TokensDisponibles() {
                     if (balance > 0) {
                         const enTransito = await tokensContract.tokensEnTransito(address, tokenId)
                         
+                        // Obtener los atributos del token
+                        const attrNames = await tokensContract.getNombresAtributos(tokenId)
+                        const attributes = await Promise.all(
+                            attrNames.map(async (name: string) => {
+                                const attr = await tokensContract.getAtributo(tokenId, name)
+                                return {
+                                    nombre: name,
+                                    valor: attr.valor || ''
+                                }
+                            })
+                        )
+                        
+                        const nombreAttr = attributes.find(attr => attr.nombre === 'Nombre')
+                        
                         return {
                             id: tokenId,
-                            nombre: tokenData[1],
+                            nombre: nombreAttr?.valor || tokenData[1],
                             descripcion: tokenData[3],
                             cantidad: balance.toString(),
                             creador: tokenData[2],

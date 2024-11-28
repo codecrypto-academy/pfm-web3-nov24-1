@@ -158,9 +158,9 @@ export default function ClientTransactions({ role }: { role: string }) {
             ? (from === userAddress || to === userAddress)
             : (role === 'fabrica') 
               ? (from === userAddress || to === userAddress)
-              : (role === 'minorista') 
-                ? to === userAddress 
-                : false;
+            : (role === 'minorista') 
+              ? to === userAddress 
+              : false;
 
           console.log('Evaluando evento:', {
             from,
@@ -233,25 +233,23 @@ export default function ClientTransactions({ role }: { role: string }) {
               estado 
             })
 
-            const [attrNames, receipt, block, token] = await Promise.all([
-              tokensContract.getNombresAtributos(tokenId),
+            // Obtener el token y sus detalles
+            const token = await tokensContract.tokens(tokenId)
+            console.log('Token details:', token)
+
+            // Obtener el receipt y block
+            const [receipt, blockData] = await Promise.all([
               provider.getTransactionReceipt(event.transactionHash),
-              provider.getBlock(event.blockNumber),
-              tokensContract.tokens(tokenId)
+              provider.getBlock(event.blockNumber)
             ])
 
-            console.log('Datos del token:', {
-              tokenId: tokenId.toString(),
-              attrNames,
-              token
-            })
-
-            if (!receipt || !block) {
+            if (!receipt || !blockData) {
               console.log('Receipt o block no encontrado para tx:', event.transactionHash)
               return null
             }
 
-            // Procesar los atributos obteniendo los valores uno por uno
+            // Obtener los atributos del token
+            const attrNames = await tokensContract.getNombresAtributos(tokenId)
             const attributes = await Promise.all(
               attrNames.map(async (name: string) => {
                 try {
@@ -259,20 +257,24 @@ export default function ClientTransactions({ role }: { role: string }) {
                   return {
                     nombre: name,
                     valor: attr.valor || '',
-                    timestamp: Number(attr.timestamp || block.timestamp)
+                    timestamp: Number(attr.timestamp || blockData.timestamp)
                   }
                 } catch (error) {
                   console.error('Error al obtener atributo:', name, error)
                   return {
                     nombre: name,
                     valor: '',
-                    timestamp: Number(block.timestamp)
+                    timestamp: Number(blockData.timestamp)
                   }
                 }
               })
             ).then(attrs => attrs.filter(attr => attr.nombre !== ''))
 
             console.log('Atributos procesados:', attributes)
+
+            // Buscar el atributo Nombre
+            const nombreAttr = attributes.find(attr => attr.nombre === 'Nombre')
+            console.log('Atributo nombre:', nombreAttr)
 
             const transaction: DetailedTransaction = {
               id: event.transactionHash,
@@ -281,15 +283,15 @@ export default function ClientTransactions({ role }: { role: string }) {
               blockNumber: event.blockNumber,
               gasUsed: receipt.gasUsed.toString(),
               gasPrice: receipt.gasPrice?.toString() || '0',
-              timestamp: Number(block.timestamp),
+              timestamp: Number(blockData.timestamp),
               estado,
-              product: attributes.find(attr => attr.nombre === 'Nombre')?.valor || token.nombre,
-              description: token.descripcion,
+              product: nombreAttr?.valor || token[1], // Usar el atributo Nombre si existe, sino el nombre del token
+              description: token[2],
               quantity: Number(cantidad),
-              attributes, // Asignar los atributos procesados
+              attributes, 
               rawMaterials: [],
-              fromLocation: null,  // Inicializar como null
-              toLocation: null,    // Inicializar como null
+              fromLocation: null,  
+              toLocation: null,    
               from: {
                 address: fromAddress,
                 name: fromParticipant.nombre,

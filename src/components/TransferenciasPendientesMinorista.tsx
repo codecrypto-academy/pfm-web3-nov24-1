@@ -89,6 +89,29 @@ export default function TransferenciasPendientesMinorista() {
                 const transfer = await tokensContract.transfers(id)
                 const token = await tokensContract.tokens(transfer.tokenId)
                 
+                // Obtener los atributos del token
+                const attrNames = await tokensContract.getNombresAtributos(transfer.tokenId)
+                const attributes = await Promise.all(
+                    attrNames.map(async (name: string) => {
+                        try {
+                            const attr = await tokensContract.getAtributo(transfer.tokenId, name)
+                            return {
+                                nombre: name,
+                                valor: attr.valor || ''
+                            }
+                        } catch (error) {
+                            console.error('Error al obtener atributo:', name, error)
+                            return {
+                                nombre: name,
+                                valor: ''
+                            }
+                        }
+                    })
+                ).then(attrs => attrs.filter(attr => attr.nombre !== ''))
+
+                // Buscar el atributo Nombre
+                const nombreAttr = attributes.find(attr => attr.nombre === 'Nombre')
+                
                 // Encontrar participantes para obtener GPS
                 const fromParticipant = usuarios.find(
                     (user: Participant) => user.direccion?.toLowerCase() === transfer.from.toLowerCase()
@@ -105,7 +128,7 @@ export default function TransferenciasPendientesMinorista() {
                     timestamp: Number(transfer.timestamp),
                     rutaMapaId: transfer.rutaMapaId,
                     token: {
-                        nombre: token.nombre,
+                        nombre: nombreAttr?.valor || token.nombre, 
                         descripcion: token.descripcion
                     },
                     fromGPS: fromParticipant?.gps ? fromParticipant.gps.split(',').map(Number) as [number, number] : undefined,

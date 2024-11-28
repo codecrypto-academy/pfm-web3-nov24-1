@@ -23,19 +23,20 @@ export default function DashboardLayout({ children }: LayoutProps) {
     const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
 
-    // Función para cargar las transferencias pendientes para la fábrica
+    // Función para cargar las transferencias pendientes para la fábrica y minorista
     const loadPendingTransfers = async () => {
-        if (!address || role !== 'fabrica' || isLoading) {
+        if (!address || !role || isLoading || (role !== 'fabrica' && role !== 'minorista')) {
             return
         }
 
         try {
             setIsLoading(true)
             const provider = new ethers.BrowserProvider(window.ethereum)
+            const signer = await provider.getSigner()
             const tokensContract = new ethers.Contract(
                 CONTRACTS.Tokens.address,
                 CONTRACTS.Tokens.abi,
-                provider
+                signer
             )
 
             // Obtener transferencias pendientes usando la función del contrato
@@ -53,7 +54,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
         let intervalId: NodeJS.Timeout | null = null
 
         const setupTransferMonitoring = async () => {
-            if (address && role === 'fabrica' && isMounted) {
+            if (address && (role === 'fabrica' || role === 'minorista') && isMounted) {
                 await loadPendingTransfers()
                 
                 // Actualizar cada 5 segundos
@@ -74,7 +75,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                 clearInterval(intervalId)
             }
         }
-    }, [address, role])
+    }, [address, role, isLoading])
 
     useEffect(() => {
         if (!authLoading && !isAuthenticated) {
@@ -223,7 +224,7 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                             className="flex items-center text-olive-700 hover:bg-olive-100/80 hover:text-olive-900 rounded-xl p-3.5 transition-all duration-300 ease-in-out gap-3 group relative"
                                         >
                                             <TruckIcon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110 group-hover:-translate-x-1" />
-                                            <span className="font-medium">Transferencias</span>
+                                            <span className="font-medium">Transferencias Pendientes</span>
                                             {pendingTransfers > 0 && (
                                                 <span className="ml-auto bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-semibold min-w-[24px] text-center shadow-sm">
                                                     {pendingTransfers}
@@ -275,6 +276,11 @@ export default function DashboardLayout({ children }: LayoutProps) {
                                         >
                                             <TruckIcon className="w-[22px] h-[22px] transition-transform duration-300 group-hover:scale-110 group-hover:-translate-x-1" />
                                             <span className="font-medium">Transferencias Pendientes</span>
+                                            {pendingTransfers > 0 && (
+                                                <span className="ml-auto bg-red-100 text-red-600 px-2.5 py-1 rounded-full text-xs font-semibold min-w-[24px] text-center shadow-sm">
+                                                    {pendingTransfers}
+                                                </span>
+                                            )}
                                         </Link>
                                     </li>
                                 </ul>
