@@ -1,6 +1,12 @@
 'use client';
 
-export default function QualityInfo() {
+import { ProductData } from '../types';
+
+interface QualityInfoProps {
+  data: ProductData;
+}
+
+export default function QualityInfo({ data }: QualityInfoProps) {
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold mb-6">Análisis de Calidad</h2>

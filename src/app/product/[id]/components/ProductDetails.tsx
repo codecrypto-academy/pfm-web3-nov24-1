@@ -1,6 +1,12 @@
 'use client';
 
-export default function ProductDetails() {
+import { ProductData } from '../types';
+
+interface ProductDetailsProps {
+  data: ProductData;
+}
+
+export default function ProductDetails({ data }: ProductDetailsProps) {
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold mb-6">Detalles del Producto</h2>
