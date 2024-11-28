@@ -4,7 +4,8 @@ import { useWeb3 } from '@/context/Web3Context'
 import { useState, useEffect } from 'react'
 import { ethers, EventLog } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
-import { ShoppingCartIcon, TagIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { ShoppingCartIcon, TagIcon, ClockIcon, MapIcon } from '@heroicons/react/24/outline'
+import TokenRouteModal from '@/components/shared/TokenRouteModal'
 
 interface Token {
     id: number;
@@ -21,6 +22,7 @@ export default function TokensDisponibles() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [selectedToken, setSelectedToken] = useState<Token | null>(null)
+    const [showRouteModal, setShowRouteModal] = useState(false)
 
     useEffect(() => {
         if (address) {
@@ -194,12 +196,23 @@ export default function TokensDisponibles() {
                                     )}
                                 </div>
                                 
-                                <div className="mt-6">
+                                <div className="mt-6 flex space-x-2">
                                     <button
                                         onClick={() => setSelectedToken(token)}
-                                        className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-olive-600 hover:bg-olive-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500"
+                                        className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-olive-600 hover:bg-olive-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500"
                                     >
+                                        <ShoppingCartIcon className="h-5 w-5 mr-2" />
                                         Ver Detalles
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedToken(token)
+                                            setShowRouteModal(true)
+                                        }}
+                                        className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500"
+                                    >
+                                        <MapIcon className="h-5 w-5 mr-2" />
+                                        Ver Ruta
                                     </button>
                                 </div>
                             </div>
@@ -217,6 +230,16 @@ export default function TokensDisponibles() {
                     </div>
                 )}
             </div>
+
+            {/* Modal de Ruta del Token */}
+            {selectedToken && (
+                <TokenRouteModal
+                    isOpen={showRouteModal}
+                    onClose={() => setShowRouteModal(false)}
+                    tokenId={selectedToken.id}
+                    creador={selectedToken.creador}
+                />
+            )}
         </div>
     )
 }
