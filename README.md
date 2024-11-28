@@ -155,3 +155,5 @@ Antes de modificar un smart contract, me tienes que consultar.
 Antes de crear un smart contract, me tienes que consultar.
 Al implementar alguna funcion nueva, no borres funciones ya hechas, sin antes explicarme el porque.
 Y me hablas en Español.
+
+Token ID- Transfer ID- TimeStamp

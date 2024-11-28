@@ -6,19 +6,19 @@ const testimonials = [
     content: "La trazabilidad que ofrece esta plataforma ha revolucionado nuestra forma de gestionar el aceite de oliva. Nuestros clientes valoran la transparencia.",
     author: "María González",
     role: "Productora de Aceite",
-    image: "/images/testimonial-1.jpg"
+    image: "/images/olive-pattern.png"
   },
   {
     content: "Como minorista, poder verificar el origen y la calidad del aceite de forma instantánea me da una ventaja competitiva única.",
     author: "Carlos Rodríguez",
     role: "Propietario de Tienda Gourmet",
-    image: "/images/testimonial-2.jpg"
+    image: "/images/olive-pattern.png"
   },
   {
     content: "La integración con blockchain garantiza la autenticidad de nuestros productos. Es justo lo que necesitábamos.",
     author: "Ana Martínez",
     role: "Directora de Cooperativa",
-    image: "/images/testimonial-3.jpg"
+    image: "/images/olive-pattern.png"
   }
 ]
 
@@ -49,12 +49,13 @@ export default function Testimonials() {
                 </p>
                 
                 <div className="flex items-center gap-4">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden bg-green-100">
                     <Image
                       src={testimonial.image}
                       alt={testimonial.author}
                       fill
-                      className="object-cover"
+                      sizes="48px"
+                      className="object-cover opacity-50"
                     />
                   </div>
                   <div>

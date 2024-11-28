@@ -26,9 +26,9 @@ export default function Home() {
   }, [isAuthenticated, role, router])
 
   const handleQRResult = async (result: string) => {
-    // Handle the QR code result here
-    console.log(result)
     setShowScanner(false)
+    // Redirigir a la página de producto con el ID escaneado
+    router.push(`/product/${result}`)
   }
 
   return (
@@ -69,7 +69,9 @@ export default function Home() {
             <>
               <div className="w-full max-w-lg mx-auto flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-2xl p-4 sm:p-8 shadow-lg hover:shadow-xl transition-shadow">
                 {showScanner ? (
-                  <QRScanner onResult={handleQRResult} />
+                  <div key="scanner">
+                    <QRScanner onResult={handleQRResult} />
+                  </div>
                 ) : (
                   <div
                     className="qr-button-container cursor-pointer w-full max-w-xs aspect-square flex items-center justify-center group"
