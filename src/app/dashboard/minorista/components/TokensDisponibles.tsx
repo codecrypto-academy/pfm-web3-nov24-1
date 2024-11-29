@@ -139,22 +139,42 @@ export default function TokensDisponibles() {
                 signer
             );
 
+            console.log('Iniciando venta:', {
+                tokenId,
+                cantidad,
+                address: await signer.getAddress()
+            });
+
+            // Procesar el token como venta
             const tx = await tokensContract.procesarToken(
                 [tokenId],
                 [ethers.parseUnits(cantidad, 'wei')],
-                "Token_Venta",
+                "Venta",
                 "Venta realizada por minorista",
-                ["Estado"],
-                ["VENTA"]
+                ["Estado", "Tipo"],
+                ["VENDIDO", "VENTA"],
+                { gasLimit: 1000000 }
             );
 
-            await tx.wait();
-            toast.success("Tokens quemados exitosamente", {
+            console.log('Transacción enviada:', tx.hash);
+            const receipt = await tx.wait();
+            console.log('Transacción confirmada:', {
+                hash: receipt.hash,
+                status: receipt.status,
+                events: receipt.logs
+            });
+
+            toast.success("Venta realizada exitosamente", {
                 icon: false
             });
             loadTokens(); // Recargar tokens después de quemar
-        } catch (error) {
-            console.error("Error al quemar tokens:", error);
+        } catch (error: any) {
+            console.error("Error detallado:", {
+                error,
+                data: error.data,
+                message: error.message,
+                reason: error.reason
+            });
             toast.error("Error al quemar tokens", {
                 icon: false
             });

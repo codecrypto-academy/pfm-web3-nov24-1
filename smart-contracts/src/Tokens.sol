@@ -330,6 +330,79 @@ contract Tokens {
         return (origenes, cantidades);
     }
 
+    // Función para quemar tokens (venta)
+    function quemarTokens(
+        uint256 _tokenId,
+        uint256 _cantidad
+    ) public {
+        require(_cantidad > 0, "La cantidad debe ser mayor que 0");
+        require(tokens[_tokenId].balances[msg.sender] >= _cantidad, "Saldo insuficiente");
+        
+        // Quemar los tokens
+        tokens[_tokenId].balances[msg.sender] -= _cantidad;
+        tokens[_tokenId].cantidad -= _cantidad;
+
+        // Añadir atributos de venta
+        tokens[_tokenId].atributos["Estado"] = Atributo({
+            nombre: "Estado",
+            valor: "VENDIDO",
+            timestamp: block.timestamp
+        });
+        if (!_existeAtributo(_tokenId, "Estado")) {
+            tokens[_tokenId].nombresAtributos.push("Estado");
+        }
+
+        tokens[_tokenId].atributos["Tipo"] = Atributo({
+            nombre: "Tipo",
+            valor: "VENTA",
+            timestamp: block.timestamp
+        });
+        if (!_existeAtributo(_tokenId, "Tipo")) {
+            tokens[_tokenId].nombresAtributos.push("Tipo");
+        }
+
+        // Añadir información del vendedor
+        tokens[_tokenId].atributos["Vendedor"] = Atributo({
+            nombre: "Vendedor",
+            valor: addressToString(msg.sender),
+            timestamp: block.timestamp
+        });
+        if (!_existeAtributo(_tokenId, "Vendedor")) {
+            tokens[_tokenId].nombresAtributos.push("Vendedor");
+        }
+
+        // Añadir rol del vendedor
+        string memory rolVendedor = usuarios.getRol(msg.sender);
+        tokens[_tokenId].atributos["RolVendedor"] = Atributo({
+            nombre: "RolVendedor",
+            valor: rolVendedor,
+            timestamp: block.timestamp
+        });
+        if (!_existeAtributo(_tokenId, "RolVendedor")) {
+            tokens[_tokenId].nombresAtributos.push("RolVendedor");
+        }
+
+        // Emitir evento de venta
+        emit TokenTransferido(
+            siguienteTransferId++,
+            _tokenId,
+            msg.sender,
+            address(this),
+            _cantidad
+        );
+    }
+
+    // Función auxiliar para verificar si un atributo ya existe
+    function _existeAtributo(uint256 _tokenId, string memory _nombreAtributo) internal view returns (bool) {
+        string[] memory atributos = tokens[_tokenId].nombresAtributos;
+        for (uint i = 0; i < atributos.length; i++) {
+            if (keccak256(bytes(atributos[i])) == keccak256(bytes(_nombreAtributo))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Función auxiliar para convertir uint a string
     function uint2str(uint256 _i) internal pure returns (string memory str) {
         if (_i == 0) {

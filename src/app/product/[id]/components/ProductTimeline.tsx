@@ -115,9 +115,6 @@ export default function ProductTimeline({ data }: ProductTimelineProps) {
     );
   }
 
-  // Debug: ver los roles que tenemos
-  console.log('Roles en los datos:', data.steps.map(step => step.participant.role));
-
   const steps: StepsMap = {
     'materia-prima': data.steps.filter(step => 
       step.participant.role.toLowerCase() === 'productor'
@@ -129,13 +126,6 @@ export default function ProductTimeline({ data }: ProductTimelineProps) {
       ['minorista', 'venta'].includes(step.participant.role.toLowerCase())
     )
   };
-
-  // Debug: ver cuántos pasos hay en cada categoría
-  console.log('Pasos por categoría:', {
-    'materia-prima': steps['materia-prima'].length,
-    'procesado': steps['procesado'].length,
-    'distribucion': steps['distribucion'].length
-  });
 
   const tabs: Tab[] = [
     { id: 'materia-prima', label: 'Materia Prima', icon: <FaTree className="w-5 h-5" /> },

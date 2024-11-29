@@ -51,15 +51,6 @@ async function getTokenTransfers(
 
     // Obtener información de la transferencia
     const transfer = await tokensContract.transfers(transferId);
-    console.log('Transfer details:', {
-      transferId: transferId.toString(),
-      state: transfer.estado.toString(),
-      hash: event.transactionHash,
-      from,
-      to,
-      timestamp: transfer.timestamp.toString(),
-      timestampCompletado: transfer.timestampCompletado.toString()
-    });
     
     // Usar el transferId como clave para evitar duplicados
     const key = transferId.toString();
@@ -78,6 +69,26 @@ async function getTokenTransfers(
         continue;
       }
 
+      // Obtener atributos del token para verificar si es una venta
+      const tokenAttrNames = await tokensContract.getNombresAtributos(currentTokenId);
+      let esVenta = false;
+      
+      for (const nombre of tokenAttrNames) {
+        const attr = await tokensContract.getAtributo(currentTokenId, nombre);
+        if ((nombre === "Estado" && attr[1] === "VENDIDO") ||
+            (nombre === "Tipo" && attr[1] === "VENTA")) {
+          esVenta = true;
+          break;
+        }
+      }
+
+      console.log('Verificando venta:', {
+        tokenId: currentTokenId.toString(),
+        from: fromUser?.rol,
+        atributos: tokenAttrNames,
+        esVenta
+      });
+
       const timelineStep: TimelineStep = {
         hash: event.transactionHash,
         hashCompletado: transfer.timestampCompletado > 0 ? 
@@ -87,13 +98,14 @@ async function getTokenTransfers(
           new Date(Number(transfer.timestampCompletado) * 1000).toISOString() : 
           undefined,
         participant: {
-          name: fromUser.nombre || from,
-          role: fromUser.rol || 'desconocido',
+          name: esVenta ? "Venta de Tokens" : fromUser.nombre || from,
+          role: esVenta ? "VENTA" : fromUser.rol || 'desconocido',
           address: from
         },
         details: {
           Cantidad: cantidad.toString(),
-          Estado: transfer.estado.toString() === '0' ? 'EN_TRANSITO' : 
+          Estado: esVenta ? "VENTA" : 
+                  transfer.estado.toString() === '0' ? 'EN_TRANSITO' : 
                   transfer.estado.toString() === '1' ? 'COMPLETADA' : 
                   'CANCELADA',
           coordenadas: fromUser.gps || '',
@@ -139,7 +151,6 @@ export default function ProductTrackingPage() {
         
         // Extraer el número de lote del QR
         const [batchNumber] = productId.split('-');
-        console.log('Número de Lote:', batchNumber);
         
         const tokensContract = new ethers.Contract(
           CONTRACTS.Tokens.address,

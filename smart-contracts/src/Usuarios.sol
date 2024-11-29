@@ -125,4 +125,11 @@ contract Usuarios {
             usuarioActivado.rol
         );
     }
+
+    function getRol(address _direccionUsuario) public view returns (string memory) {
+        require(_direccionUsuario != address(0), "Direccion no valida");
+        require(esUsuario[_direccionUsuario], "La direccion no existe");
+
+        return usuarios[getIndiceUsuario(_direccionUsuario)].rol;
+    }
 }
