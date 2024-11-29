@@ -24,6 +24,8 @@ contract Tokens {
         mapping(address => uint256) balances;
         mapping(string => Atributo) atributos;  // nombre del atributo => valor
         string[] nombresAtributos;              // Para poder iterar sobre los atributos
+        mapping(uint256 => uint256) tokenOrigenACantidad; // Nuevo: mapeo de token origen a cantidad
+        uint256[] tokensOrigen;                           // Nuevo: array de tokens origen
     }
 
     // Enumeración para los estados de transferencia
@@ -244,11 +246,14 @@ contract Tokens {
     function procesarToken(
         uint256[] memory _tokenIds,
         uint256[] memory _cantidades,
+        string memory _nombreProducto,      // Nuevo parámetro para el nombre
+        string memory _descripcion,         // Nuevo parámetro para la descripción
         string[] memory _nombresAtributos,
         string[] memory _valoresAtributos
     ) public returns (uint256) {
         require(_tokenIds.length == _cantidades.length, "Arrays de tokens y cantidades deben tener misma longitud");
         require(_nombresAtributos.length == _valoresAtributos.length, "Arrays de atributos deben tener misma longitud");
+        require(bytes(_nombreProducto).length > 0, "El nombre del producto no puede estar vacio");
         
         // Verificar saldos y quemar tokens
         for(uint i = 0; i < _tokenIds.length; i++) {
@@ -293,14 +298,36 @@ contract Tokens {
             cantidadTotal += _cantidades[i];
         }
 
-        // Crear el nuevo token procesado
-        return crearToken(
-            "Producto Procesado",
+        // Crear el nuevo token procesado con el nombre y descripción proporcionados
+        uint256 nuevoTokenId = crearToken(
+            _nombreProducto,
             cantidadTotal,
-            "Producto procesado de multiples tokens",
+            _descripcion,
             nombresCompletos,
             valoresCompletos
         );
+
+        // Guardar relaciones explícitas de trazabilidad
+        for(uint i = 0; i < _tokenIds.length; i++) {
+            tokens[nuevoTokenId].tokenOrigenACantidad[_tokenIds[i]] = _cantidades[i];
+            tokens[nuevoTokenId].tokensOrigen.push(_tokenIds[i]);
+        }
+
+        return nuevoTokenId;
+    }
+
+    // Nueva función para obtener los tokens origen y sus cantidades
+    function getTokensOrigen(uint256 _tokenId) public view returns (uint256[] memory, uint256[] memory) {
+        require(_tokenId < siguienteTokenId, "Token no existe");
+        
+        uint256[] memory origenes = tokens[_tokenId].tokensOrigen;
+        uint256[] memory cantidades = new uint256[](origenes.length);
+        
+        for(uint i = 0; i < origenes.length; i++) {
+            cantidades[i] = tokens[_tokenId].tokenOrigenACantidad[origenes[i]];
+        }
+        
+        return (origenes, cantidades);
     }
 
     // Función auxiliar para convertir uint a string

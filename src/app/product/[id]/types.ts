@@ -8,6 +8,7 @@ export interface TokenInfo {
 export interface TimelineStep {
   hash: string;
   timestamp: string;
+  timestampCompletado?: string;
   participant: {
     name: string;
     role: string;

@@ -445,6 +445,8 @@ export default function ProcessProduct() {
                 tx = await contract.procesarToken(
                     tokenIds,
                     cantidades,
+                    newProductName,           // Nombre del producto
+                    newProductDescription,    // Descripción del producto
                     nombresAtributos,
                     valoresAtributos
                 );

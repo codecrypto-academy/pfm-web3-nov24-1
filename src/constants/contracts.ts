@@ -443,6 +443,30 @@ export const CONTRACTS = {
   },
   {
     "type": "function",
+    "name": "getTokensOrigen",
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getTransferenciasPendientes",
     "inputs": [
       {
@@ -496,6 +520,16 @@ export const CONTRACTS = {
         "name": "_cantidades",
         "type": "uint256[]",
         "internalType": "uint256[]"
+      },
+      {
+        "name": "_nombreProducto",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "_descripcion",
+        "type": "string",
+        "internalType": "string"
       },
       {
         "name": "_nombresAtributos",
@@ -1356,6 +1390,30 @@ export const TOKENS_ABI = [
   },
   {
     "type": "function",
+    "name": "getTokensOrigen",
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getTransferenciasPendientes",
     "inputs": [
       {
@@ -1409,6 +1467,16 @@ export const TOKENS_ABI = [
         "name": "_cantidades",
         "type": "uint256[]",
         "internalType": "uint256[]"
+      },
+      {
+        "name": "_nombreProducto",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "_descripcion",
+        "type": "string",
+        "internalType": "string"
       },
       {
         "name": "_nombresAtributos",

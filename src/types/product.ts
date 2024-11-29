@@ -3,6 +3,8 @@ export interface TokenInfo {
   nombre: string;
   cantidad: number;
   atributos: Record<string, string | number>;
+  tokensOrigen?: string[];                              // Array de IDs de tokens origen
+  tokenOrigenACantidad?: Record<string, number>;        // Mapping de token ID a cantidad
 }
 
 export interface Destinatario {
@@ -13,8 +15,10 @@ export interface Destinatario {
 }
 
 export interface TimelineStep {
-  hash: string;
+  hash: string;  // Hash de la transacción de envío
+  hashCompletado?: string;  // Hash de la transacción de completado/cancelado
   timestamp: string;
+  timestampCompletado?: string;
   participant: {
     name: string;
     role: string;
@@ -25,6 +29,7 @@ export interface TimelineStep {
     Estado: string;
     coordenadas: string;
     destinatario?: Destinatario;
+    rutaMapaId?: string;
   };
   tokenInfo?: TokenInfo;
   materiaPrima?: TokenInfo[];

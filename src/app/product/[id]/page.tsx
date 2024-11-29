@@ -10,9 +10,13 @@ import QualityInfo from './components/QualityInfo';
 import LocationMap from './components/LocationMap';
 import { TokenInfo, TimelineStep, ProductData, User } from '@/types/product';
 
-async function getTokenTransfers(tokenId: string, tokensContract: ethers.Contract, usuariosContract: ethers.Contract, provider: ethers.Provider) {
-  const steps: TimelineStep[] = [];
-  const processedTransfers = new Set<string>();
+async function getTokenTransfers(
+  tokenId: string, 
+  tokensContract: ethers.Contract, 
+  usuariosContract: ethers.Contract, 
+  provider: ethers.Provider
+): Promise<TimelineStep[]> {
+  const transferMap = new Map<string, TimelineStep>();
 
   // Obtener eventos de transferencia
   const latestBlock = await provider.getBlockNumber();
@@ -37,56 +41,85 @@ async function getTokenTransfers(tokenId: string, tokensContract: ethers.Contrac
     
     const args = event.args || {};
     const currentTokenId = args.tokenId;
-    const from = args.from;
-    const to = args.to;
+    const from = args.from as string;
+    const to = args.to as string;
     const cantidad = args.cantidad;
+    const transferId = args.transferId;
 
     if (!currentTokenId || currentTokenId.toString() !== tokenId) continue;
-    
-    // Evitar duplicados
-    const transferKey = `${event.transactionHash}-${currentTokenId}`;
-    if (processedTransfers.has(transferKey)) continue;
-    processedTransfers.add(transferKey);
 
-    // Obtener información de los usuarios
-    const usuarios = await usuariosContract.getUsuarios();
-    const fromUser = usuarios.find((user: User) => user.direccion.toLowerCase() === from.toLowerCase());
-    const toUser = usuarios.find((user: User) => user.direccion.toLowerCase() === to.toLowerCase());
-    
-    if (!fromUser || !toUser) {
-      console.error('Usuario no encontrado:', !fromUser ? from : to);
-      continue;
-    }
-
-    steps.push({
+    // Obtener información de la transferencia
+    const transfer = await tokensContract.transfers(transferId);
+    console.log('Transfer details:', {
+      transferId: transferId.toString(),
+      state: transfer.estado.toString(),
       hash: event.transactionHash,
-      timestamp: new Date(Number(token[5]) * 1000).toISOString(),
-      participant: {
-        name: fromUser.nombre,
-        role: fromUser.rol,
-        address: from
-      },
-      details: {
-        Cantidad: cantidad.toString(),
-        Estado: "Completado",
-        coordenadas: fromUser.gps,
-        destinatario: {
-          name: toUser.nombre,
-          role: toUser.rol,
-          address: to,
-          coordenadas: toUser.gps
-        }
-      },
-      tokenInfo: {
-        id: currentTokenId.toString(),
-        nombre: token[1],
-        cantidad: Number(cantidad),
-        atributos: { ...atributos }
-      }
+      from,
+      to,
+      timestamp: transfer.timestamp.toString(),
+      timestampCompletado: transfer.timestampCompletado.toString()
     });
+    
+    // Usar el transferId como clave para evitar duplicados
+    const key = transferId.toString();
+    if (!transferMap.has(key)) {
+      // Obtener información de los usuarios
+      const usuarios = await usuariosContract.getUsuarios();
+      const fromUser = usuarios.find((user: User) => 
+        user.direccion.toLowerCase() === from.toLowerCase()
+      );
+      const toUser = usuarios.find((user: User) => 
+        user.direccion.toLowerCase() === to.toLowerCase()
+      );
+
+      if (!fromUser || !toUser) {
+        console.error('Usuario no encontrado:', !fromUser ? from : to);
+        continue;
+      }
+
+      const timelineStep: TimelineStep = {
+        hash: event.transactionHash,
+        hashCompletado: transfer.timestampCompletado > 0 ? 
+          undefined : undefined,
+        timestamp: new Date(Number(transfer.timestamp) * 1000).toISOString(),
+        timestampCompletado: transfer.timestampCompletado > 0 ? 
+          new Date(Number(transfer.timestampCompletado) * 1000).toISOString() : 
+          undefined,
+        participant: {
+          name: fromUser.nombre || from,
+          role: fromUser.rol || 'desconocido',
+          address: from
+        },
+        details: {
+          Cantidad: cantidad.toString(),
+          Estado: transfer.estado.toString() === '0' ? 'EN_TRANSITO' : 
+                  transfer.estado.toString() === '1' ? 'COMPLETADA' : 
+                  'CANCELADA',
+          coordenadas: fromUser.gps || '',
+          destinatario: {
+            name: toUser.nombre || to,
+            role: toUser.rol || 'desconocido',
+            address: to,
+            coordenadas: toUser.gps || ''
+          },
+          rutaMapaId: transfer.rutaMapaId || undefined
+        },
+        tokenInfo: {
+          id: tokenId,
+          nombre: token.nombre,
+          cantidad: Number(token.cantidad),
+          atributos
+        }
+      };
+
+      transferMap.set(key, timelineStep);
+    }
   }
 
-  return steps;
+  // Convertir el mapa a un array y ordenar por timestamp
+  return Array.from(transferMap.values()).sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
 }
 
 export default function ProductTrackingPage() {
@@ -159,19 +192,20 @@ export default function ProductTrackingPage() {
 
                 // Obtener transferencias de la materia prima
                 const mpSteps = await getTokenTransfers(mpTokenId, tokensContract, usuariosContract, provider);
-                
-                // Agregar información adicional a cada paso de la materia prima
-                const enhancedMpSteps = mpSteps.map(step => ({
-                  ...step,
-                  tokenInfo: {
-                    id: mpTokenId,
-                    nombre: mpToken.nombre,
-                    cantidad: Number(cantidad),
-                    atributos: mpAtributos
-                  }
-                }));
-                
-                materiasPrimasPromises.push(Promise.resolve(enhancedMpSteps));
+                if (mpSteps) {  
+                  // Agregar información adicional a cada paso de la materia prima
+                  const enhancedMpSteps = mpSteps.map(step => ({
+                    ...step,
+                    tokenInfo: {
+                      id: mpTokenId,
+                      nombre: mpToken.nombre,
+                      cantidad: Number(cantidad),
+                      atributos: mpAtributos
+                    }
+                  }));
+                  
+                  materiasPrimasPromises.push(Promise.resolve(enhancedMpSteps));
+                }
               }
             }
           }
@@ -179,15 +213,17 @@ export default function ProductTrackingPage() {
           // Esperar a que se resuelvan todas las promesas de materias primas
           const materiasPrimasSteps = await Promise.all(materiasPrimasPromises);
           
-          // Agregar los pasos de las materias primas al historial
-          allSteps = [...allSteps, ...materiasPrimasSteps.flat()];
+          // Agregar los pasos de las materias primas al historial si allSteps existe
+          if (allSteps) {
+            allSteps = [...allSteps, ...materiasPrimasSteps.flat()];
+
+            // Ordenar todos los pasos por timestamp
+            allSteps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          }
         }
 
-        // Ordenar todos los pasos por timestamp
-        allSteps.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
         setProductData({
-          steps: allSteps,
+          steps: allSteps || [],  
           batchId: batchNumber
         });
         setLoading(false);
