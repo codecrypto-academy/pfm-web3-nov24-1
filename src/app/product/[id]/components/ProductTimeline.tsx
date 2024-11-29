@@ -1,103 +1,50 @@
 'use client';
 
-import { FaTree, FaIndustry, FaStore } from 'react-icons/fa';
+import { TokenInfo, TimelineStep, ProductData } from '@/types/product';
+import { FaTree, FaIndustry, FaStore, FaArrowRight, FaBoxOpen } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-
-interface TokenInfo {
-  id: string;
-  nombre: string;
-  cantidad: number;
-  atributos: { [key: string]: any };
-}
-
-interface TimelineStep {
-  hash: string;
-  timestamp: string;
-  participant: {
-    name: string;
-    role: string;
-    address: string;
-  };
-  details: {
-    [key: string]: string | number;
-  };
-  tokenInfo?: TokenInfo;
-  materiaPrima?: TokenInfo[];
-}
-
-interface ProductData {
-  steps: TimelineStep[];
-  batchId: string;
-}
+import { formatAttributeName } from '@/utils/attributeLabels';
 
 interface ProductTimelineProps {
   data: ProductData;
 }
 
+const tokensToKg = (tokens: number) => {
+  return (tokens / 1000).toFixed(3);
+};
+
 const getRoleIcon = (role: string) => {
   switch (role.toLowerCase()) {
     case 'productor':
-      return <FaTree className="w-6 h-6 text-green-600" />;
+      return <FaTree className="w-8 h-8 text-green-600" />;
     case 'procesador':
-      return <FaIndustry className="w-6 h-6 text-blue-600" />;
+      return <FaIndustry className="w-8 h-8 text-blue-600" />;
     case 'distribuidor':
-      return <FaStore className="w-6 h-6 text-purple-600" />;
+      return <FaStore className="w-8 h-8 text-purple-600" />;
     default:
-      return null;
+      return <FaBoxOpen className="w-8 h-8 text-gray-600" />;
   }
 };
 
-const renderAttributes = (atributos: { [key: string]: any }) => {
-  if (!atributos || Object.keys(atributos).length === 0) return null;
-
+const renderMateriaPrima = (mp: TokenInfo) => {
   return (
-    <div className="mt-2">
-      <h4 className="font-semibold text-gray-700">Atributos:</h4>
-      <div className="grid grid-cols-2 gap-2">
-        {Object.entries(atributos).map(([key, value]) => (
-          <div key={key} className="text-sm">
-            <span className="font-medium">{key.replace(/_/g, ' ')}: </span>
-            <span className="text-gray-600">{value.toString()}</span>
-          </div>
-        ))}
+    <div key={mp.id} className="bg-white p-4 rounded-lg shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="font-semibold text-lg">{mp.nombre}</h4>
+          <p className="text-sm text-gray-600">ID: {mp.id}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-medium">{mp.cantidad} tokens</p>
+          <p className="text-sm text-gray-500">({tokensToKg(mp.cantidad)} KG)</p>
+        </div>
       </div>
-    </div>
-  );
-};
-
-const renderTokenInfo = (tokenInfo: TokenInfo) => {
-  if (!tokenInfo) return null;
-
-  return (
-    <div className="bg-white p-4 rounded-lg shadow-sm mt-4">
-      <h4 className="font-semibold text-lg text-gray-800">Información del Producto</h4>
-      <div className="mt-2 space-y-2">
-        <p><span className="font-medium">ID: </span>{tokenInfo.id}</p>
-        <p><span className="font-medium">Nombre: </span>{tokenInfo.nombre}</p>
-        <p><span className="font-medium">Cantidad: </span>{tokenInfo.cantidad}</p>
-        {renderAttributes(tokenInfo.atributos)}
-      </div>
-    </div>
-  );
-};
-
-const renderRawMaterials = (materiaPrima: TokenInfo[]) => {
-  if (!materiaPrima || materiaPrima.length === 0) return null;
-
-  return (
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm mt-4">
-      <h4 className="font-semibold text-lg text-gray-800">Materias Primas Utilizadas</h4>
-      <div className="space-y-4 mt-2">
-        {materiaPrima.map((mp, index) => (
-          <div key={index} className="border-l-4 border-blue-400 pl-4">
-            <p><span className="font-medium">ID: </span>{mp.id}</p>
-            <p><span className="font-medium">Nombre: </span>{mp.nombre}</p>
-            <p><span className="font-medium">Cantidad: </span>{mp.cantidad}</p>
-            {renderAttributes(mp.atributos)}
-          </div>
-        ))}
-      </div>
+      {mp.atributos && Object.entries(mp.atributos).map(([key, value]) => (
+        <p key={key} className="text-sm text-gray-600 mt-1">
+          {formatAttributeName(key)}: {value ? String(value) : 'Sin información'}
+        </p>
+      ))}
     </div>
   );
 };
@@ -111,40 +58,73 @@ export default function ProductTimeline({ data }: ProductTimelineProps) {
     );
   }
 
+  // Encontrar el paso de procesamiento (si existe)
+  const procesamientoStep = data.steps.find(step => 
+    step.tokenInfo?.atributos?.['Tipo_Producto'] === 'Procesado'
+  );
+
   return (
-    <div className="relative container mx-auto">
-      <div className="border-l-2 border-gray-200 ml-6">
-        {data.steps.map((step, index) => (
-          <div key={step.hash} className="mb-8 ml-6">
-            <div className="flex items-center mb-2">
-              <div className="absolute -left-3 bg-white p-2 rounded-full border-2 border-gray-200">
-                {getRoleIcon(step.participant.role)}
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-500">
-                  {format(new Date(step.timestamp), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
-                </p>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {step.participant.name}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {step.participant.role}
-                </p>
-                <p className="text-xs text-gray-500 font-mono">
-                  {step.participant.address}
+    <div className="space-y-8">
+      {/* Línea de tiempo del ciclo de vida */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-xl font-bold mb-6">Ciclo de Vida del Producto</h3>
+        <div className="flex justify-between items-center">
+          {data.steps.map((step, index) => (
+            <div key={step.hash} className="flex items-center">
+              <div className="text-center">
+                <div className="mb-2">{getRoleIcon(step.participant.role)}</div>
+                <p className="font-medium">{step.participant.name}</p>
+                <p className="text-sm text-gray-600">{step.participant.role}</p>
+                <p className="text-xs text-gray-500">
+                  {format(new Date(step.timestamp), "d MMM yyyy", { locale: es })}
                 </p>
               </div>
+              {index < data.steps.length - 1 && (
+                <FaArrowRight className="mx-4 text-gray-400" />
+              )}
             </div>
-
-            {step.tokenInfo && renderTokenInfo(step.tokenInfo)}
-            {step.materiaPrima && renderRawMaterials(step.materiaPrima)}
-
-            <div className="mt-4 text-sm text-gray-500">
-              <p className="font-mono">Hash de transacción: {step.hash}</p>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* Panel de Materias Primas (solo para productos procesados) */}
+      {procesamientoStep?.materiaPrima && procesamientoStep.materiaPrima.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-xl font-bold mb-4">Materias Primas Utilizadas</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {procesamientoStep.materiaPrima.map(mp => renderMateriaPrima(mp))}
+          </div>
+        </div>
+      )}
+
+      {/* Información del Procesamiento */}
+      {procesamientoStep && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-xl font-bold mb-4">Detalles del Procesamiento</h3>
+          <div className="space-y-2">
+            <p>
+              <span className="font-medium">Procesador: </span>
+              {procesamientoStep.participant.name}
+            </p>
+            <p>
+              <span className="font-medium">Fecha: </span>
+              {format(new Date(procesamientoStep.timestamp), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+            </p>
+            {procesamientoStep.tokenInfo?.atributos && (
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                {Object.entries(procesamientoStep.tokenInfo.atributos)
+                  .filter(([key]) => !key.startsWith('Token_Origen_'))
+                  .map(([key, value]) => (
+                    <p key={key} className="text-sm">
+                      <span className="font-medium">{formatAttributeName(key)}: </span>
+                      {value ? String(value) : 'Sin información'}
+                    </p>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

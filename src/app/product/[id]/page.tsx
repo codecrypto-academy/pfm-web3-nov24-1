@@ -8,6 +8,7 @@ import ProductTraceabilityTree from './components/ProductTraceabilityTree';
 import ProductDetails from './components/ProductDetails';
 import QualityInfo from './components/QualityInfo';
 import LocationMap from './components/LocationMap';
+import ProductTimeline from './components/ProductTimeline';
 import { TokenInfo, TimelineStep, ProductData, User } from '@/types/product';
 
 async function getTokenTransfers(
@@ -238,36 +239,28 @@ export default function ProductTrackingPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Información del Producto</h1>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-900"></div>
-        </div>
-      ) : productData ? (
-        <div className="space-y-8">
-          {/* Primera fila: Detalles del producto y mapa */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ProductDetails data={productData} />
+      <div className="space-y-8">
+        {loading ? (
+          <div className="text-center py-8">
+            <p>Cargando información del producto...</p>
+          </div>
+        ) : !productData ? (
+          <div className="text-center py-8">
+            <p>No se encontró información para este producto.</p>
+          </div>
+        ) : (
+          <>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <ProductDetails data={productData} />
+              <QualityInfo data={productData} />
+            </div>
             <LocationMap steps={productData.steps} />
-          </div>
-
-          {/* Segunda fila: Información de calidad */}
-          <div className="mt-6">
-            <QualityInfo data={productData} />
-          </div>
-
-          {/* Tercera fila: Árbol de trazabilidad */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-2xl font-semibold mb-4">Trazabilidad del Producto</h2>
+            <ProductTimeline data={productData} />
             <ProductTraceabilityTree data={productData} />
-          </div>
-        </div>
-      ) : (
-        <div className="text-center text-gray-600">
-          No se encontró información del producto
-        </div>
-      )}
+           
+          </>
+        )}
+      </div>
     </div>
   );
 }

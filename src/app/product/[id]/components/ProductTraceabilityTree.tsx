@@ -2,6 +2,7 @@
 
 import { FaChevronRight, FaCheckCircle, FaTimesCircle, FaClock, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { TokenInfo, TimelineStep, ProductData } from '@/types/product';
+import { formatAttributeName } from '@/utils/attributeLabels';
 import { useState, useMemo } from 'react';
 
 interface ProductTraceabilityTreeProps {
@@ -93,6 +94,11 @@ export const ProductTraceabilityTree: React.FC<ProductTraceabilityTreeProps> = (
     }
   };
 
+  // Función para convertir tokens a KG
+  const tokensToKg = (tokens: number) => {
+    return (tokens / 1000).toFixed(3);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
       <div>
@@ -135,6 +141,9 @@ export const ProductTraceabilityTree: React.FC<ProductTraceabilityTreeProps> = (
                         <div className="mt-2">
                           <h3 className="text-lg font-medium flex items-center">
                             <span className="text-gray-900">{step.participant.name}</span>
+                            {step.tokenInfo && (
+                              <span className="mx-2 text-gray-600">({step.tokenInfo.nombre})</span>
+                            )}
                             <span className="mx-2 text-gray-400">→</span>
                             <span className="text-gray-900">{step.details.destinatario?.name}</span>
                           </h3>
@@ -146,7 +155,12 @@ export const ProductTraceabilityTree: React.FC<ProductTraceabilityTreeProps> = (
                           <div className="flex items-center space-x-4">
                             <div>
                               <p className="text-sm font-medium text-gray-500">Cantidad</p>
-                              <p className="text-lg font-semibold">{step.details.Cantidad}</p>
+                              <p className="text-lg font-semibold">
+                                {step.details.Cantidad} tokens
+                                <span className="text-sm text-gray-500 ml-2">
+                                  ({tokensToKg(step.details.Cantidad)} KG)
+                                </span>
+                              </p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-500">Enviado</p>
@@ -161,109 +175,138 @@ export const ProductTraceabilityTree: React.FC<ProductTraceabilityTreeProps> = (
                     {expandedTransfer === step.hash && (
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <div className="space-y-4">
-                          {/* Información del Envío */}
-                          <div className="bg-blue-50 p-3 rounded-lg">
-                            <h4 className="font-medium text-blue-900 mb-2">Detalles del Envío</h4>
-                            <div className="grid grid-cols-2 gap-4">
+                          {/* Detalles del Envío */}
+                          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                            <h4 className="text-lg font-semibold text-gray-900 mb-3">Detalles del Envío</h4>
+                            <div className="space-y-3">
                               <div>
-                                <p className="text-sm font-medium text-blue-800">Remitente</p>
-                                <p className="text-sm text-blue-900">{step.participant.name}</p>
-                                <p className="text-xs text-blue-700">{step.participant.role}</p>
-                                {step.participant.address && (
-                                  <p className="text-xs text-blue-600 mt-1 font-mono">
-                                    {`${step.participant.address.substring(0, 6)}...${step.participant.address.substring(38)}`}
-                                  </p>
-                                )}
+                                <p className="text-sm font-medium text-gray-700">Remitente</p>
+                                <p className="text-sm text-gray-900">{step.participant.name}</p>
+                                <p className="text-xs text-gray-600">{step.participant.role}</p>
+                              </div>
+                              {step.tokenInfo && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700">Producto</p>
+                                  <p className="text-sm text-gray-900">{step.tokenInfo.nombre}</p>
+                                  <p className="text-xs text-gray-600">ID: {step.tokenInfo.id}</p>
+                                  {step.tokenInfo.atributos && Object.entries(step.tokenInfo.atributos).map(([key, value]) => (
+                                    <p key={key} className="text-xs text-gray-600">
+                                      {formatAttributeName(key)}: {value ? String(value) : 'Sin información'}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-sm font-medium text-gray-700">Cantidad</p>
+                                <p className="text-sm text-gray-900">
+                                  {step.details.Cantidad} tokens
+                                  <span className="text-xs text-gray-500 ml-2">
+                                    ({tokensToKg(step.details.Cantidad)} KG)
+                                  </span>
+                                </p>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-blue-800">Fecha de Envío</p>
-                                <p className="text-sm text-blue-900">{new Date(step.timestamp).toLocaleString()}</p>
+                                <p className="text-sm font-medium text-gray-700">Dirección Wallet</p>
+                                <a
+                                  href={`https://sepolia.etherscan.io/address/${step.participant.address}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 font-mono"
+                                >
+                                  {step.participant.address.substring(0, 6)}...{step.participant.address.substring(38)}
+                                </a>
                               </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-700">Fecha y Hora de Envío</p>
+                                <p className="text-sm text-gray-900">{new Date(step.timestamp).toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-700">Hash de Transacción</p>
+                                <a
+                                  href={`https://sepolia.etherscan.io/tx/${step.hash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 font-mono"
+                                >
+                                  0x{step.hash.substring(2, 6)}...{step.hash.substring(62)}
+                                </a>
+                              </div>
+                              {step.details.coordenadas && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700">Ubicación de Origen</p>
+                                  <p className="text-sm text-gray-900">{step.details.coordenadas}</p>
+                                </div>
+                              )}
                             </div>
                           </div>
 
-                          {/* Información de Recepción */}
-                          {step.timestampCompletado && (
-                            <div className={`p-3 rounded-lg ${
-                              step.details.Estado === 'COMPLETADA' ? 'bg-green-50' : 'bg-red-50'
+                          {/* Detalles de Recepción */}
+                          {(step.details.destinatario || step.hashCompletado) && (
+                            <div className={`p-4 rounded-lg ${
+                              step.details.Estado === 'COMPLETADA' ? 'bg-green-50' : 
+                              step.details.Estado === 'CANCELADA' ? 'bg-red-50' : 'bg-yellow-50'
                             }`}>
-                              <h4 className={`font-medium mb-2 ${
-                                step.details.Estado === 'COMPLETADA' ? 'text-green-900' : 'text-red-900'
-                              }`}>
-                                {step.details.Estado === 'COMPLETADA' ? 'Detalles de Recepción' : 'Detalles de Cancelación'}
-                              </h4>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <p className={`text-sm font-medium ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-800' : 'text-red-800'
-                                  }`}>
-                                    {step.details.Estado === 'COMPLETADA' ? 'Receptor' : 'Cancelado por'}
-                                  </p>
-                                  <p className={`text-sm ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-900' : 'text-red-900'
-                                  }`}>
-                                    {step.details.destinatario?.name}
-                                  </p>
-                                  <p className={`text-xs ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-700' : 'text-red-700'
-                                  }`}>
-                                    {step.details.destinatario?.role}
-                                  </p>
-                                  {step.details.destinatario?.address && (
-                                    <p className={`text-xs mt-1 font-mono ${
-                                      step.details.Estado === 'COMPLETADA' ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                      {`${step.details.destinatario.address.substring(0, 6)}...${step.details.destinatario.address.substring(38)}`}
-                                    </p>
-                                  )}
-                                </div>
-                                <div>
-                                  <p className={`text-sm font-medium ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-800' : 'text-red-800'
-                                  }`}>
-                                    Fecha de {step.details.Estado === 'COMPLETADA' ? 'Recepción' : 'Cancelación'}
-                                  </p>
-                                  <p className={`text-sm ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-900' : 'text-red-900'
-                                  }`}>
-                                    {new Date(step.timestampCompletado).toLocaleString()}
-                                  </p>
-                                  <p className={`text-sm mt-2 font-medium ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-800' : 'text-red-800'
-                                  }`}>
-                                    Duración
-                                  </p>
-                                  <p className={`text-sm ${
-                                    step.details.Estado === 'COMPLETADA' ? 'text-green-900' : 'text-red-900'
-                                  }`}>
-                                    {formatDuration(step.timestamp, step.timestampCompletado)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Detalles Adicionales */}
-                          {(step.details.rutaMapaId || step.details.coordenadas || step.details.destinatario?.coordenadas) && (
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                              <h4 className="font-medium text-gray-900 mb-2">Información Adicional</h4>
-                              <div className="space-y-2">
-                                {step.details.rutaMapaId && (
+                              <h4 className="text-lg font-semibold text-gray-900 mb-3">Detalles de Recepción</h4>
+                              <div className="space-y-3">
+                                {step.tokenInfo && (
                                   <div>
-                                    <p className="text-sm font-medium text-gray-700">ID de Ruta</p>
-                                    <p className="text-sm text-gray-900">{step.details.rutaMapaId}</p>
+                                    <p className="text-sm font-medium text-gray-700">Producto</p>
+                                    <p className="text-sm text-gray-900">{step.tokenInfo.nombre}</p>
+                                    <p className="text-xs text-gray-600">ID: {step.tokenInfo.id}</p>
+                                    {step.tokenInfo.atributos && Object.entries(step.tokenInfo.atributos).map(([key, value]) => (
+                                      <p key={key} className="text-xs text-gray-600">
+                                        {formatAttributeName(key)}: {value ? String(value) : 'Sin información'}
+                                      </p>
+                                    ))}
                                   </div>
                                 )}
-                                {step.details.coordenadas && (
+                                {step.details.destinatario && (
                                   <div>
-                                    <p className="text-sm font-medium text-gray-700">Coordenadas de Origen</p>
-                                    <p className="text-sm text-gray-900">{step.details.coordenadas}</p>
+                                    <p className="text-sm font-medium text-gray-700">Destinatario</p>
+                                    <p className="text-sm text-gray-900">{step.details.destinatario.name}</p>
+                                    <p className="text-xs text-gray-600">{step.details.destinatario.role}</p>
                                   </div>
                                 )}
-                                {step.details.destinatario?.coordenadas && (
+                                {step.details.destinatario && (
                                   <div>
-                                    <p className="text-sm font-medium text-gray-700">Coordenadas de Destino</p>
+                                    <p className="text-sm font-medium text-gray-700">Dirección Wallet</p>
+                                    <a
+                                      href={`https://sepolia.etherscan.io/address/${step.details.destinatario.address}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-blue-600 hover:text-blue-800 font-mono"
+                                    >
+                                      {step.details.destinatario.address.substring(0, 6)}...{step.details.destinatario.address.substring(38)}
+                                    </a>
+                                  </div>
+                                )}
+                                {step.details.destinatario && step.details.destinatario.coordenadas && (
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700">Ubicación de Destino</p>
                                     <p className="text-sm text-gray-900">{step.details.destinatario.coordenadas}</p>
+                                  </div>
+                                )}
+                                {step.timestampCompletado && (
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700">
+                                      Fecha y Hora de {step.details.Estado === 'COMPLETADA' ? 'Recepción' : 'Cancelación'}
+                                    </p>
+                                    <p className="text-sm text-gray-900">{new Date(step.timestampCompletado).toLocaleString()}</p>
+                                  </div>
+                                )}
+                                {step.hashCompletado && (
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700">
+                                      Hash de {step.details.Estado === 'COMPLETADA' ? 'Confirmación' : 'Cancelación'}
+                                    </p>
+                                    <a
+                                      href={`https://sepolia.etherscan.io/tx/${step.hashCompletado}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-blue-600 hover:text-blue-800 font-mono"
+                                    >
+                                      0x{step.hashCompletado.substring(2, 6)}...{step.hashCompletado.substring(62)}
+                                    </a>
                                   </div>
                                 )}
                               </div>
