@@ -53,10 +53,7 @@ export default function MinoristaDashboard() {
                     <h2 className="text-xl font-semibold mb-4">Tokens Disponibles</h2>
                     <TokensDisponibles />
                 </section>
-                <section>
-                    <h2 className="text-xl font-semibold mb-4">Transferencias Pendientes</h2>
-                    <ClientTransactions role="minorista" />
-                </section>
+                
             </div>
         </div>
     )

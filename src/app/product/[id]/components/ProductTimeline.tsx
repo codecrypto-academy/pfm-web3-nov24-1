@@ -1,10 +1,25 @@
 'use client';
 
 import { TokenInfo, TimelineStep, ProductData } from '@/types/product';
-import { FaTree, FaIndustry, FaStore, FaArrowRight, FaBoxOpen } from 'react-icons/fa';
+import { FaTree, FaIndustry, FaStore, FaArrowRight, FaBoxOpen, FaMoneyBillWave } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatAttributeName } from '@/utils/attributeLabels';
+import { useState } from 'react';
+
+type TabId = 'materia-prima' | 'procesado' | 'distribucion';
+
+interface StepsMap {
+  'materia-prima': TimelineStep[];
+  'procesado': TimelineStep[];
+  'distribucion': TimelineStep[];
+}
+
+interface Tab {
+  id: TabId;
+  label: string;
+  icon: JSX.Element;
+}
 
 interface ProductTimelineProps {
   data: ProductData;
@@ -17,39 +32,81 @@ const tokensToKg = (tokens: number) => {
 const getRoleIcon = (role: string) => {
   switch (role.toLowerCase()) {
     case 'productor':
-      return <FaTree className="w-8 h-8 text-green-600" />;
-    case 'procesador':
-      return <FaIndustry className="w-8 h-8 text-blue-600" />;
-    case 'distribuidor':
-      return <FaStore className="w-8 h-8 text-purple-600" />;
+      return <FaTree className="w-6 h-6 text-green-600" />;
+    case 'fabrica':
+      return <FaIndustry className="w-6 h-6 text-blue-600" />;
+    case 'minorista':
+      return <FaStore className="w-6 h-6 text-purple-600" />;
+    case 'venta':
+      return <FaMoneyBillWave className="w-6 h-6 text-yellow-600" />;
     default:
-      return <FaBoxOpen className="w-8 h-8 text-gray-600" />;
+      return <FaBoxOpen className="w-6 h-6 text-gray-600" />;
   }
 };
 
-const renderMateriaPrima = (mp: TokenInfo) => {
+const StepContent = ({ step }: { step: TimelineStep }) => {
   return (
-    <div key={mp.id} className="bg-white p-4 rounded-lg shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <h4 className="font-semibold text-lg">{mp.nombre}</h4>
-          <p className="text-sm text-gray-600">ID: {mp.id}</p>
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      <div className="flex items-center gap-4 mb-4">
+        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gray-50 border-2 border-gray-200">
+          {getRoleIcon(step.participant.role)}
         </div>
-        <div className="text-right">
-          <p className="font-medium">{mp.cantidad} tokens</p>
-          <p className="text-sm text-gray-500">({tokensToKg(mp.cantidad)} KG)</p>
+        <div>
+          <h3 className="text-lg font-bold">
+            {step.participant.role === 'VENTA' ? 'Venta de Tokens' : step.participant.name}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {step.participant.role === 'VENTA' ? 'Tokens Quemados' : step.participant.role}
+          </p>
         </div>
       </div>
-      {mp.atributos && Object.entries(mp.atributos).map(([key, value]) => (
-        <p key={key} className="text-sm text-gray-600 mt-1">
-          {formatAttributeName(key)}: {value ? String(value) : 'Sin información'}
-        </p>
-      ))}
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-gray-600">
+            {format(new Date(step.timestamp), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+          </p>
+          {step.tokenInfo && (
+            <p className="text-sm font-medium">
+              {step.participant.role === 'VENTA' ? 'Vendido: ' : 'Cantidad: '}
+              {tokensToKg(step.tokenInfo.cantidad)} KG
+            </p>
+          )}
+        </div>
+
+        {step.tokenInfo?.atributos && (
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+            {Object.entries(step.tokenInfo.atributos)
+              .filter(([key]) => !key.startsWith('Token_Origen_'))
+              .map(([key, value]) => (
+                <p key={key} className="text-sm">
+                  <span className="font-medium">{formatAttributeName(key)}: </span>
+                  {value ? String(value) : 'Sin información'}
+                </p>
+              ))}
+          </div>
+        )}
+
+        {step.details.Estado && (
+          <div className="pt-4 border-t border-gray-200">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+              step.details.Estado === 'COMPLETADA' ? 'bg-green-100 text-green-800' :
+              step.details.Estado === 'EN_TRANSITO' ? 'bg-yellow-100 text-yellow-800' :
+              step.details.Estado === 'VENTA' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {step.details.Estado === 'VENTA' ? 'VENDIDO' : `Estado: ${step.details.Estado}`}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 export default function ProductTimeline({ data }: ProductTimelineProps) {
+  const [activeTab, setActiveTab] = useState<TabId>('materia-prima');
+  
   if (!data || !data.steps || data.steps.length === 0) {
     return (
       <div className="text-center py-8">
@@ -58,73 +115,88 @@ export default function ProductTimeline({ data }: ProductTimelineProps) {
     );
   }
 
-  // Encontrar el paso de procesamiento (si existe)
-  const procesamientoStep = data.steps.find(step => 
-    step.tokenInfo?.atributos?.['Tipo_Producto'] === 'Procesado'
-  );
+  // Debug: ver los roles que tenemos
+  console.log('Roles en los datos:', data.steps.map(step => step.participant.role));
+
+  const steps: StepsMap = {
+    'materia-prima': data.steps.filter(step => 
+      step.participant.role.toLowerCase() === 'productor'
+    ),
+    'procesado': data.steps.filter(step => 
+      step.participant.role.toLowerCase() === 'fabrica'
+    ),
+    'distribucion': data.steps.filter(step => 
+      ['minorista', 'venta'].includes(step.participant.role.toLowerCase())
+    )
+  };
+
+  // Debug: ver cuántos pasos hay en cada categoría
+  console.log('Pasos por categoría:', {
+    'materia-prima': steps['materia-prima'].length,
+    'procesado': steps['procesado'].length,
+    'distribucion': steps['distribucion'].length
+  });
+
+  const tabs: Tab[] = [
+    { id: 'materia-prima', label: 'Materia Prima', icon: <FaTree className="w-5 h-5" /> },
+    { id: 'procesado', label: 'Fábrica', icon: <FaIndustry className="w-5 h-5" /> },
+    { id: 'distribucion', label: 'Minorista', icon: <FaStore className="w-5 h-5" /> }
+  ];
 
   return (
-    <div className="space-y-8">
-      {/* Línea de tiempo del ciclo de vida */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-xl font-bold mb-6">Ciclo de Vida del Producto</h3>
-        <div className="flex justify-between items-center">
-          {data.steps.map((step, index) => (
-            <div key={step.hash} className="flex items-center">
-              <div className="text-center">
-                <div className="mb-2">{getRoleIcon(step.participant.role)}</div>
-                <p className="font-medium">{step.participant.name}</p>
-                <p className="text-sm text-gray-600">{step.participant.role}</p>
-                <p className="text-xs text-gray-500">
-                  {format(new Date(step.timestamp), "d MMM yyyy", { locale: es })}
-                </p>
-              </div>
-              {index < data.steps.length - 1 && (
-                <FaArrowRight className="mx-4 text-gray-400" />
+    <div className="bg-white rounded-lg shadow-lg">
+      <div className="border-b border-gray-200">
+        <div className="flex">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 ${
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {steps[tab.id].length > 0 && (
+                <span className="ml-2 bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                  {steps[tab.id].length}
+                </span>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Panel de Materias Primas (solo para productos procesados) */}
-      {procesamientoStep?.materiaPrima && procesamientoStep.materiaPrima.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">Materias Primas Utilizadas</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {procesamientoStep.materiaPrima.map(mp => renderMateriaPrima(mp))}
+      <div className="p-6">
+        {steps[activeTab].length > 0 ? (
+          <div className="space-y-6">
+            {steps[activeTab].map((step) => (
+              <StepContent key={step.hash} step={step} />
+            ))}
           </div>
-        </div>
-      )}
-
-      {/* Información del Procesamiento */}
-      {procesamientoStep && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">Detalles del Procesamiento</h3>
-          <div className="space-y-2">
-            <p>
-              <span className="font-medium">Procesador: </span>
-              {procesamientoStep.participant.name}
-            </p>
-            <p>
-              <span className="font-medium">Fecha: </span>
-              {format(new Date(procesamientoStep.timestamp), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
-            </p>
-            {procesamientoStep.tokenInfo?.atributos && (
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                {Object.entries(procesamientoStep.tokenInfo.atributos)
-                  .filter(([key]) => !key.startsWith('Token_Origen_'))
-                  .map(([key, value]) => (
-                    <p key={key} className="text-sm">
-                      <span className="font-medium">{formatAttributeName(key)}: </span>
-                      {value ? String(value) : 'Sin información'}
-                    </p>
-                  ))}
-              </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            {activeTab === 'distribucion' ? (
+              <>
+                <p className="text-lg font-medium mb-2">No hay información de distribución</p>
+                <p className="text-sm">Este producto aún no ha llegado a la etapa de distribución</p>
+              </>
+            ) : activeTab === 'procesado' ? (
+              <>
+                <p className="text-lg font-medium mb-2">No hay información de fábrica</p>
+                <p className="text-sm">Este producto aún no ha sido procesado en fábrica</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium mb-2">No hay información de materia prima</p>
+                <p className="text-sm">No se encontró información sobre el origen de este producto</p>
+              </>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

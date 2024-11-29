@@ -89,8 +89,11 @@ export default function LocationMap({ steps }: LocationMapProps) {
   const center: LatLngExpression = [positions[0].lat, positions[0].lng];
 
   return (
-    <div className="w-full h-[400px] rounded-lg overflow-hidden border border-gray-200">
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+    <div className="w-full h-[400px] rounded-lg overflow-hidden ">
+      <h2 className="text-2xl font-bold mb-6">Ruta del Producto</h2>
       <Map center={center} positions={positions} />
+    </div>
     </div>
   );
 }

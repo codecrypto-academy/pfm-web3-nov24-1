@@ -1,11 +1,13 @@
 'use client'
 
-import { useWeb3 } from '@/context/Web3Context'
 import { useState, useEffect } from 'react'
 import { ethers, EventLog } from 'ethers'
 import { CONTRACTS } from '@/constants/contracts'
 import { ShoppingCartIcon, TagIcon, ClockIcon, MapIcon } from '@heroicons/react/24/outline'
 import TokenRouteModal from '@/components/shared/TokenRouteModal'
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { useWeb3 } from '@/context/Web3Context';
 
 interface Token {
     id: number;
@@ -23,6 +25,8 @@ export default function TokensDisponibles() {
     const [error, setError] = useState<string | null>(null)
     const [selectedToken, setSelectedToken] = useState<Token | null>(null)
     const [showRouteModal, setShowRouteModal] = useState(false)
+    const [showSellModal, setShowSellModal] = useState(false)
+    const [sellAmount, setSellAmount] = useState('')
 
     useEffect(() => {
         if (address) {
@@ -125,6 +129,97 @@ export default function TokensDisponibles() {
         }
     }
 
+    const burnTokens = async (tokenId: number, cantidad: string) => {
+        try {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const tokensContract = new ethers.Contract(
+                CONTRACTS.Tokens.address,
+                CONTRACTS.Tokens.abi,
+                signer
+            );
+
+            const tx = await tokensContract.procesarToken(
+                [tokenId],
+                [ethers.parseUnits(cantidad, 'wei')],
+                "Token_Venta",
+                "Venta realizada por minorista",
+                ["Estado"],
+                ["VENTA"]
+            );
+
+            await tx.wait();
+            toast.success("Tokens quemados exitosamente", {
+                icon: false
+            });
+            loadTokens(); // Recargar tokens después de quemar
+        } catch (error) {
+            console.error("Error al quemar tokens:", error);
+            toast.error("Error al quemar tokens", {
+                icon: false
+            });
+        }
+    };
+
+    const handleSell = async () => {
+        if (!selectedToken || !sellAmount) {
+            toast.error("Por favor, ingrese una cantidad", {
+                icon: false
+            });
+            return;
+        }
+        
+        try {
+            const amountInKg = parseFloat(sellAmount);
+            if (isNaN(amountInKg) || amountInKg <= 0) {
+                toast.error("Por favor, ingrese una cantidad válida mayor a 0", {
+                    icon: false
+                });
+                return;
+            }
+            
+            // Convertir kg a tokens (1 kg = 1000 tokens)
+            const tokensToSell = Math.floor(amountInKg * 1000);
+            const disponibleKg = parseInt(selectedToken.cantidad) / 1000;
+            
+            if (amountInKg > disponibleKg) {
+                toast.error(`La cantidad máxima disponible es ${disponibleKg.toFixed(3)} kg`, {
+                    icon: false
+                });
+                return;
+            }
+            
+            // Mostrar mensaje de confirmación
+            const confirmar = window.confirm(
+                `¿Está seguro que desea vender ${amountInKg.toFixed(3)} kg de ${selectedToken.nombre}?`
+            );
+            
+            if (!confirmar) return;
+            
+            // Mostrar loading
+            toast.info("Procesando venta...", {
+                icon: false,
+                position: "bottom-right",
+                autoClose: false,
+                hideProgressBar: true
+            });
+            
+            await burnTokens(selectedToken.id, tokensToSell.toString());
+            setShowSellModal(false);
+            setSellAmount('');
+            
+            // Mostrar éxito con la cantidad vendida
+            toast.success(`Se vendieron ${amountInKg.toFixed(3)} kg de ${selectedToken.nombre} exitosamente`, {
+                icon: false
+            });
+        } catch (error) {
+            console.error("Error en la venta:", error);
+            toast.error("Error al procesar la venta. Por favor intente nuevamente", {
+                icon: false
+            });
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 p-8">
@@ -179,19 +274,19 @@ export default function TokensDisponibles() {
                             <div className="p-6">
                                 <div className="flex justify-between items-start mb-4">
                                     <h3 className="text-lg font-semibold text-gray-900">{token.nombre}</h3>
-                                    <TagIcon className="h-6 w-6 text-olive-600" />
+                                    <TagIcon className="h-5 w-5 text-olive-600" />
                                 </div>
                                 
                                 <p className="text-gray-600 mb-4 line-clamp-2">{token.descripcion}</p>
                                 
                                 <div className="space-y-2">
                                     <div className="flex items-center text-sm text-gray-500">
-                                        <ClockIcon className="h-5 w-5 mr-2" />
-                                        <span>Stock: {Number(token.cantidad) / 1000} kg</span>
+                                        <ClockIcon className="h-4 w-4 mr-2" />
+                                        <span>Stock: {(Number(token.cantidad) / 1000).toFixed(3)} kg</span>
                                     </div>
                                     {token.balance !== "0" && (
                                         <div className="text-sm text-amber-600">
-                                            {Number(token.balance) / 1000} kg en tránsito
+                                            {(Number(token.balance) / 1000).toFixed(3)} kg en tránsito
                                         </div>
                                     )}
                                 </div>
@@ -201,7 +296,7 @@ export default function TokensDisponibles() {
                                         onClick={() => setSelectedToken(token)}
                                         className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-olive-600 hover:bg-olive-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500"
                                     >
-                                        <ShoppingCartIcon className="h-5 w-5 mr-2" />
+                                        <ShoppingCartIcon className="h-4 w-4 mr-2" />
                                         Ver Detalles
                                     </button>
                                     <button
@@ -211,8 +306,17 @@ export default function TokensDisponibles() {
                                         }}
                                         className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-olive-500"
                                     >
-                                        <MapIcon className="h-5 w-5 mr-2" />
+                                        <MapIcon className="h-4 w-4 mr-2" />
                                         Ver Ruta
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedToken(token)
+                                            setShowSellModal(true)
+                                        }}
+                                        className="inline-flex items-center justify-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    >
+                                        Vender
                                     </button>
                                 </div>
                             </div>
@@ -222,7 +326,7 @@ export default function TokensDisponibles() {
 
                 {tokens.length === 0 && (
                     <div className="text-center py-12">
-                        <ShoppingCartIcon className="mx-auto h-12 w-12 text-gray-400" />
+                        <ShoppingCartIcon className="mx-auto h-8 w-8 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No hay productos disponibles</h3>
                         <p className="mt-1 text-sm text-gray-500">
                             Los productos aparecerán aquí cuando estén disponibles.
@@ -230,6 +334,58 @@ export default function TokensDisponibles() {
                     </div>
                 )}
             </div>
+
+            {/* Modal de Venta */}
+            {showSellModal && selectedToken && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                        <h2 className="text-lg font-semibold mb-4">Vender {selectedToken.nombre}</h2>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Cantidad disponible: {(Number(selectedToken.cantidad) / 1000).toFixed(3)} kg
+                            </label>
+                            <input
+                                type="number"
+                                min="0.001"
+                                max={(Number(selectedToken.cantidad) / 1000)}
+                                step="0.001"
+                                value={sellAmount}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    // Permitir números positivos y decimales
+                                    if (value === '' || parseFloat(value) >= 0) {
+                                        setSellAmount(value);
+                                    }
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-olive-500"
+                                placeholder="Ingrese la cantidad en kilogramos"
+                            />
+                            <p className="mt-1 text-sm text-gray-500">
+                                {sellAmount && !isNaN(parseFloat(sellAmount)) 
+                                    ? `Se quemarán ${Math.floor(parseFloat(sellAmount) * 1000)} tokens` 
+                                    : 'Ingrese la cantidad en kilogramos'}
+                            </p>
+                        </div>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowSellModal(false);
+                                    setSellAmount('');
+                                }}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSell}
+                                className="px-4 py-2 text-sm font-medium text-white bg-olive-600 hover:bg-olive-700 rounded-md"
+                            >
+                                Confirmar Venta
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal de Ruta del Token */}
             {selectedToken && (
@@ -240,6 +396,19 @@ export default function TokensDisponibles() {
                     creador={selectedToken.creador}
                 />
             )}
+            <ToastContainer
+                position="bottom-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+                limit={3}
+            />
         </div>
     )
 }
