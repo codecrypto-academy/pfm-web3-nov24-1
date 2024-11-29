@@ -27,6 +27,7 @@ export interface TimelineStep {
   details: {
     Cantidad: string;
     Estado: string;
+    Tipo?: string;
     coordenadas: string;
     destinatario?: Destinatario;
     rutaMapaId?: string;

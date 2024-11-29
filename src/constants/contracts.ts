@@ -119,6 +119,25 @@ export const CONTRACTS = {
   },
   {
     "type": "function",
+    "name": "getRol",
+    "inputs": [
+      {
+        "name": "_direccionUsuario",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getUsuarios",
     "inputs": [],
     "outputs": [
@@ -549,6 +568,24 @@ export const CONTRACTS = {
         "internalType": "uint256"
       }
     ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "quemarTokens",
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_cantidad",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -1069,6 +1106,25 @@ export const USUARIOS_ABI = [
   },
   {
     "type": "function",
+    "name": "getRol",
+    "inputs": [
+      {
+        "name": "_direccionUsuario",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getUsuarios",
     "inputs": [],
     "outputs": [
@@ -1496,6 +1552,24 @@ export const TOKENS_ABI = [
         "internalType": "uint256"
       }
     ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "quemarTokens",
+    "inputs": [
+      {
+        "name": "_tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_cantidad",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {

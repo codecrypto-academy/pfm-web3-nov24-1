@@ -92,10 +92,10 @@ const StepContent = ({ step }: { step: TimelineStep }) => {
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
               step.details.Estado === 'COMPLETADA' ? 'bg-green-100 text-green-800' :
               step.details.Estado === 'EN_TRANSITO' ? 'bg-yellow-100 text-yellow-800' :
-              step.details.Estado === 'VENTA' ? 'bg-yellow-100 text-yellow-800' :
+              step.details.Estado === 'VENDIDO' || step.details.Tipo === 'VENTA' ? 'bg-blue-100 text-blue-800' :
               'bg-red-100 text-red-800'
             }`}>
-              {step.details.Estado === 'VENTA' ? 'VENDIDO' : `Estado: ${step.details.Estado}`}
+              {step.details.Estado === 'VENDIDO' || step.details.Tipo === 'VENTA' ? 'VENDIDO' : `Estado: ${step.details.Estado}`}
             </span>
           </div>
         )}
@@ -123,7 +123,9 @@ export default function ProductTimeline({ data }: ProductTimelineProps) {
       step.participant.role.toLowerCase() === 'fabrica'
     ),
     'distribucion': data.steps.filter(step => 
-      ['minorista', 'venta'].includes(step.participant.role.toLowerCase())
+      ['minorista', 'venta'].includes(step.participant.role.toLowerCase()) ||
+      step.details.Estado === 'VENDIDO' ||
+      (step.details.Tipo && step.details.Tipo === 'VENTA')
     )
   };
 

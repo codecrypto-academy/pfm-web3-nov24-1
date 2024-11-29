@@ -145,14 +145,10 @@ export default function TokensDisponibles() {
                 address: await signer.getAddress()
             });
 
-            // Procesar el token como venta
-            const tx = await tokensContract.procesarToken(
-                [tokenId],
-                [ethers.parseUnits(cantidad, 'wei')],
-                "Venta",
-                "Venta realizada por minorista",
-                ["Estado", "Tipo"],
-                ["VENDIDO", "VENTA"],
+            // Quemar los tokens usando la función específica del contrato
+            const tx = await tokensContract.quemarTokens(
+                tokenId,
+                ethers.parseUnits(cantidad, 'wei'),
                 { gasLimit: 1000000 }
             );
 
