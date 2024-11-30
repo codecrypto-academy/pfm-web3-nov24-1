@@ -117,13 +117,13 @@ export default function ProductTimeline({ data }: ProductTimelineProps) {
 
   const steps: StepsMap = {
     'materia-prima': data.steps.filter(step => 
-      step.participant.role.toLowerCase() === 'productor'
+      step.participant.role.toUpperCase() === 'PRODUCTOR'
     ),
     'procesado': data.steps.filter(step => 
-      step.participant.role.toLowerCase() === 'fabrica'
+      step.participant.role.toUpperCase() === 'FABRICA'
     ),
     'distribucion': data.steps.filter(step => 
-      ['minorista', 'venta'].includes(step.participant.role.toLowerCase()) ||
+      ['MINORISTA', 'VENTA'].includes(step.participant.role.toUpperCase()) ||
       step.details.Estado === 'VENDIDO' ||
       (step.details.Tipo && step.details.Tipo === 'VENTA')
     )

@@ -59,15 +59,23 @@ async function getTokenTransfers(
       const usuarios = await usuariosContract.getUsuarios();
       const fromUser = usuarios.find((user: User) => 
         user.direccion.toLowerCase() === from.toLowerCase()
-      );
+      ) || {
+        direccion: from,
+        nombre: 'Fábrica',
+        rol: 'FABRICA',
+        gps: '40.4168,-3.7038',
+        activo: true
+      };
+      
       const toUser = usuarios.find((user: User) => 
         user.direccion.toLowerCase() === to.toLowerCase()
-      );
-
-      if (!fromUser || !toUser) {
-        console.error('Usuario no encontrado:', !fromUser ? from : to);
-        continue;
-      }
+      ) || {
+        direccion: to,
+        nombre: 'Usuario',
+        rol: 'MINORISTA',
+        gps: '40.4168,-3.7038',
+        activo: true
+      };
 
       // Obtener atributos del token para verificar si es una venta
       const tokenAttrNames = await tokensContract.getNombresAtributos(currentTokenId);
