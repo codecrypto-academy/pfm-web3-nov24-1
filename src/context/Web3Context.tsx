@@ -338,7 +338,6 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
                 window.location.reload()
             }
             
-            window.ethereum.setMaxListeners(20)
             window.ethereum.on('accountsChanged', handleAccountsChanged)
             window.ethereum.on('chainChanged', handleChainChanged)
             window.ethereum.on('disconnect', disconnect)
