@@ -8,7 +8,6 @@ import ProductTraceabilityTree from './components/ProductTraceabilityTree';
 import ProductDetails from './components/ProductDetails';
 import QualityInfo from './components/QualityInfo';
 import LocationMap from './components/LocationMap';
-import ProductTimeline from './components/ProductTimeline';
 import { TokenInfo, TimelineStep, ProductData, User } from '@/types/product';
 
 async function getTokenTransfers(
@@ -51,6 +50,15 @@ async function getTokenTransfers(
 
     // Obtener información de la transferencia
     const transfer = await tokensContract.transfers(transferId);
+    console.log('Transfer details:', {
+      transferId: transferId.toString(),
+      state: transfer.estado.toString(),
+      hash: event.transactionHash,
+      from,
+      to,
+      timestamp: transfer.timestamp.toString(),
+      timestampCompletado: transfer.timestampCompletado.toString()
+    });
     
     // Usar el transferId como clave para evitar duplicados
     const key = transferId.toString();
@@ -59,43 +67,15 @@ async function getTokenTransfers(
       const usuarios = await usuariosContract.getUsuarios();
       const fromUser = usuarios.find((user: User) => 
         user.direccion.toLowerCase() === from.toLowerCase()
-      ) || {
-        direccion: from,
-        nombre: 'Fábrica',
-        rol: 'FABRICA',
-        gps: '40.4168,-3.7038',
-        activo: true
-      };
-      
+      );
       const toUser = usuarios.find((user: User) => 
         user.direccion.toLowerCase() === to.toLowerCase()
-      ) || {
-        direccion: to,
-        nombre: 'Usuario',
-        rol: 'MINORISTA',
-        gps: '40.4168,-3.7038',
-        activo: true
-      };
+      );
 
-      // Obtener atributos del token para verificar si es una venta
-      const tokenAttrNames = await tokensContract.getNombresAtributos(currentTokenId);
-      let esVenta = false;
-      
-      for (const nombre of tokenAttrNames) {
-        const attr = await tokensContract.getAtributo(currentTokenId, nombre);
-        if ((nombre === "Estado" && attr[1] === "VENDIDO") ||
-            (nombre === "Tipo" && attr[1] === "VENTA")) {
-          esVenta = true;
-          break;
-        }
+      if (!fromUser || !toUser) {
+        console.error('Usuario no encontrado:', !fromUser ? from : to);
+        continue;
       }
-
-      console.log('Verificando venta:', {
-        tokenId: currentTokenId.toString(),
-        from: fromUser?.rol,
-        atributos: tokenAttrNames,
-        esVenta
-      });
 
       const timelineStep: TimelineStep = {
         hash: event.transactionHash,
@@ -106,14 +86,13 @@ async function getTokenTransfers(
           new Date(Number(transfer.timestampCompletado) * 1000).toISOString() : 
           undefined,
         participant: {
-          name: esVenta ? "Venta de Tokens" : fromUser.nombre || from,
-          role: esVenta ? "VENTA" : fromUser.rol || 'desconocido',
+          name: fromUser.nombre || from,
+          role: fromUser.rol || 'desconocido',
           address: from
         },
         details: {
           Cantidad: cantidad.toString(),
-          Estado: esVenta ? "VENTA" : 
-                  transfer.estado.toString() === '0' ? 'EN_TRANSITO' : 
+          Estado: transfer.estado.toString() === '0' ? 'EN_TRANSITO' : 
                   transfer.estado.toString() === '1' ? 'COMPLETADA' : 
                   'CANCELADA',
           coordenadas: fromUser.gps || '',
@@ -159,6 +138,7 @@ export default function ProductTrackingPage() {
         
         // Extraer el número de lote del QR
         const [batchNumber] = productId.split('-');
+        console.log('Número de Lote:', batchNumber);
         
         const tokensContract = new ethers.Contract(
           CONTRACTS.Tokens.address,
@@ -258,28 +238,36 @@ export default function ProductTrackingPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="space-y-8">
-        {loading ? (
-          <div className="text-center py-8">
-            <p>Cargando información del producto...</p>
-          </div>
-        ) : !productData ? (
-          <div className="text-center py-8">
-            <p>No se encontró información para este producto.</p>
-          </div>
-        ) : (
-          <>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <ProductDetails data={productData} />
-              <QualityInfo data={productData} />
-            </div>
+      <h1 className="text-3xl font-bold mb-6">Información del Producto</h1>
+      
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      ) : productData ? (
+        <div className="space-y-8">
+          {/* Primera fila: Detalles del producto y mapa */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ProductDetails data={productData} />
             <LocationMap steps={productData.steps} />
-            <ProductTimeline data={productData} />
+          </div>
+
+          {/* Segunda fila: Información de calidad */}
+          <div className="mt-6">
+            <QualityInfo data={productData} />
+          </div>
+
+          {/* Tercera fila: Árbol de trazabilidad */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-semibold mb-4">Trazabilidad del Producto</h2>
             <ProductTraceabilityTree data={productData} />
-           
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center text-gray-600">
+          No se encontró información del producto
+        </div>
+      )}
     </div>
   );
 }
