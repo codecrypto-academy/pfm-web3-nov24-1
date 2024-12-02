@@ -1,50 +1,59 @@
+// Tipos base
+export interface Usuario {
+  direccion: string;
+  nombre: string;
+  gps: string;
+  rol: string;
+  activo: boolean;
+}
+
+export interface CondicionesTransporte {
+  temperaturaMinima: number;
+  temperaturaMaxima: number;
+  tipoRefrigeracion: string;
+}
+
+export type EstadoTransferencia = 'EN_TRANSITO' | 'COMPLETADA' | 'CANCELADA' | 'VENDIDO';
+export type TipoOperacion = 'PRODUCCION' | 'PROCESAMIENTO' | 'DISTRIBUCION' | 'VENTA';
+
+// Tipo para la información del token
 export interface TokenInfo {
   id: string;
   nombre: string;
   cantidad: number;
   atributos: Record<string, string | number>;
-  tokensOrigen?: string[];                              // Array de IDs de tokens origen
-  tokenOrigenACantidad?: Record<string, number>;        // Mapping de token ID a cantidad
+  tokensOrigen?: string[];
+  tokenOrigenACantidad?: Record<string, number>;
 }
 
-export interface Destinatario {
-  name: string;
-  role: string;
-  address: string;
-  coordenadas: string;
-}
-
+// Tipos para la vista de timeline
 export interface TimelineStep {
-  hash: string;  // Hash de la transacción de envío
-  hashCompletado?: string;  // Hash de la transacción de completado/cancelado
+  hash: string;
   timestamp: string;
   timestampCompletado?: string;
   participant: {
     name: string;
     role: string;
     address: string;
+    coordenadas?: string;
   };
   details: {
     Cantidad: string;
-    Estado: string;
-    Tipo?: string;
+    Estado: EstadoTransferencia;
     coordenadas: string;
-    destinatario?: Destinatario;
     rutaMapaId?: string;
+    destinatario?: {
+      name: string;
+      role: string;
+      address: string;
+      coordenadas: string;
+    };
+    Tipo?: string;
   };
   tokenInfo?: TokenInfo;
-  materiaPrima?: TokenInfo[];
 }
 
 export interface ProductData {
   steps: TimelineStep[];
   batchId: string;
-}
-
-export interface User {
-  direccion: string;
-  nombre: string;
-  rol: string;
-  gps: string;
-  activo: boolean;
 }

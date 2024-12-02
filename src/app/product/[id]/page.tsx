@@ -8,7 +8,16 @@ import ProductTraceabilityTree from './components/ProductTraceabilityTree';
 import ProductDetails from './components/ProductDetails';
 import QualityInfo from './components/QualityInfo';
 import LocationMap from './components/LocationMap';
-import { TokenInfo, TimelineStep, ProductData, User } from '@/types/product';
+import { TokenInfo, TimelineStep, ProductData, EstadoTransferencia } from '@/types/product';
+import ProductTimeline from './components/ProductTimeline';
+
+interface User {
+  direccion: string;
+  nombre: string;
+  rol: string;
+  gps: string;
+  activo: boolean;
+}
 
 async function getTokenTransfers(
   tokenId: string, 
@@ -50,6 +59,8 @@ async function getTokenTransfers(
 
     // Obtener información de la transferencia
     const transfer = await tokensContract.transfers(transferId);
+    const block = await provider.getBlock(event.blockNumber);
+    
     console.log('Transfer details:', {
       transferId: transferId.toString(),
       state: transfer.estado.toString(),
@@ -57,7 +68,8 @@ async function getTokenTransfers(
       from,
       to,
       timestamp: transfer.timestamp.toString(),
-      timestampCompletado: transfer.timestampCompletado.toString()
+      timestampCompletado: transfer.timestampCompletado.toString(),
+      blockTimestamp: block?.timestamp
     });
     
     // Usar el transferId como clave para evitar duplicados
@@ -68,9 +80,23 @@ async function getTokenTransfers(
       const fromUser = usuarios.find((user: User) => 
         user.direccion.toLowerCase() === from.toLowerCase()
       );
-      const toUser = usuarios.find((user: User) => 
-        user.direccion.toLowerCase() === to.toLowerCase()
-      );
+      
+      // Si el destinatario es la dirección del contrato de Tokens, crear un usuario virtual
+      let toUser: User | undefined;
+      const tokensContractAddress = await tokensContract.getAddress();
+      if (to.toLowerCase() === tokensContractAddress.toLowerCase()) {
+        toUser = {
+          direccion: to,
+          nombre: 'Venta de Tokens',
+          rol: 'VENTA',
+          gps: '',
+          activo: true
+        };
+      } else {
+        toUser = usuarios.find((user: User) => 
+          user.direccion.toLowerCase() === to.toLowerCase()
+        );
+      }
 
       if (!fromUser || !toUser) {
         console.error('Usuario no encontrado:', !fromUser ? from : to);
@@ -79,9 +105,9 @@ async function getTokenTransfers(
 
       const timelineStep: TimelineStep = {
         hash: event.transactionHash,
-        hashCompletado: transfer.timestampCompletado > 0 ? 
-          undefined : undefined,
-        timestamp: new Date(Number(transfer.timestamp) * 1000).toISOString(),
+        timestamp: toUser.rol === 'VENTA' ? 
+          new Date(Number(block?.timestamp || 0) * 1000).toISOString() :
+          new Date(Number(transfer.timestamp) * 1000).toISOString(),
         timestampCompletado: transfer.timestampCompletado > 0 ? 
           new Date(Number(transfer.timestampCompletado) * 1000).toISOString() : 
           undefined,
@@ -92,9 +118,17 @@ async function getTokenTransfers(
         },
         details: {
           Cantidad: cantidad.toString(),
-          Estado: transfer.estado.toString() === '0' ? 'EN_TRANSITO' : 
-                  transfer.estado.toString() === '1' ? 'COMPLETADA' : 
-                  'CANCELADA',
+          Estado: toUser.rol === 'VENTA' ? 'VENDIDO' as EstadoTransferencia : (() => {
+            switch(transfer.estado.toString()) {
+              case '0': return 'EN_TRANSITO' as EstadoTransferencia;
+              case '1': return 'COMPLETADA' as EstadoTransferencia;
+              case '2': return 'CANCELADA' as EstadoTransferencia;
+              default: 
+                return (atributos['Estado'] === 'VENDIDO' 
+                  ? 'VENDIDO' 
+                  : 'DESCONOCIDO') as EstadoTransferencia;
+            }
+          })(),
           coordenadas: fromUser.gps || '',
           destinatario: {
             name: toUser.nombre || to,
@@ -255,6 +289,10 @@ export default function ProductTrackingPage() {
           {/* Segunda fila: Información de calidad */}
           <div className="mt-6">
             <QualityInfo data={productData} />
+          </div>
+
+          <div className="mt-6">
+            <ProductTimeline data={productData} />
           </div>
 
           {/* Tercera fila: Árbol de trazabilidad */}

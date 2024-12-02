@@ -88,6 +88,8 @@ export const ProductTraceabilityTree: React.FC<ProductTraceabilityTreeProps> = (
         return <FaTimesCircle className="h-5 w-5 text-red-500" />;
       case 'EN_TRANSITO':
         return <FaClock className="h-5 w-5 text-yellow-500" />;
+      case 'VENDIDO':
+        return <FaCheckCircle className="h-5 w-5 text-blue-500" />;
       default:
         return null;
     }

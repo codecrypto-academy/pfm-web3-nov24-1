@@ -14,7 +14,9 @@ export interface RawMaterial {
 export enum EstadoTransferencia {
   EN_TRANSITO,
   COMPLETADA,
-  CANCELADA
+  CANCELADA,
+  VENDIDO,
+  DESCONOCIDO
 }
 
 export interface DetailedTransaction {

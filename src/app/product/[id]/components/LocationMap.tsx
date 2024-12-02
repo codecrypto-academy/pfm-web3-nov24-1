@@ -34,17 +34,32 @@ export default function LocationMap({ steps }: LocationMapProps) {
     const allPositions: Position[] = [];
 
     steps.forEach(step => {
-      if (!step.details.coordenadas || !step.details.destinatario) return;
+      // Si es una venta o no hay coordenadas, omitir
+      if (step.participant.role === 'VENTA' || !step.details.coordenadas) return;
+      
+      // Si no hay destinatario o es una venta, omitir
+      if (!step.details.destinatario || 
+          (step.details.destinatario as any).role === 'VENTA') return;
 
-      // Añadir posición del origen
-      const [fromLat, fromLng] = step.details.coordenadas.split(',').map(Number);
+      // Validar que las coordenadas sean números válidos
+      const fromCoords = step.details.coordenadas.split(',').map(Number);
       const destinatario = step.details.destinatario as {
         name: string;
         role: string;
         address: string;
         coordenadas: string;
       };
-      const [toLat, toLng] = destinatario.coordenadas.split(',').map(Number);
+
+      // Si no hay coordenadas del destinatario o son inválidas, omitir
+      if (!destinatario.coordenadas) return;
+      const toCoords = destinatario.coordenadas.split(',').map(Number);
+
+      // Validar que todas las coordenadas sean números válidos
+      if (fromCoords.length !== 2 || toCoords.length !== 2 ||
+          fromCoords.some(isNaN) || toCoords.some(isNaN)) return;
+
+      const [fromLat, fromLng] = fromCoords;
+      const [toLat, toLng] = toCoords;
 
       // Añadir posición del origen
       allPositions.push({
