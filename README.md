@@ -1,3 +1,11 @@
+## VERCEL
+La parte front del proyecto se ha desplegado en Vercel con el siguiente enlace:
+https://trazabilidad-aceite-pfm.vercel.app/
+
+**Repositorio copia para despliegues**
+Enlace al repositorio de despliegues de Vercel:
+https://github.com/JoakiDev/trazabilidad-aceite-pfm
+
 ## Extension para drawio
 
 code --install-extension hediet.vscode-drawio
