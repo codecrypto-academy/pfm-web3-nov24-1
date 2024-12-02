@@ -182,6 +182,18 @@ export const ProductTraceabilityTree: React.FC<ProductTraceabilityTreeProps> = (
                                 <p className="text-sm text-blue-900">{new Date(step.timestamp).toLocaleString()}</p>
                               </div>
                             </div>
+                            {/* Hash de Blockchain */}
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <p className="text-sm font-medium text-blue-800 mb-1">Hash de Blockchain</p>
+                              <a 
+                                href={`https://sepolia.etherscan.io/tx/${step.hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:text-blue-800 transition-colors font-mono break-all"
+                              >
+                                {step.hash}
+                              </a>
+                            </div>
                           </div>
 
                           {/* Información de Recepción */}

@@ -74,6 +74,21 @@ const StepContent = ({ step }: { step: TimelineStep }) => {
           )}
         </div>
 
+        {/* Hash de blockchain */}
+        <div className="pt-2 pb-2">
+          <p className="text-xs text-gray-500 font-mono break-all">
+            <span className="font-medium text-gray-600">TX Hash: </span>
+            <a 
+              href={`https://sepolia.etherscan.io/tx/${step.hash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-blue-600 transition-colors"
+            >
+              {step.hash}
+            </a>
+          </p>
+        </div>
+
         {step.tokenInfo?.atributos && (
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
             {Object.entries(step.tokenInfo.atributos)

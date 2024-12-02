@@ -15,6 +15,10 @@ export const attributeLabels: { [key: string]: string } = {
     'Esreceta': 'Es Receta',
     'temperatura': 'Temperatura',
     'color': 'Color',
+    'RolVendedor': 'Vendedor',
+    'Token_Origen_1': 'Token Origen 1',
+    'Token_Origen_2': 'Token Origen 2',
+    'Ingrediente_Aceituna': 'Aceituna',
     // Añadir más mapeos según sea necesario
 };
 
