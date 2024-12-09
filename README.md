@@ -175,7 +175,7 @@ Imagenes:
   Steps for every participant:
   <img width="1148" alt="image" src="https://github.com/user-attachments/assets/288b084c-6192-4172-8387-622b71ee6435">
 
-  Transfers from the raw matirial, up to the store:
+  Transfers from the raw material, up to the store:
   <img width="1144" alt="image" src="https://github.com/user-attachments/assets/bb98fe60-fb39-4f99-b728-4c14021ba0cd">
 
   Example of one of the participants dashboard:
