@@ -163,3 +163,18 @@ El sistema utiliza dos contratos principales desplegados en la red Sepolia:
 ## Despliegue
 La aplicación está desplegada en Vercel y accesible en:
 https://trazabilidad-aceite-pfm.vercel.app/
+
+Imagenes:
+
+  Product information:
+  <img width="1148" alt="image" src="https://github.com/user-attachments/assets/ed70ca47-a964-4fe4-9fc7-3fde65bbe9e8">
+
+  Quality check (to be implemented)
+  <img width="1148" alt="image" src="https://github.com/user-attachments/assets/6aef9532-6039-4866-8a1b-a54bfab77dbc">
+
+  Steps for every participant:
+  <img width="1148" alt="image" src="https://github.com/user-attachments/assets/288b084c-6192-4172-8387-622b71ee6435">
+
+  Transfers from the raw matirial, up to the store:
+  <img width="1144" alt="image" src="https://github.com/user-attachments/assets/bb98fe60-fb39-4f99-b728-4c14021ba0cd">
+
