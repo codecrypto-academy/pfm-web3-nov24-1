@@ -178,3 +178,7 @@ Imagenes:
   Transfers from the raw matirial, up to the store:
   <img width="1144" alt="image" src="https://github.com/user-attachments/assets/bb98fe60-fb39-4f99-b728-4c14021ba0cd">
 
+  Example of one of the participants dashboard:
+  <img width="1259" alt="image" src="https://github.com/user-attachments/assets/f366dc99-b7cc-4f1e-b3ae-7bced358d6aa">
+
+
